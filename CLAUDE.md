@@ -57,11 +57,40 @@ These friendly UI controls map to AceStep parameters:
 | Polished / Raw | `num_inference_steps` | |
 | Seed | `seed` | Advanced panel only |
 
+### Model Selection (Advanced Panel)
+
+| UI Label | AceStep Param | Values |
+|---|---|---|
+| Generation model | `ACESTEP_CONFIG_PATH` | `acestep-v15-turbo` (default), `acestep-v15-sft`, `acestep-v15-base` |
+| Planning intelligence | `ACESTEP_LM_MODEL_PATH` | None, `acestep-5Hz-lm-0.6B`, `acestep-5Hz-lm-1.7B` (default), `acestep-5Hz-lm-4B` |
+| Batch size | `batch_size` | 1–4 normally; locked to 1 when sft/base + 4B LM |
+
+`Qwen3-Embedding-0.6B` is an internal text encoder — always required, never exposed in the UI.
+
+### Batch Size & VRAM Constraint
+
+`batch_size` is always visible in the advanced panel. Its maximum is determined by two factors: the model combination and the user-selected VRAM tier.
+
+**VRAM tier selector** (advanced panel, user sets once):
+- ≤16GB (default — conservative)
+- 24GB
+- 32GB+
+
+**Batch size maximums by tier:**
+
+| VRAM Tier | sft/base + 4B LM | All other combos |
+|---|---|---|
+| ≤16GB | 1 (locked, show inline note) | 2 |
+| 24GB | 2 | 4 |
+| 32GB+ | 4 | 8 |
+
+When batch_size is locked to 1, show a concise inline note in the advanced panel explaining the model+VRAM combination requires it. Never silently change the value.
+
 ## Current Build Stage
 
 Check `docs/PROJECT_PLAN.md` build order. Update this line when a stage is complete:
 
-**Current stage: 4 — Controls column**
+**Current stage: 5 — FastAPI backend**
 
 ## What to Avoid
 

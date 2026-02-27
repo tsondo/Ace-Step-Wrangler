@@ -491,6 +491,13 @@ html, body {
 
 .number-input:focus { border-color: var(--accent); }
 .number-input::placeholder { color: var(--text-muted); }
+.number-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.batch-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
 
 /* ----- Select ----- */
 .select-input {
@@ -540,6 +547,21 @@ html, body {
 
 .generate-btn:active {
   transform: scale(0.98);
+}
+
+.generate-btn.ready {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+.generate-hint {
+  font-size: 12px;
+  color: var(--danger);
+  min-height: 0;
+  line-height: 1.4;
+}
+
+.generate-hint:empty {
+  display: none;
 }
 
 /* ============================================================

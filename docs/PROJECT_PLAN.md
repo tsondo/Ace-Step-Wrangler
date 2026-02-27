@@ -48,12 +48,51 @@ These friendly controls map to underlying AceStep parameters:
 | Polished / Raw | `num_inference_steps` | More steps = more polished |
 | Seed | `seed` | Optional, shown in advanced panel |
 
+## Model Selection (Advanced Panel)
+
+Two independent model axes, both exposed in the advanced panel with friendly labels.
+
+### Generation Model (`ACESTEP_CONFIG_PATH` / DiT)
+
+| UI Label | Model | Notes |
+|---|---|---|
+| Turbo (default) | `acestep-v15-turbo` | Fast, high quality, 8 steps |
+| High Quality | `acestep-v15-sft` | Best prompt adherence, slower |
+| Base | `acestep-v15-base` | For LoRA/fine-tuning workflows; tricky to use manually |
+
+### Planning Intelligence (`ACESTEP_LM_MODEL_PATH` / LM)
+
+| UI Label | Model | Notes |
+|---|---|---|
+| None | — | Fastest, lowest VRAM, no Chain-of-Thought planning |
+| Small | `acestep-5Hz-lm-0.6B` | ~6.5GB VRAM total |
+| Medium (default) | `acestep-5Hz-lm-1.7B` | ~8.5GB VRAM total |
+| Large | `acestep-5Hz-lm-4B` | ~13.5GB VRAM total, strongest composition |
+
+**Note:** `Qwen3-Embedding-0.6B` is a fixed internal text encoder baked into the DiT architecture. It is always required and is never a user-facing choice.
+
+### Batch Size & VRAM Constraint
+
+`batch_size` controls how many songs generate simultaneously (1–8). Limits depend on the model combination and available VRAM. The UI should always expose batch_size but enforce sensible limits per tier:
+
+| VRAM Tier | Example GPUs | sft/base + 4B LM | All other combos |
+|---|---|---|---|
+| ≤16GB | RTX 4080, 3080 Ti | Lock to 1, show warning | Max 2 |
+| 24GB | RTX 3090, 4090 | Max 2 | Max 4 |
+| 32GB+ | A100, H100, 3090x2 | Max 4 | Max 8 |
+
+Implementation notes:
+- The UI cannot auto-detect VRAM — expose a **VRAM tier selector** in the advanced panel (≤16GB / 24GB / 32GB+) so the user sets it once and the batch_size max updates accordingly.
+- Default tier: 16GB (conservative — better to under-promise).
+- When batch_size is locked to 1 due to model+VRAM combination, show a clear inline note explaining why.
+- `batch_size` lives in the advanced panel and is always visible regardless of tier.
+
 ## Build Order
 
 1. **Static shell** — HTML/CSS layout, colors, typography, no functionality ✓
 2. **Lyrics panel** — type, paste, file load, character/line count display ✓
 3. **Style panel** — clickable genre preset tags + free text override field ✓
-4. **Controls column** — friendly sliders, Generate button, basic validation
+4. **Controls column** — friendly sliders, Generate button, basic validation ✓
 5. **FastAPI backend** — `/generate`, `/status`, `/cancel` endpoints wired to AceStep
 6. **Progress + output panel** — polling, waveform display, playback, download
 7. **Warnings system** — duration vs. lyrics length heuristic, other validation

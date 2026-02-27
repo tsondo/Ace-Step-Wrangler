@@ -157,12 +157,54 @@
       </div>
 
       <button class="generate-btn" id="generate-btn">&#9654; Generate</button>
+      <div class="generate-hint" id="generate-hint"></div>
 
       <!-- Advanced panel (collapsed by default) -->
       <details class="advanced-panel">
         <summary class="advanced-toggle">Advanced</summary>
         <div class="advanced-content">
 
+          <!-- Model selection -->
+          <div class="control-group">
+            <label class="field-label" for="gen-model">Generation model</label>
+            <select id="gen-model" class="select-input">
+              <option value="turbo" selected>Turbo (default)</option>
+              <option value="sft">High Quality</option>
+              <option value="base">Base</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label class="field-label" for="lm-model">Planning intelligence</label>
+            <select id="lm-model" class="select-input">
+              <option value="none">None</option>
+              <option value="0.6b">Small</option>
+              <option value="1.7b" selected>Medium (default)</option>
+              <option value="4b">Large</option>
+            </select>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <!-- VRAM tier & batch size -->
+          <div class="control-group">
+            <label class="field-label" for="vram-tier">VRAM tier</label>
+            <select id="vram-tier" class="select-input">
+              <option value="16" selected>≤16GB (default)</option>
+              <option value="24">24GB</option>
+              <option value="32">32GB+</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label class="field-label" for="batch-size">Batch size</label>
+            <input type="number" id="batch-size" class="number-input" value="1" min="1" max="2">
+            <p class="batch-note hidden" id="batch-note"></p>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <!-- Raw generation params -->
           <div class="control-group">
             <label class="field-label" for="seed">Seed</label>
             <input type="number" id="seed" class="number-input" placeholder="Random" min="0" max="2147483647">

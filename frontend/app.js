@@ -1,5 +1,5 @@
 // ACE-Step Wrangler — app.js
-// Stage 3: Style panel — tag groups, selection count, clear all, style preview.
+// Stage 4: Controls validation — ready state, inline hint, content change hooks.
 
 // ===== Slider display & fill =====
 
@@ -140,6 +140,7 @@ function loadTextFile(file) {
   reader.onload = (e) => {
     lyricsText.value = e.target.result;
     updateLyricsCount();
+    updateGenerateState();
     lyricsText.focus();
   };
   reader.onerror = () => showFileError('Could not read file.');
@@ -192,9 +193,84 @@ lyricsPanel.addEventListener('drop', (e) => {
   if (file) loadTextFile(file);
 });
 
-// ===== Generate button (stub — wired in Stage 5) =====
+// ===== Advanced panel — model selection & batch size constraint =====
 
-document.getElementById('generate-btn').addEventListener('click', () => {
+const BATCH_LIMITS = {
+  '16': { heavy: 1, normal: 2 },
+  '24': { heavy: 2, normal: 4 },
+  '32': { heavy: 4, normal: 8 },
+};
+
+function isHeavyCombo() {
+  const model = document.getElementById('gen-model').value;
+  const lm    = document.getElementById('lm-model').value;
+  return (model === 'sft' || model === 'base') && lm === '4b';
+}
+
+function updateBatchLimit() {
+  const tier       = document.getElementById('vram-tier').value;
+  const max        = BATCH_LIMITS[tier][isHeavyCombo() ? 'heavy' : 'normal'];
+  const batchInput = document.getElementById('batch-size');
+  const batchNote  = document.getElementById('batch-note');
+
+  batchInput.max = max;
+  if (Number(batchInput.value) > max) batchInput.value = max;
+
+  if (max === 1) {
+    batchInput.disabled = true;
+    batchNote.textContent = 'Locked to 1 — this model + VRAM combination requires it.';
+    batchNote.classList.remove('hidden');
+  } else {
+    batchInput.disabled = false;
+    batchNote.textContent = '';
+    batchNote.classList.add('hidden');
+  }
+}
+
+['gen-model', 'lm-model', 'vram-tier'].forEach(id =>
+  document.getElementById(id).addEventListener('change', updateBatchLimit)
+);
+
+updateBatchLimit();
+
+// ===== Generate — validation & ready state =====
+
+const generateBtn  = document.getElementById('generate-btn');
+const generateHint = document.getElementById('generate-hint');
+
+function hasContent() {
+  return lyricsText.value.trim().length > 0 || getStylePrompt().length > 0;
+}
+
+function updateGenerateState() {
+  if (hasContent()) {
+    generateBtn.classList.add('ready');
+    generateHint.textContent = '';
+  } else {
+    generateBtn.classList.remove('ready');
+  }
+}
+
+generateBtn.addEventListener('click', () => {
+  if (!hasContent()) {
+    generateHint.textContent = 'Add some lyrics or a style description first.';
+    return;
+  }
   // TODO Stage 5: POST to /generate
-  console.log('[stub] generate');
+  console.log('[stub] generate', {
+    style:    getStylePrompt(),
+    lyrics:   lyricsText.value,
+    duration: Number(document.getElementById('duration').value),
+  });
 });
+
+// Keep state in sync with all content-affecting inputs
+lyricsText.addEventListener('input', updateGenerateState);
+styleText.addEventListener('input', updateGenerateState);
+document.querySelectorAll('.tag').forEach(tag =>
+  tag.addEventListener('click', updateGenerateState)
+);
+document.getElementById('clear-tags-btn').addEventListener('click', updateGenerateState);
+document.getElementById('clear-btn').addEventListener('click', updateGenerateState);
+
+updateGenerateState();
