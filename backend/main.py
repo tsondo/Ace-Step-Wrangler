@@ -183,13 +183,21 @@ def _heuristic_seconds(lyrics: str, bpm: int, time_signature: str) -> float:
     except (ValueError, IndexError):
         num = 4
 
+    def _lookup_bars(header: str) -> int:
+        h = header.strip().lower()
+        if h in _SECTION_BARS:
+            return _SECTION_BARS[h]
+        # "Verse 1", "Pre-Chorus 2", etc. — match by prefix/containment
+        for key, bars in _SECTION_BARS.items():
+            if h.startswith(key) or key in h:
+                return bars
+        return 8  # unknown section: default 8 bars
+
     if not headers:
         # No section markers — assume generic 2-verse / 2-chorus structure
         total_bars = 16 * 2 + 8 * 2
     else:
-        total_bars = sum(
-            _SECTION_BARS.get(h.strip().lower(), 8) for h in headers
-        )
+        total_bars = sum(_lookup_bars(h) for h in headers)
 
     seconds = total_bars * num / bpm * 60
     seconds = round(seconds / 5) * 5          # snap to nearest 5 s
