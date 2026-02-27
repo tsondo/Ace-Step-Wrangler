@@ -9,6 +9,9 @@ nested object. parse_result() handles that.
 """
 
 import json
+import mimetypes
+from pathlib import Path
+
 import httpx
 
 ACESTEP_BASE_URL = "http://localhost:8001"
@@ -111,10 +114,20 @@ async def format_input(lyrics: str) -> dict:
 
 async def get_audio_bytes(path: str) -> tuple[bytes, str]:
     """
-    Download audio from AceStep and return (bytes, content_type).
-    `path` is the URL-encoded path value from audio_url, e.g.
-    '/v1/audio?path=%2F...'  — we forward the path query param.
+    Download audio and return (bytes, content_type).
+
+    AceStep's query_result returns a local filesystem path in the `file` field.
+    When `path` has no query string it is treated as an absolute filesystem path
+    and served directly (both processes share the same filesystem).
+    Paths that include a query string are forwarded to the AceStep HTTP server.
     """
+    if "?" not in path:
+        fp = Path(path)
+        if not fp.is_file():
+            raise FileNotFoundError(f"Audio file not found: {path}")
+        ct = mimetypes.guess_type(str(fp))[0] or "audio/mpeg"
+        return fp.read_bytes(), ct
+
     async with httpx.AsyncClient(timeout=_TIMEOUT_AUDIO) as client:
         r = await client.get(f"{ACESTEP_BASE_URL}{path}")
         r.raise_for_status()
