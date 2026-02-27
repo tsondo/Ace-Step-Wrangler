@@ -310,8 +310,37 @@ async def api_health():
         raise HTTPException(status_code=503, detail=str(exc))
 
 
+def _ensure_in_tmp(path: str) -> str:
+    """Copy a file to the system temp dir if it isn't already there.
+
+    AceStep's /release_task rejects absolute src_audio_path values that lie
+    outside tempfile.gettempdir() (typically /tmp) as a path-traversal guard.
+    Generated audio files live in the project's .cache directory, so we copy
+    them to /tmp before forwarding the path.
+    """
+    import os
+    system_temp = os.path.realpath(tempfile.gettempdir())
+    real = os.path.realpath(path)
+    try:
+        in_temp = os.path.commonpath([system_temp, real]) == system_temp
+    except ValueError:
+        in_temp = False
+    if in_temp:
+        return path
+    suffix = Path(path).suffix or ".mp3"
+    fd, tmp_path = tempfile.mkstemp(prefix="wrangler_src_", suffix=suffix)
+    os.close(fd)
+    shutil.copy2(real, tmp_path)
+    return tmp_path
+
+
 @app.post("/generate")
 async def generate(req: GenerateRequest):
+    # AceStep rejects absolute src_audio_path values outside /tmp — copy if needed
+    if req.src_audio_path:
+        safe_path = _ensure_in_tmp(req.src_audio_path)
+        if safe_path != req.src_audio_path:
+            req = req.model_copy(update={"src_audio_path": safe_path})
     payload = _build_payload(req)
     try:
         task_id = await release_task(payload)
