@@ -967,7 +967,8 @@ function drawWaveform() {
   const barWidth = w / barCount;
   const selStart = Number(wfRegionStart.value) || 0;
   const selEnd = Number(wfRegionEnd.value) || 0;
-  const hasSelection = selEnd > selStart;
+  // Only highlight the selection in Fix & Blend mode; Reimagine ignores the region
+  const hasSelection = selEnd > selStart && _reworkApproach === 'repaint';
 
   const mutedColor = getComputedColor('--text-muted');
   const accentColor = getComputedColor('--accent');
