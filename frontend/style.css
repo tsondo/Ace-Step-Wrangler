@@ -48,7 +48,8 @@
   /* Layout */
   --header-h:   52px;
   --output-h:  158px;
-  --col-side:  260px;
+  --col-left:  260px;
+  --col-right: 520px;
 }
 
 /* ----- Base ----- */
@@ -228,7 +229,7 @@ html, body {
    ============================================================ */
 #main {
   display: grid;
-  grid-template-columns: var(--col-side) 1fr var(--col-side);
+  grid-template-columns: var(--col-left) 1fr var(--col-right);
   overflow: hidden;
 }
 

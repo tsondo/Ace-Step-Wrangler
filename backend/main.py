@@ -231,7 +231,7 @@ def _heuristic_seconds(lyrics: str, bpm: int, time_signature: str) -> float:
 
     seconds = total_bars * num / bpm * 60
     seconds = round(seconds / 5) * 5          # snap to nearest 5 s
-    return max(10.0, min(240.0, seconds))
+    return max(10.0, min(600.0, seconds))
 
 
 class EstimateDurationRequest(BaseModel):
@@ -366,7 +366,7 @@ async def estimate_duration(req: EstimateDurationRequest):
             if "duration" in body:
                 secs = float(body["duration"])
                 secs = round(secs / 5) * 5
-                secs = max(10.0, min(240.0, secs))
+                secs = max(10.0, min(600.0, secs))
                 return {"seconds": secs, "method": "lm"}
         except Exception:
             pass  # fall through to heuristic

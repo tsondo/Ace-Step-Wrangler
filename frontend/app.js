@@ -98,7 +98,7 @@ function updateControlsForMode(mode) {
   const durationEl = document.getElementById('duration');
   let lockNote = document.getElementById('duration-lock-note');
   if (mode === 'rework' && _uploadedAudioDuration) {
-    const dur = Math.max(10, Math.min(240, Math.round(_uploadedAudioDuration / 5) * 5));
+    const dur = Math.max(10, Math.min(600, Math.round(_uploadedAudioDuration / 5) * 5));
     durationEl.value = dur;
     updateSlider(durationEl);
     durationEl.disabled = true;
@@ -542,7 +542,7 @@ function useLyrics(applyMeta) {
     }
     // Duration
     if (_lyricsGenResult.duration) {
-      const dur = Math.max(10, Math.min(240, Math.round(Number(_lyricsGenResult.duration) / 5) * 5));
+      const dur = Math.max(10, Math.min(600, Math.round(Number(_lyricsGenResult.duration) / 5) * 5));
       const durationSlider = document.getElementById('duration');
       durationSlider.value = dur;
       updateSlider(durationSlider);
@@ -981,7 +981,7 @@ async function computeAutoDuration() {
     });
     if (!res.ok) return;
     const data = await res.json();
-    const secs = Math.max(10, Math.min(240, Math.round(data.seconds / 5) * 5));
+    const secs = Math.max(10, Math.min(600, Math.round(data.seconds / 5) * 5));
     durationSlider.value = secs;
     updateSlider(durationSlider);
     checkLyricsWarning();

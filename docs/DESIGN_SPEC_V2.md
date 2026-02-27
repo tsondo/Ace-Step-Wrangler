@@ -10,6 +10,18 @@ This spec adds three major features to ACE-Step-Wrangler:
 
 These features build on the existing three-column layout without breaking it. The spatial layout stays the same across all modes — only the panel *contents* change.
 
+### Layout Dimensions
+
+The three-column grid uses an asymmetric layout to give sliders more travel distance:
+
+| Column | CSS Variable | Width | Purpose |
+|--------|-------------|-------|---------|
+| Left | `--col-left` | 260px | Style panel (Create) / Audio Input (Rework) |
+| Center | `1fr` | Flexible | Lyrics panel |
+| Right | `--col-right` | 520px | Controls panel — wider for usable slider travel |
+
+Duration slider range: **10s – 10 min** (600s), step 5s.
+
 ---
 
 ## 1. Task Mode Selector
@@ -197,7 +209,7 @@ Future enhancement: waveform visualization with draggable region handles. Not in
 
 When in Rework mode, the Controls panel adjusts:
 
-- **Duration slider**: Disabled when "Whole song" is checked (locked to source audio length). When a region is selected, defaults to the region length but can be adjusted.
+- **Duration slider**: 10s–10min range. Disabled when "Whole song" is checked (locked to source audio length). When a region is selected, defaults to the region length but can be adjusted.
 - **All other sliders** (lyric adherence, creativity, quality): Same behavior as Create mode
 - **Generate button**: Same position, same behavior
 - **Advanced panel**: Same, but `task_type` is set automatically based on the Approach selector (user doesn't see this field)
