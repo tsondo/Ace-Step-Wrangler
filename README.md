@@ -15,20 +15,31 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 
 ## Requirements
 
-- Python 3.10+
-- AceStep 1.5 installed and working
+- Python 3.11+
+- A running AceStep 1.5 instance with its REST API enabled (see [AceStep 1.5 docs](https://github.com/ace-step/ACE-Step-1.5))
 - A modern browser
+
+ACE-Step-Wrangler runs in its own virtual environment and communicates with AceStep over its local REST API. You do not need to install AceStep into the same environment.
 
 ## Installation
 
 ```bash
 git clone https://github.com/yourusername/ACE-Step-Wrangler.git
 cd ACE-Step-Wrangler
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r backend/requirements.txt
 ```
 
 ## Usage
 
+First, make sure AceStep 1.5 is running with its API enabled:
+```bash
+# In your AceStep directory
+uv run acestep-api  # default: http://localhost:8001
+```
+
+Then start ACE-Step-Wrangler:
 ```bash
 python backend/main.py
 ```
