@@ -94,9 +94,9 @@ Once loaded, the filename, duration, and an audio player appear. The output pane
 
 ### Approach
 
-**Reimagine** — generates a new creative take on the **entire song**. The waveform selection has no effect here; any region you drew is ignored. Use the **Cover strength** slider to control how closely the result resembles the original.
+**Reimagine** — generates a new creative take on the **entire song**. The waveform selection has no effect here; any region you drew is ignored. Use the **Reimagine strength** slider to control how closely the result resembles the original.
 
-| Cover strength | Effect |
+| Reimagine strength | Effect |
 |---|---|
 | Low (Subtle) | Stays close to the original structure and feel |
 | High (Dramatic) | More departure from the source |
