@@ -942,13 +942,15 @@ function formatTimecode(secs) {
   return m + ':' + String(s).padStart(2, '0') + '.' + frac;
 }
 
-// Drag-to-select on waveform canvas
+// Click-to-seek + drag-to-select on waveform canvas
 let _wfDragging = false;
 let _wfDragStart = 0;
-let _wfHandleDrag = null; // 'left' | 'right' | null
+let _wfDragMoved = false;   // true once mouse has moved far enough to be a drag
+let _wfMouseDownX = 0;
+let _wfHandleDrag = null;   // 'left' | 'right' | null
 
 waveformContainer.addEventListener('mousedown', (e) => {
-  // Check if drag started on a handle
+  // Handle edge-drag
   const target = e.target;
   if (target.classList.contains('waveform-handle-left')) {
     _wfHandleDrag = 'left';
@@ -960,14 +962,15 @@ waveformContainer.addEventListener('mousedown', (e) => {
     e.preventDefault();
     return;
   }
-
   if (target.classList.contains('waveform-section-label')) return;
 
   _wfDragging = true;
+  _wfDragMoved = false;
+  _wfMouseDownX = e.clientX;
   const rect = waveformCanvas.getBoundingClientRect();
   const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
   _wfDragStart = (x / rect.width) * _waveformDuration;
-  setWaveformRegion(_wfDragStart, _wfDragStart);
+  // Don't start a region yet — wait to see if it's a click or a real drag
 });
 
 document.addEventListener('mousemove', (e) => {
@@ -984,15 +987,30 @@ document.addEventListener('mousemove', (e) => {
     const start = Number(wfRegionStart.value) || 0;
     setWaveformRegion(start, Math.max(secs, start));
   } else if (_wfDragging) {
-    const start = Math.min(_wfDragStart, secs);
-    const end = Math.max(_wfDragStart, secs);
-    setWaveformRegion(start, end);
+    // Require >4px movement before treating as a drag (avoids accidental region clear)
+    if (!_wfDragMoved && Math.abs(e.clientX - _wfMouseDownX) > 4) {
+      _wfDragMoved = true;
+      setWaveformRegion(_wfDragStart, _wfDragStart);
+    }
+    if (_wfDragMoved) {
+      setWaveformRegion(Math.min(_wfDragStart, secs), Math.max(_wfDragStart, secs));
+    }
   }
 });
 
-document.addEventListener('mouseup', () => {
+document.addEventListener('mouseup', (e) => {
+  if (_wfDragging && !_wfDragMoved && _waveformDuration > 0) {
+    // Pure click — seek audioPreview to this position and play
+    const rect = waveformCanvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const secs = (x / rect.width) * _waveformDuration;
+    audioPreview.currentTime = secs;
+    _stopOthers(audioPreview);
+    audioPreview.play();
+  }
   _wfDragging = false;
   _wfHandleDrag = null;
+  _wfDragMoved = false;
 });
 
 // Number input -> waveform sync

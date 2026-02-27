@@ -1154,6 +1154,7 @@ details[open] > .advanced-toggle {
   left: 0;
   width: 100%;
   height: 100%;
+  cursor: pointer;
 }
 
 .waveform-loading {
