@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACE-Step Wrangler</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== Header ===== -->
+  <header id="header">
+    <div class="logo">
+      <span class="logo-icon">♪</span>
+      <span class="logo-text">ACE-Step <span class="logo-accent">Wrangler</span></span>
+    </div>
+    <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+  </header>
+
+  <!-- ===== Main Three-Column Layout ===== -->
+  <main id="main">
+
+    <!-- Left: Style -->
+    <section class="panel" id="style-panel">
+      <h2 class="panel-title">Style</h2>
+
+      <!-- Genre tags -->
+      <div class="tag-section">
+        <span class="tag-group-label">Genre</span>
+        <div class="tag-grid">
+          <button class="tag">Electronic</button>
+          <button class="tag">Hip-Hop</button>
+          <button class="tag">Jazz</button>
+          <button class="tag">Rock</button>
+          <button class="tag">Classical</button>
+          <button class="tag">Ambient</button>
+          <button class="tag">Pop</button>
+          <button class="tag">R&amp;B</button>
+          <button class="tag">Folk</button>
+          <button class="tag">Metal</button>
+          <button class="tag">Latin</button>
+          <button class="tag">Blues</button>
+          <button class="tag">Country</button>
+          <button class="tag">Reggae</button>
+          <button class="tag">Soul</button>
+          <button class="tag">Funk</button>
+        </div>
+      </div>
+
+      <!-- Mood tags -->
+      <div class="tag-section">
+        <span class="tag-group-label">Mood</span>
+        <div class="tag-grid">
+          <button class="tag">Uplifting</button>
+          <button class="tag">Melancholic</button>
+          <button class="tag">Energetic</button>
+          <button class="tag">Chill</button>
+          <button class="tag">Dark</button>
+          <button class="tag">Dreamy</button>
+          <button class="tag">Intense</button>
+          <button class="tag">Romantic</button>
+          <button class="tag">Nostalgic</button>
+          <button class="tag">Aggressive</button>
+        </div>
+      </div>
+
+      <!-- Tag selection status -->
+      <div class="tags-status hidden" id="tags-status">
+        <span class="tags-count" id="tags-count">1 selected</span>
+        <button class="ghost-btn" id="clear-tags-btn">Clear all</button>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Free text override -->
+      <div class="field-group">
+        <label class="field-label" for="style-text">Custom description</label>
+        <textarea
+          id="style-text"
+          class="text-input"
+          placeholder="Describe your sound… e.g. dreamy lo-fi with warm bass and vinyl crackle"
+          rows="4"
+        ></textarea>
+      </div>
+
+      <!-- Style preview -->
+      <div class="style-preview" id="style-preview">
+        <span class="style-preview-label">Style prompt</span>
+        <span class="style-preview-text empty" id="style-preview-text">Nothing set — add tags or a description</span>
+      </div>
+    </section>
+
+    <!-- Center: Lyrics -->
+    <section class="panel" id="lyrics-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Lyrics</h2>
+        <div class="panel-actions">
+          <button class="ghost-btn" id="load-file-btn">Load file</button>
+          <button class="ghost-btn" id="clear-btn">Clear</button>
+        </div>
+      </div>
+
+      <textarea
+        id="lyrics-text"
+        class="text-input lyrics-area"
+        placeholder="Type or paste your lyrics here…&#10;&#10;[Verse 1]&#10;Lines go here&#10;&#10;[Chorus]&#10;Lines go here"
+        spellcheck="true"
+      ></textarea>
+
+      <div class="lyrics-meta">
+        <span class="lyrics-count" id="lyrics-count">0 lines · 0 chars</span>
+        <span class="lyrics-warning hidden" id="lyrics-warning">⚠ May be too long for selected duration</span>
+      </div>
+    </section>
+
+    <!-- Right: Controls -->
+    <section class="panel" id="controls-panel">
+      <h2 class="panel-title">Controls</h2>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="field-label" for="duration">Duration</label>
+          <span class="control-value" id="duration-value">30s</span>
+        </div>
+        <input type="range" id="duration" class="slider" min="10" max="240" value="30" step="5">
+        <div class="slider-bounds"><span>10s</span><span>4 min</span></div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="field-label" for="lyric-adherence">Strictly follow lyrics</label>
+          <span class="control-value" id="lyric-adherence-value">Med</span>
+        </div>
+        <input type="range" id="lyric-adherence" class="slider" min="0" max="2" value="1" step="1">
+        <div class="slider-bounds"><span>Loose</span><span>Strict</span></div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="field-label" for="creativity">Creativity</label>
+          <span class="control-value" id="creativity-value">50%</span>
+        </div>
+        <input type="range" id="creativity" class="slider" min="0" max="100" value="50" step="1">
+        <div class="slider-bounds"><span>Restrained</span><span>Wild</span></div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label class="field-label" for="quality">Quality</label>
+          <span class="control-value" id="quality-value">Balanced</span>
+        </div>
+        <input type="range" id="quality" class="slider" min="0" max="2" value="1" step="1">
+        <div class="slider-bounds"><span>Raw</span><span>Polished</span></div>
+      </div>
+
+      <button class="generate-btn" id="generate-btn">&#9654; Generate</button>
+
+      <!-- Advanced panel (collapsed by default) -->
+      <details class="advanced-panel">
+        <summary class="advanced-toggle">Advanced</summary>
+        <div class="advanced-content">
+
+          <div class="control-group">
+            <label class="field-label" for="seed">Seed</label>
+            <input type="number" id="seed" class="number-input" placeholder="Random" min="0" max="2147483647">
+          </div>
+
+          <div class="control-group">
+            <label class="field-label" for="scheduler">Scheduler</label>
+            <select id="scheduler" class="select-input">
+              <option value="euler">Euler</option>
+              <option value="dpm">DPM++</option>
+              <option value="ddim">DDIM</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <label class="field-label" for="inference-steps">Inference steps</label>
+              <span class="control-value" id="inference-steps-value">60</span>
+            </div>
+            <input type="range" id="inference-steps" class="slider" min="10" max="150" value="60" step="5">
+            <div class="slider-bounds"><span>10</span><span>150</span></div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <label class="field-label" for="guidance-lyric">Guidance scale (lyric)</label>
+              <span class="control-value" id="guidance-lyric-value">5.0</span>
+            </div>
+            <input type="range" id="guidance-lyric" class="slider" min="1" max="15" value="5" step="0.5">
+            <div class="slider-bounds"><span>1</span><span>15</span></div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <label class="field-label" for="guidance-audio">Guidance scale (audio)</label>
+              <span class="control-value" id="guidance-audio-value">4.0</span>
+            </div>
+            <input type="range" id="guidance-audio" class="slider" min="1" max="15" value="4" step="0.5">
+            <div class="slider-bounds"><span>1</span><span>15</span></div>
+          </div>
+
+        </div>
+      </details>
+    </section>
+
+  </main>
+
+  <!-- ===== Output Panel ===== -->
+  <footer id="output-panel">
+    <div class="output-header">
+      <span class="output-title">Output</span>
+      <div class="output-controls">
+        <button class="icon-btn output-play-btn" id="play-btn" disabled aria-label="Play">&#9654;</button>
+        <button class="ghost-btn" id="download-btn" disabled>Download</button>
+      </div>
+    </div>
+    <div class="waveform-container" id="waveform">
+      <span class="waveform-hint">Generated audio will appear here</span>
+    </div>
+  </footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

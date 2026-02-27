@@ -50,9 +50,9 @@ These friendly controls map to underlying AceStep parameters:
 
 ## Build Order
 
-1. **Static shell** — HTML/CSS layout, colors, typography, no functionality
-2. **Lyrics panel** — type, paste, file load, character/line count display
-3. **Style panel** — clickable genre preset tags + free text override field
+1. **Static shell** — HTML/CSS layout, colors, typography, no functionality ✓
+2. **Lyrics panel** — type, paste, file load, character/line count display ✓
+3. **Style panel** — clickable genre preset tags + free text override field ✓
 4. **Controls column** — friendly sliders, Generate button, basic validation
 5. **FastAPI backend** — `/generate`, `/status`, `/cancel` endpoints wired to AceStep
 6. **Progress + output panel** — polling, waveform display, playback, download

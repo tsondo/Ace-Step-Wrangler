@@ -61,7 +61,7 @@ These friendly UI controls map to AceStep parameters:
 
 Check `docs/PROJECT_PLAN.md` build order. Update this line when a stage is complete:
 
-**Current stage: 1 — Static HTML/CSS shell**
+**Current stage: 4 — Controls column**
 
 ## What to Avoid
 

@@ -64,7 +64,19 @@ ACE-Step-Wrangler/
 
 ## Status
 
-🚧 Early development — not yet functional.
+Early development — frontend shell is in place but generation is not yet wired up.
+
+| Stage | Description | Status |
+|---|---|---|
+| 1 | Static HTML/CSS shell | Done |
+| 2 | Lyrics panel (file load, count) | Done |
+| 3 | Style panel (tags, mood, preview) | Done |
+| 4 | Controls column (sliders, validation) | Pending |
+| 5 | FastAPI backend + AceStep wiring | Pending |
+| 6 | Progress + output panel | Pending |
+| 7 | Warnings system | Pending |
+| 8 | Advanced panel | Pending |
+| 9 | Polish pass | Pending |
 
 ## License
 
