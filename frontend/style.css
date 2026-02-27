@@ -529,6 +529,14 @@ html, body {
   display: none !important;
 }
 
+/* Dim flanking panels while Lyrics > Generate tab is active */
+#main.lyrics-gen-mode #style-panel,
+#main.lyrics-gen-mode #controls-panel {
+  opacity: 0.25;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
 /* ============================================================
    Rework Panel — Audio Upload & Approach
    ============================================================ */

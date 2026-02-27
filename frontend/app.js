@@ -543,6 +543,8 @@ function switchLyricsTab(tab) {
   lyricsTabWrite.classList.toggle('hidden', tab !== 'write');
   lyricsTabGenerate.classList.toggle('hidden', tab !== 'generate');
   writeTabActions.classList.toggle('hidden', tab !== 'write');
+  // Dim style + controls panels when Generate tab is active — they're not inputs to lyrics gen
+  document.getElementById('main').classList.toggle('lyrics-gen-mode', tab === 'generate');
 }
 
 lyricsTabBtns.forEach(btn =>
