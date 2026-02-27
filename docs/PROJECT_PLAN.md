@@ -93,7 +93,7 @@ Implementation notes:
 2. **Lyrics panel** — type, paste, file load, character/line count display ✓
 3. **Style panel** — clickable genre preset tags + free text override field ✓
 4. **Controls column** — friendly sliders, Generate button, basic validation ✓
-5. **FastAPI backend** — `/generate`, `/status`, `/cancel` endpoints wired to AceStep
+5. **FastAPI backend** — `/generate`, `/status`, `/cancel` endpoints wired to AceStep ✓
 6. **Progress + output panel** — polling, waveform display, playback, download
 7. **Warnings system** — duration vs. lyrics length heuristic, other validation
 8. **Advanced panel** — raw AceStep params, seed, scheduler (collapsed by default)

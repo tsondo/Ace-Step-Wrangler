@@ -90,7 +90,7 @@ When batch_size is locked to 1, show a concise inline note in the advanced panel
 
 Check `docs/PROJECT_PLAN.md` build order. Update this line when a stage is complete:
 
-**Current stage: 5 — FastAPI backend**
+**Current stage: 6 — Progress + output panel**
 
 ## What to Avoid
 

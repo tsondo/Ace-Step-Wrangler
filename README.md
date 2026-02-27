@@ -72,7 +72,7 @@ Early development — frontend shell is in place but generation is not yet wired
 | 2 | Lyrics panel (file load, count) | Done |
 | 3 | Style panel (tags, mood, preview) | Done |
 | 4 | Controls column (sliders, validation) | Done |
-| 5 | FastAPI backend + AceStep wiring | Pending |
+| 5 | FastAPI backend + AceStep wiring | Done |
 | 6 | Progress + output panel | Pending |
 | 7 | Warnings system | Pending |
 | 8 | Advanced panel | Pending |

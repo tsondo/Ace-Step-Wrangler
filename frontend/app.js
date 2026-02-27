@@ -251,17 +251,101 @@ function updateGenerateState() {
   }
 }
 
-generateBtn.addEventListener('click', () => {
+// Collect the full request payload from all UI controls
+function buildPayload() {
+  const seedRaw = document.getElementById('seed').value.trim();
+  return {
+    style:           getStylePrompt(),
+    lyrics:          lyricsText.value,
+    duration:        Number(document.getElementById('duration').value),
+    lyric_adherence: Number(document.getElementById('lyric-adherence').value),
+    creativity:      Number(document.getElementById('creativity').value),
+    quality:         Number(document.getElementById('quality').value),
+    seed:            seedRaw !== '' ? parseInt(seedRaw, 10) : null,
+    gen_model:       document.getElementById('gen-model').value,
+    batch_size:      Number(document.getElementById('batch-size').value),
+    scheduler:       document.getElementById('scheduler').value,
+  };
+}
+
+let _pollInterval = null;
+
+function setGenerating(on) {
+  generateBtn.textContent = on ? 'Generating…' : '▶ Generate';
+  generateBtn.disabled    = on;
+}
+
+function showAudio(audioUrl) {
+  const waveform = document.getElementById('waveform');
+  waveform.innerHTML = '';
+
+  const audio = document.createElement('audio');
+  audio.controls = true;
+  audio.src      = '/audio?path=' + encodeURIComponent(audioUrl);
+  audio.style.width = '100%';
+  waveform.appendChild(audio);
+
+  // Enable download button
+  const dlBtn = document.getElementById('download-btn');
+  dlBtn.disabled = false;
+  dlBtn.onclick = () => {
+    const a = document.createElement('a');
+    a.href     = audio.src;
+    a.download = 'acestep-output.mp3';
+    a.click();
+  };
+}
+
+generateBtn.addEventListener('click', async () => {
   if (!hasContent()) {
     generateHint.textContent = 'Add some lyrics or a style description first.';
     return;
   }
-  // TODO Stage 5: POST to /generate
-  console.log('[stub] generate', {
-    style:    getStylePrompt(),
-    lyrics:   lyricsText.value,
-    duration: Number(document.getElementById('duration').value),
-  });
+  generateHint.textContent = '';
+
+  setGenerating(true);
+
+  let taskId;
+  try {
+    const res = await fetch('/generate', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(buildPayload()),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    ({ task_id: taskId } = await res.json());
+  } catch (err) {
+    generateHint.textContent = `Error: ${err.message}`;
+    setGenerating(false);
+    return;
+  }
+
+  // Poll /status/{task_id} every 2 seconds
+  _pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/status/${taskId}`);
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+
+      if (data.status === 'done') {
+        clearInterval(_pollInterval);
+        setGenerating(false);
+        showAudio(data.audio_url);
+      } else if (data.status === 'error') {
+        clearInterval(_pollInterval);
+        setGenerating(false);
+        generateHint.textContent = 'Generation failed. Check AceStep logs.';
+      }
+      // 'processing' → keep polling
+    } catch (err) {
+      clearInterval(_pollInterval);
+      setGenerating(false);
+      generateHint.textContent = `Polling error: ${err.message}`;
+    }
+  }, 2000);
 });
 
 // Keep state in sync with all content-affecting inputs
