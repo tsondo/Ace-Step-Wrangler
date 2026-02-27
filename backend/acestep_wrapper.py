@@ -77,6 +77,23 @@ async def query_result(task_id: str) -> dict:
     }
 
 
+# AceStep's _parse_description_hints() maps these to ISO codes.
+_LANG_LABELS: dict[str, str] = {
+    "en": "English",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "pt": "Portuguese",
+    "it": "Italian",
+    "ru": "Russian",
+    "ar": "Arabic",
+    "hi": "Hindi",
+}
+
+
 async def create_sample(query: str, language: str = "en") -> str:
     """Submit a lyrics-generation task via /release_task with sample_query.
 
@@ -86,12 +103,19 @@ async def create_sample(query: str, language: str = "en") -> str:
 
     Do NOT use analysis_only here — that re-analyzes the original (empty) request
     params, discarding everything create_sample() produced.
+
+    Language note: AceStep ignores vocal_language="en" in sample_query mode —
+    it treats "en" as "no preference" and infers language from the description.
+    We embed the language label in the query so _parse_description_hints()
+    returns the correct ISO code, which the constrained decoder then enforces.
     """
+    label = _LANG_LABELS.get(language)
+    enriched_query = f"{query}. {label} vocals." if label else query
     async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
         r = await client.post(
             f"{ACESTEP_BASE_URL}/release_task",
             json={
-                "sample_query": query,
+                "sample_query": enriched_query,
                 "vocal_language": language,
             },
         )
