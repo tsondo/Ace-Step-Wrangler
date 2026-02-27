@@ -32,7 +32,7 @@ Three-column layout with a persistent output panel at the bottom:
 │               │                         │                   │
 │               │                         │  [▶ GENERATE]     │
 ├───────────────┴─────────────────────────┴───────────────────┤
-│  OUTPUT — waveform / progress / playback / download          │
+│  OUTPUT — result cards / progress / playback / download      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,6 +87,18 @@ Implementation notes:
 - When batch_size is locked to 1 due to model+VRAM combination, show a clear inline note explaining why.
 - `batch_size` lives in the advanced panel and is always visible regardless of tier.
 
+### Audio Format Selector (Advanced Panel)
+
+A format selector is exposed in the advanced panel alongside other generation parameters:
+
+| UI Label | Value | Notes |
+|---|---|---|
+| MP3 (default) | `mp3` | Smaller files, good for previewing |
+| WAV | `wav` | Lossless, best for DAW import |
+| FLAC | `flac` | Lossless + compressed |
+
+Passed to AceStep as the `audio_format` payload field. The download filename extension should match the selected format.
+
 ## Build Order
 
 1. **Static shell** — HTML/CSS layout, colors, typography, no functionality ✓
@@ -94,10 +106,54 @@ Implementation notes:
 3. **Style panel** — clickable genre preset tags + free text override field ✓
 4. **Controls column** — friendly sliders, Generate button, basic validation ✓
 5. **FastAPI backend** — `/generate`, `/status`, `/cancel` endpoints wired to AceStep ✓
-6. **Progress + output panel** — polling, waveform display, playback, download
+6. **Progress + output panel** — polling, per-result cards, playback, download (see Stage 6 spec below)
 7. **Warnings system** — duration vs. lyrics length heuristic, other validation
 8. **Advanced panel** — raw AceStep params, seed, scheduler (collapsed by default)
 9. **Polish pass** — transitions, error states, keyboard shortcuts, accessibility
+
+## Stage 6 — Progress + Output Panel (Detailed Spec)
+
+### Output Panel Behaviour
+
+The output panel (footer) transitions through three states:
+
+1. **Idle** — placeholder hint text, play and download buttons disabled.
+2. **Generating** — a progress indicator (spinner or animated bar) with a "Generating…" label. No cards yet.
+3. **Done** — a horizontal scrollable row (or wrapping grid) of **result cards**, one per batch item.
+
+### Result Cards
+
+Each card represents a single generated audio file and contains:
+
+- An inline `<audio>` element with browser-native controls for immediate preview.
+- A **Download audio** button — triggers a file download via `/download/{job_id}/{index}/audio`. Filename: `acestep-{job_id}-{index}.{format}` where `{format}` matches the audio format chosen at generation time.
+- A **Download JSON** button — triggers download via `/download/{job_id}/{index}/json`. Contains the generation metadata returned by AceStep (`metas` field), plus a copy of the parameters used (style prompt, lyrics, all control values). Filename: `acestep-{job_id}-{index}.json`.
+- The card index label (e.g. "Result 1 of 3") for orientation when batch_size > 1.
+
+No zip/bulk download is provided — the user previews each result and downloads only what they want to keep.
+
+### Backend Endpoints for Stage 6
+
+Two new download endpoints to add to `main.py`:
+
+#### `GET /download/{job_id}/{index}/audio`
+- Fetches the audio bytes from AceStep using the stored `audio_url` for that job/index.
+- Returns the file with `Content-Disposition: attachment` and the correct MIME type.
+- The job result (task_id → list of audio_urls + metadata) must be stored server-side after a successful `/status` poll resolves to `done`. A simple in-process dict is sufficient for now (no persistence required).
+
+#### `GET /download/{job_id}/{index}/json`
+- Returns a JSON file containing:
+  - `generated_at`: ISO timestamp
+  - `params`: the full `GenerateRequest` fields used for the job
+  - `meta`: the AceStep `metas` dict for that index (may be null)
+- Returned with `Content-Disposition: attachment; filename="acestep-{job_id}-{index}.json"`.
+
+### Implementation Notes
+
+- Keep result state in a module-level dict in `main.py` keyed by `task_id`. Entries are written when a `/status` poll returns `done` and never expire within a session (process restart clears them, which is acceptable for now).
+- The frontend continues polling `/status/{task_id}` as implemented in Stage 5. On `status === "done"`, it renders the result cards using the `audio_url` array from the response. The download buttons hit the new `/download/` endpoints rather than proxying through `/audio`.
+- The existing `/audio` proxy endpoint can remain for legacy compatibility but the new card-based UI should use `/download/` for downloads.
+- Cards should render in order (index 0 first). If only one result, omit the "Result N of N" label.
 
 ## Key Design Principles
 
