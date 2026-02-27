@@ -153,7 +153,16 @@
               <span class="upload-filename" id="upload-filename"></span>
               <span class="upload-duration" id="upload-duration"></span>
             </div>
-            <audio id="audio-preview" controls></audio>
+            <audio id="audio-preview"></audio>
+            <div class="audio-player" id="audio-preview-player">
+              <button class="player-btn player-rewind" type="button" title="Rewind to start">⟪</button>
+              <button class="player-btn player-play"   type="button" title="Play">▶</button>
+              <button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>
+              <div class="player-scrubber">
+                <div class="player-scrubber-fill"></div>
+              </div>
+              <span class="player-time">0:00 / 0:00</span>
+            </div>
             <button class="ghost-btn" id="remove-audio-btn" type="button">Remove</button>
           </div>
         </div>
@@ -281,7 +290,16 @@
 
         <div class="lyrics-preview hidden" id="lyrics-preview">
           <div class="lyrics-preview-meta" id="lyrics-preview-meta"></div>
-          <audio id="lyrics-audio-preview" class="lyrics-audio-preview hidden" controls></audio>
+          <audio id="lyrics-audio-preview"></audio>
+          <div class="audio-player hidden" id="lyrics-player">
+            <button class="player-btn player-rewind" type="button" title="Rewind to start">⟪</button>
+            <button class="player-btn player-play"   type="button" title="Play">▶</button>
+            <button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>
+            <div class="player-scrubber">
+              <div class="player-scrubber-fill"></div>
+            </div>
+            <span class="player-time">0:00 / 0:00</span>
+          </div>
           <pre class="lyrics-preview-text" id="lyrics-preview-text"></pre>
           <div class="lyrics-preview-actions">
             <button class="ghost-btn" id="use-lyrics-btn" type="button">Use These Lyrics</button>

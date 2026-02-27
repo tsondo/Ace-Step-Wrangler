@@ -795,9 +795,70 @@ html, body {
   overflow-y: auto;
 }
 
-.lyrics-audio-preview {
+/* ============================================================
+   Custom Audio Player
+   ============================================================ */
+.audio-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
-  height: 32px;
+  flex-shrink: 0;
+}
+
+.player-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-ui);
+  line-height: 1.4;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.player-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.player-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.player-scrubber {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+  min-width: 0;
+}
+
+.player-scrubber:hover {
+  height: 6px;
+}
+
+.player-scrubber-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+
+.player-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 

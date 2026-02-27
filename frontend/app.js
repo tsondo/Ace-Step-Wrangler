@@ -1,5 +1,87 @@
 // ACE-Step Wrangler — app.js
 
+// ===== Custom Audio Player =====
+// StemForge-style transport: Rewind / Play / Stop (separate, not a toggle).
+// Stop saves position; Rewind jumps to 0 (keeps playing if already playing);
+// scrubber click seeks AND starts playback; end of track resets to 0.
+
+const _playerRegistry = new Set(); // tracks every live audio element
+
+function _stopOthers(except) {
+  _playerRegistry.forEach(el => { if (el !== except && !el.paused) el.pause(); });
+}
+
+function _fmtTime(s) {
+  if (!isFinite(s) || s < 0) s = 0;
+  const m = Math.floor(s / 60);
+  return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+function initAudioPlayer(audioEl, playerEl) {
+  _playerRegistry.add(audioEl);
+
+  const rewindBtn = playerEl.querySelector('.player-rewind');
+  const playBtn   = playerEl.querySelector('.player-play');
+  const stopBtn   = playerEl.querySelector('.player-stop');
+  const scrubber  = playerEl.querySelector('.player-scrubber');
+  const fill      = playerEl.querySelector('.player-scrubber-fill');
+  const timeEl    = playerEl.querySelector('.player-time');
+
+  function updateProgress() {
+    const cur = audioEl.currentTime || 0;
+    const dur = isFinite(audioEl.duration) ? audioEl.duration : 0;
+    fill.style.width = dur ? ((cur / dur) * 100) + '%' : '0%';
+    timeEl.textContent = _fmtTime(cur) + ' / ' + _fmtTime(dur);
+  }
+
+  function syncStopBtn() {
+    stopBtn.disabled = audioEl.paused;
+  }
+
+  // Play — start from current position, stop all other players
+  playBtn.addEventListener('click', () => {
+    _stopOthers(audioEl);
+    audioEl.play();
+  });
+
+  // Stop — pause and save position (next Play resumes from here)
+  stopBtn.addEventListener('click', () => {
+    audioEl.pause();
+  });
+
+  // Rewind — jump to 0; keep playing if already playing, else just seek
+  rewindBtn.addEventListener('click', () => {
+    audioEl.currentTime = 0;
+    updateProgress();
+  });
+
+  // Scrubber click — seek to position AND start playback immediately
+  scrubber.addEventListener('click', (e) => {
+    const dur = audioEl.duration;
+    if (!dur || !isFinite(dur)) return;
+    const rect = scrubber.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    audioEl.currentTime = (x / rect.width) * dur;
+    _stopOthers(audioEl);
+    audioEl.play();
+  });
+
+  // End of track — stop and reset to 0
+  audioEl.addEventListener('ended', () => {
+    audioEl.currentTime = 0;
+    updateProgress();
+    syncStopBtn();
+  });
+
+  audioEl.addEventListener('play',        syncStopBtn);
+  audioEl.addEventListener('pause',       syncStopBtn);
+  audioEl.addEventListener('timeupdate',  updateProgress);
+  audioEl.addEventListener('loadedmetadata', updateProgress);
+
+  syncStopBtn();
+  updateProgress();
+}
+
 // ===== Utility =====
 
 function debounce(fn, ms) {
@@ -137,6 +219,13 @@ const audioUploadZone = document.getElementById('audio-upload-zone');
 const uploadPrompt    = document.getElementById('upload-prompt');
 const uploadLoaded    = document.getElementById('upload-loaded');
 const audioPreview    = document.getElementById('audio-preview');
+
+// Initialise custom players for the two static audio elements
+initAudioPlayer(audioPreview, document.getElementById('audio-preview-player'));
+initAudioPlayer(
+  document.getElementById('lyrics-audio-preview'),
+  document.getElementById('lyrics-player'),
+);
 
 function handleAudioUpload(file) {
   if (!file || !file.type.startsWith('audio/')) {
@@ -516,13 +605,14 @@ async function generateLyrics() {
     // Audio preview
     const lyricsAudio = document.getElementById('lyrics-audio-preview');
     const sendToReworkBtn = document.getElementById('send-to-rework-btn');
+    const lyricsPlayer = document.getElementById('lyrics-player');
     if (_lyricsGenResult.audio_path) {
       lyricsAudio.src = '/audio?path=' + encodeURIComponent(_lyricsGenResult.audio_path);
-      lyricsAudio.classList.remove('hidden');
+      lyricsPlayer.classList.remove('hidden');
       sendToReworkBtn.classList.remove('hidden');
     } else {
       lyricsAudio.src = '';
-      lyricsAudio.classList.add('hidden');
+      lyricsPlayer.classList.add('hidden');
       sendToReworkBtn.classList.add('hidden');
     }
 
@@ -1302,9 +1392,19 @@ function createResultCard(taskId, index, result, total, fmt) {
   }
 
   const audio = document.createElement('audio');
-  audio.controls = true;
   audio.src = '/audio?path=' + encodeURIComponent(result.audio_url);
   card.appendChild(audio);
+
+  const player = document.createElement('div');
+  player.className = 'audio-player';
+  player.innerHTML =
+    '<button class="player-btn player-rewind" type="button" title="Rewind to start">⟪</button>' +
+    '<button class="player-btn player-play"   type="button" title="Play">▶</button>' +
+    '<button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>' +
+    '<div class="player-scrubber"><div class="player-scrubber-fill"></div></div>' +
+    '<span class="player-time">0:00 / 0:00</span>';
+  card.appendChild(player);
+  initAudioPlayer(audio, player);
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
