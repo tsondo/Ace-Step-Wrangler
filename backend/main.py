@@ -277,8 +277,10 @@ class GenerateLyricsRequest(BaseModel):
 async def generate_lyrics(req: GenerateLyricsRequest):
     """Generate structured lyrics from a natural language description.
 
-    Uses AceStep's LM via /release_task with analysis_only=true, then polls
-    server-side until complete (typically ~5-10s, LM-only — no DiT inference).
+    Uses AceStep's sample_query mode: the LM generates lyrics + metadata,
+    then AceStep proceeds to audio generation. We poll until complete and
+    extract the lyrics/metadata from the result. The generated audio is
+    available as a bonus but not returned here.
     """
     if not req.description.strip():
         raise HTTPException(status_code=422, detail="Description cannot be empty")
@@ -288,9 +290,9 @@ async def generate_lyrics(req: GenerateLyricsRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
 
-    # Server-side polling — the LM call is fast enough to block
-    for _ in range(30):  # 30 × 1s = 30s timeout
-        await asyncio.sleep(1)
+    # Server-side polling — includes full audio generation, so allow longer
+    for _ in range(300):  # 300 × 2s = 10 min timeout
+        await asyncio.sleep(2)
         try:
             data = await query_result(task_id)
         except Exception as exc:
@@ -300,13 +302,16 @@ async def generate_lyrics(req: GenerateLyricsRequest):
             results = data.get("results") or []
             if not results:
                 raise HTTPException(status_code=502, detail="No results returned")
-            meta = results[0].get("meta") or {}
+            result = results[0]
+            meta = result.get("meta") or {}
+            # caption and lyrics are at the result top level, not inside metas
+            # metas has: bpm, duration, keyscale, timesignature, genres
             return {
-                "caption": meta.get("prompt", ""),
-                "lyrics": meta.get("lyrics", ""),
+                "caption": result.get("prompt", ""),
+                "lyrics": result.get("lyrics", ""),
                 "bpm": meta.get("bpm"),
-                "key_scale": meta.get("key_scale", ""),
-                "time_signature": meta.get("time_signature", "4/4"),
+                "key_scale": meta.get("keyscale", ""),
+                "time_signature": meta.get("timesignature", "4/4"),
                 "duration": meta.get("duration"),
             }
         elif data["status"] == "error":

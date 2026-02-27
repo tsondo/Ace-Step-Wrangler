@@ -63,21 +63,32 @@ async def query_result(task_id: str) -> dict:
     return {
         "status": "done",
         "results": [
-            {"audio_url": item["file"], "meta": item.get("metas")}
+            {
+                "audio_url": item.get("file", ""),
+                "meta": item.get("metas"),
+                "prompt": item.get("prompt", ""),
+                "lyrics": item.get("lyrics", ""),
+            }
             for item in items
         ],
     }
 
 
 async def create_sample(query: str, language: str = "en") -> str:
-    """Submit a lyrics-generation task via /release_task with analysis_only=true.
-    Returns the task_id string for polling with query_result()."""
+    """Submit a lyrics-generation task via /release_task with sample_query.
+
+    AceStep's create_sample() generates lyrics + caption + metadata via the LM,
+    then proceeds to audio generation. We extract the lyrics/metadata from the
+    result — the generated audio is a free bonus the user can ignore or use.
+
+    Do NOT use analysis_only here — that re-analyzes the original (empty) request
+    params, discarding everything create_sample() produced.
+    """
     async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
         r = await client.post(
             f"{ACESTEP_BASE_URL}/release_task",
             json={
                 "sample_query": query,
-                "analysis_only": True,
                 "vocal_language": language,
             },
         )
