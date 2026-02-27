@@ -998,13 +998,10 @@ document.addEventListener('mousemove', (e) => {
   }
 });
 
-document.addEventListener('mouseup', (e) => {
+document.addEventListener('mouseup', () => {
   if (_wfDragging && !_wfDragMoved && _waveformDuration > 0) {
-    // Pure click — seek audioPreview to this position and play
-    const rect = waveformCanvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const secs = (x / rect.width) * _waveformDuration;
-    audioPreview.currentTime = secs;
+    // Pure click — seek to position already computed on mousedown and play
+    audioPreview.currentTime = _wfDragStart;
     _stopOthers(audioPreview);
     audioPreview.play();
   }
