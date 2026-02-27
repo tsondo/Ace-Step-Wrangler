@@ -88,6 +88,11 @@ class GenerateRequest(BaseModel):
     bpm:            Optional[int] = None
     time_signature: str          = "4/4"
 
+    # Raw advanced overrides (from advanced panel sliders — win over friendly presets)
+    guidance_scale_raw:   Optional[float] = None
+    audio_guidance_scale: Optional[float] = None
+    inference_steps_raw:  Optional[int]   = None
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -113,19 +118,28 @@ def _build_payload(req: GenerateRequest) -> dict:
     else:
         prompt = req.style
 
+    # Raw advanced values override the friendly preset mappings when provided
+    guidance_scale   = req.guidance_scale_raw  if req.guidance_scale_raw  is not None \
+                       else _LYRIC_ADHERENCE[lyric_adherence]
+    inference_steps  = req.inference_steps_raw if req.inference_steps_raw is not None \
+                       else _QUALITY_STEPS[quality]
+
     payload = {
         "prompt":          prompt,
         "lyrics":          req.lyrics,
         "audio_duration":  req.duration,
-        "guidance_scale":  _LYRIC_ADHERENCE[lyric_adherence],
+        "guidance_scale":  guidance_scale,
         "shift":           shift,
-        "inference_steps": _QUALITY_STEPS[quality],
+        "inference_steps": inference_steps,
         "batch_size":      max(1, req.batch_size),
         "use_random_seed": req.seed is None,
         "seed":            req.seed if req.seed is not None else -1,
         "infer_method":    _SCHEDULER.get(req.scheduler, "ode"),
         "audio_format":    req.audio_format,
     }
+
+    if req.audio_guidance_scale is not None:
+        payload["audio_guidance_scale"] = req.audio_guidance_scale
 
     model_name = _GEN_MODEL.get(req.gen_model)
     if model_name:

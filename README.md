@@ -75,7 +75,7 @@ Early development — frontend shell is in place but generation is not yet wired
 | 5 | FastAPI backend + AceStep wiring | Done |
 | 6 | Progress + output panel | Done |
 | 7 | Warnings system | Done |
-| 8 | Advanced panel | Pending |
+| 8 | Advanced panel | Done |
 | 9 | Polish pass | Pending |
 
 ## License

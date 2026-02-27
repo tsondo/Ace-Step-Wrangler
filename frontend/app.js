@@ -303,6 +303,45 @@ function updateBatchLimit() {
 
 updateBatchLimit();
 
+// ===== Advanced panel — friendly ↔ raw slider sync =====
+// Friendly sliders (quality, lyric-adherence) drive preset values on the raw
+// advanced sliders. The user can then fine-tune the raw sliders independently.
+// buildPayload() always reads the raw slider values, so fine-tuning is preserved.
+
+const _LYRIC_STEPS_MAP = [3.0, 7.0, 12.0]; // lyric-adherence → guidance_scale
+const _QUALITY_STEPS_MAP = [15, 60, 120];   // quality → inference_steps
+
+function syncAdvancedFromFriendly() {
+  const adherence     = Number(document.getElementById('lyric-adherence').value);
+  const quality       = Number(document.getElementById('quality').value);
+  const guidanceLyric = document.getElementById('guidance-lyric');
+  const infSteps      = document.getElementById('inference-steps');
+
+  guidanceLyric.value = _LYRIC_STEPS_MAP[adherence];
+  updateSlider(guidanceLyric);
+
+  infSteps.value = _QUALITY_STEPS_MAP[quality];
+  updateSlider(infSteps);
+}
+
+// Sync on page load so raw sliders start consistent with friendly defaults
+syncAdvancedFromFriendly();
+
+// When a friendly slider moves, update the corresponding raw slider
+document.getElementById('lyric-adherence').addEventListener('input', () => {
+  const val = Number(document.getElementById('lyric-adherence').value);
+  const guidanceLyric = document.getElementById('guidance-lyric');
+  guidanceLyric.value = _LYRIC_STEPS_MAP[val];
+  updateSlider(guidanceLyric);
+});
+
+document.getElementById('quality').addEventListener('input', () => {
+  const val = Number(document.getElementById('quality').value);
+  const infSteps = document.getElementById('inference-steps');
+  infSteps.value = _QUALITY_STEPS_MAP[val];
+  updateSlider(infSteps);
+});
+
 // ===== Generate — validation & ready state =====
 
 const generateBtn  = document.getElementById('generate-btn');
@@ -342,6 +381,10 @@ function buildPayload() {
     key:             keyRoot ? `${keyRoot} ${keyMode}` : '',
     bpm:             bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
     time_signature:  document.getElementById('time-sig').value,
+    // Raw advanced slider values — override the friendly preset mappings
+    guidance_scale_raw:   Number(document.getElementById('guidance-lyric').value),
+    audio_guidance_scale: Number(document.getElementById('guidance-audio').value),
+    inference_steps_raw:  Number(document.getElementById('inference-steps').value),
   };
 }
 
