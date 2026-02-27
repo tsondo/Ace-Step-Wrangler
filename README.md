@@ -26,10 +26,10 @@ ACE-Step-Wrangler runs in its own virtual environment and communicates with AceS
 ```bash
 git clone https://github.com/yourusername/ACE-Step-Wrangler.git
 cd ACE-Step-Wrangler
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r backend/requirements.txt
+uv sync
 ```
+
+That's it. uv will create the virtual environment and install all dependencies automatically.
 
 ## Usage
 
@@ -41,7 +41,7 @@ uv run acestep-api  # default: http://localhost:8001
 
 Then start ACE-Step-Wrangler:
 ```bash
-python backend/main.py
+uv run python backend/main.py
 ```
 
 Then open your browser to `http://localhost:7860`.
@@ -50,10 +50,10 @@ Then open your browser to `http://localhost:7860`.
 
 ```
 ACE-Step-Wrangler/
+├── pyproject.toml            # Project dependencies (managed by uv)
 ├── backend/
 │   ├── main.py               # FastAPI server
-│   ├── acestep_wrapper.py    # AceStep API wrapper
-│   └── requirements.txt
+│   └── acestep_wrapper.py    # AceStep API wrapper
 ├── frontend/
 │   ├── index.html
 │   ├── style.css

@@ -21,12 +21,13 @@ See `docs/PROJECT_PLAN.md` for full architecture, layout, build order, and desig
 ACE-Step-Wrangler/
 ├── CLAUDE.md               ← you are here
 ├── README.md
+├── pyproject.toml          ← managed by uv, do not hand-edit
+├── uv.lock                 ← auto-generated, commit this
 ├── docs/
 │   └── PROJECT_PLAN.md     ← full design spec, read this first
 ├── backend/
 │   ├── main.py             ← FastAPI app entry point
-│   ├── acestep_wrapper.py  ← thin wrapper around AceStep Python API
-│   └── requirements.txt
+│   └── acestep_wrapper.py  ← thin wrapper around AceStep REST API
 └── frontend/
     ├── index.html
     ├── style.css
@@ -38,7 +39,9 @@ ACE-Step-Wrangler/
 - **No frameworks.** Frontend is plain HTML/CSS/JS. Do not introduce React, Vue, or any JS framework.
 - **No build toolchain.** No webpack, vite, npm, etc. All JS is written to run directly in the browser.
 - **One file per concern.** Keep HTML, CSS, and JS in separate files unless there's a compelling reason.
-- **Backend is thin.** The FastAPI backend should do minimal logic — its job is to expose AceStep cleanly, not to reimplement AceStep features.
+- **Use uv for all dependency management.** Do not create or edit `requirements.txt`. Add dependencies via `uv add <package>` which updates `pyproject.toml` and `uv.lock` automatically.
+- **Backend is thin.** The FastAPI backend should do minimal logic — its job is to relay requests to AceStep's REST API cleanly, not to reimplement AceStep features.
+- **AceStep is a separate process.** Never import AceStep directly. All communication goes through its local REST API (default: `http://localhost:8001`).
 - **Friendly labels only in the main UI.** ML jargon (guidance scale, inference steps, scheduler) belongs exclusively in the advanced panel.
 - **Warn early.** Validation and warnings (e.g. lyrics too long for duration) should fire in the frontend before the user hits Generate, not after.
 
