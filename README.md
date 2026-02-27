@@ -56,6 +56,8 @@ Open `http://localhost:7860` in your browser and start making music.
 
 Ctrl+C shuts down both servers gracefully.
 
+> **First run:** AceStep will automatically download its models (~10 GB) on first launch. The default download includes the turbo DiT model, the 1.7B language model, the Qwen3 text encoder, and the audio VAE. The exact LM model chosen may vary based on your GPU's available VRAM. Ensure you have sufficient disk space and a reasonable internet connection. Models are cached locally and only downloaded once. You can also pre-download them with `uv run acestep-download`.
+
 ### GPU Selection
 
 ACE-Step is a single-GPU model — it does not do multi-GPU inference, but `CUDA_VISIBLE_DEVICES` controls which GPU it uses.
