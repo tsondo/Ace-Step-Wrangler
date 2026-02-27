@@ -94,14 +94,14 @@ Once loaded, the filename, duration, and an audio player appear. The output pane
 
 ### Approach
 
-**Reimagine** — generates a new creative take on the entire song, guided by your style direction. Use the **Cover strength** slider to control how closely the result resembles the original.
+**Reimagine** — generates a new creative take on the **entire song**. The waveform selection has no effect here; any region you drew is ignored. Use the **Cover strength** slider to control how closely the result resembles the original.
 
 | Cover strength | Effect |
 |---|---|
 | Low (Subtle) | Stays close to the original structure and feel |
 | High (Dramatic) | More departure from the source |
 
-**Fix & Blend** — regenerates only a selected region of the song while keeping everything else intact. Best used for specific sections rather than large portions.
+**Fix & Blend** — regenerates **only the selected region** while keeping everything else intact. This is the approach to use when you want to change a specific section. Best used on targeted sections rather than large portions of the song.
 
 Set the region:
 - Click and drag on the **waveform** to select a range (highlighted in amber)
