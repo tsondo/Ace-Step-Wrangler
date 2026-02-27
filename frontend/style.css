@@ -529,8 +529,7 @@ html, body {
   display: none !important;
 }
 
-/* Dim flanking panels while Lyrics > Generate tab is active */
-#main.lyrics-gen-mode #style-panel,
+/* Dim controls panel while Lyrics > Generate tab is active (style panel stays live) */
 #main.lyrics-gen-mode #controls-panel {
   opacity: 0.25;
   pointer-events: none;

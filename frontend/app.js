@@ -584,12 +584,16 @@ async function generateLyrics() {
   lyricsGenStatus.classList.remove('hidden');
   lyricsPreview.classList.add('hidden');
 
+  // Combine description with the assembled style prompt so the LM gets the full picture
+  const styleContext = [getStylePrompt(), getSongParamsSummary()].filter(Boolean).join(', ');
+  const fullDescription = styleContext ? `${description}. Style: ${styleContext}` : description;
+
   try {
     const res = await fetch('/generate-lyrics', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        description,
+        description: fullDescription,
         vocal_language: document.getElementById('lyrics-language').value,
       }),
     });
