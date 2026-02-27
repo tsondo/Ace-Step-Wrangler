@@ -602,7 +602,7 @@ html, body {
 /* Approach selector */
 .approach-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
@@ -610,13 +610,14 @@ html, body {
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px;
+  padding: 9px 12px;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
   text-align: left;
-  transition: border-color 0.15s, background 0.15s;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .approach-btn:hover {
@@ -628,20 +629,8 @@ html, body {
   background: var(--accent-dim);
 }
 
-.approach-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.approach-btn.active .approach-name {
+.approach-btn.active {
   color: var(--accent);
-}
-
-.approach-desc {
-  font-size: 10px;
-  color: var(--text-muted);
-  line-height: 1.4;
 }
 
 /* Region inputs */
