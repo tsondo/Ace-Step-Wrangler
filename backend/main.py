@@ -21,6 +21,7 @@ import uvicorn
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse, parse_qs
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -234,6 +235,62 @@ def _heuristic_seconds(lyrics: str, bpm: int, time_signature: str) -> float:
     return max(10.0, min(600.0, seconds))
 
 
+def _estimate_sections(
+    lyrics: str, duration: float, bpm: int, time_signature: str
+) -> list[dict]:
+    """Estimate section boundaries from lyrics structure, scaled to actual duration."""
+    headers = _SECTION_RE.findall(lyrics)
+    if not headers:
+        return []
+
+    try:
+        num = int(time_signature.split("/")[0])
+    except (ValueError, IndexError):
+        num = 4
+
+    def _lookup_bars(header: str) -> int:
+        h = header.strip().lower()
+        if h in _SECTION_BARS:
+            return _SECTION_BARS[h]
+        for key, bars in _SECTION_BARS.items():
+            if h.startswith(key) or key in h:
+                return bars
+        return 8
+
+    sections = []
+    for header in headers:
+        bars = _lookup_bars(header)
+        raw_secs = bars * num / bpm * 60
+        sections.append({"name": header.strip(), "bars": bars, "raw_secs": raw_secs})
+
+    # Scale proportionally to fit actual duration
+    total_raw = sum(s["raw_secs"] for s in sections)
+    if total_raw <= 0:
+        return []
+
+    scale = duration / total_raw
+    cursor = 0.0
+    result = []
+    for s in sections:
+        scaled = s["raw_secs"] * scale
+        result.append({
+            "name": s["name"],
+            "start": round(cursor, 2),
+            "end": round(cursor + scaled, 2),
+            "bars": s["bars"],
+        })
+        cursor += scaled
+
+    return result
+
+
+class EstimateSectionsRequest(BaseModel):
+    lyrics:         str           = ""
+    duration:       float         = 30.0
+    bpm:            Optional[int] = None
+    time_signature: str           = "4/4"
+
+
 class EstimateDurationRequest(BaseModel):
     lyrics:         str          = ""
     bpm:            Optional[int] = None
@@ -304,8 +361,14 @@ async def generate_lyrics(req: GenerateLyricsRequest):
                 raise HTTPException(status_code=502, detail="No results returned")
             result = results[0]
             meta = result.get("meta") or {}
-            # caption and lyrics are at the result top level, not inside metas
-            # metas has: bpm, duration, keyscale, timesignature, genres
+
+            # Extract audio paths for preview & rework
+            raw_audio_url = result.get("audio_url", "")
+            audio_path = ""
+            if raw_audio_url:
+                parsed = parse_qs(urlparse(raw_audio_url).query)
+                audio_path = parsed.get("path", [""])[0]
+
             return {
                 "caption": result.get("prompt", ""),
                 "lyrics": result.get("lyrics", ""),
@@ -313,6 +376,8 @@ async def generate_lyrics(req: GenerateLyricsRequest):
                 "key_scale": meta.get("keyscale", ""),
                 "time_signature": meta.get("timesignature", "4/4"),
                 "duration": meta.get("duration"),
+                "audio_url": raw_audio_url,
+                "audio_path": audio_path,
             }
         elif data["status"] == "error":
             raise HTTPException(status_code=502, detail="Lyrics generation failed")
@@ -382,6 +447,14 @@ async def estimate_duration(req: EstimateDurationRequest):
     if not req.bpm:
         resp["assumed_bpm"] = 120
     return resp
+
+
+@app.post("/estimate-sections")
+async def estimate_sections(req: EstimateSectionsRequest):
+    """Estimate section boundaries from lyrics structure, scaled to actual duration."""
+    bpm = req.bpm if req.bpm else 120
+    sections = _estimate_sections(req.lyrics, req.duration, bpm, req.time_signature)
+    return {"sections": sections}
 
 
 @app.get("/download/{job_id}/{index}/audio")

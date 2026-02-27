@@ -491,6 +491,19 @@ async function generateLyrics() {
       if (value) lyricsPreviewMeta.appendChild(createMetaBadge(label, value));
     }
 
+    // Audio preview
+    const lyricsAudio = document.getElementById('lyrics-audio-preview');
+    const sendToReworkBtn = document.getElementById('send-to-rework-btn');
+    if (_lyricsGenResult.audio_path) {
+      lyricsAudio.src = '/audio?path=' + encodeURIComponent(_lyricsGenResult.audio_path);
+      lyricsAudio.classList.remove('hidden');
+      sendToReworkBtn.classList.remove('hidden');
+    } else {
+      lyricsAudio.src = '';
+      lyricsAudio.classList.add('hidden');
+      sendToReworkBtn.classList.add('hidden');
+    }
+
     lyricsPreview.classList.remove('hidden');
   } catch (err) {
     lyricsGenHint.textContent = `Error: ${err.message}`;
@@ -555,6 +568,41 @@ function useLyrics(applyMeta) {
 
 document.getElementById('use-lyrics-btn').addEventListener('click', () => useLyrics(false));
 document.getElementById('use-lyrics-meta-btn').addEventListener('click', () => useLyrics(true));
+
+// --- Send generated audio to Rework ---
+
+function sendToRework() {
+  if (!_lyricsGenResult || !_lyricsGenResult.audio_path) return;
+
+  // Set server-side audio path (no upload needed — already on disk)
+  _uploadedAudioPath = _lyricsGenResult.audio_path;
+
+  // Set audio preview in rework panel
+  audioPreview.src = '/audio?path=' + encodeURIComponent(_lyricsGenResult.audio_path);
+
+  // Get duration from metadata or from the lyrics audio player
+  const lyricsAudio = document.getElementById('lyrics-audio-preview');
+  const dur = _lyricsGenResult.duration || (lyricsAudio.duration && isFinite(lyricsAudio.duration) ? lyricsAudio.duration : null);
+  if (dur) {
+    _uploadedAudioDuration = Number(dur);
+    document.getElementById('upload-duration').textContent = formatDuration(_uploadedAudioDuration);
+    document.getElementById('region-end').value = Math.round(_uploadedAudioDuration * 10) / 10;
+    document.getElementById('region-end').max = Math.round(_uploadedAudioDuration * 10) / 10;
+    document.getElementById('region-start').max = Math.round(_uploadedAudioDuration * 10) / 10;
+  }
+
+  // Update upload UI to show loaded state
+  document.getElementById('upload-filename').textContent = 'Generated audio';
+  uploadPrompt.classList.add('hidden');
+  uploadLoaded.classList.remove('hidden');
+
+  // Switch to rework mode
+  switchMode('rework');
+  updateControlsForMode('rework');
+  updateGenerateState();
+}
+
+document.getElementById('send-to-rework-btn').addEventListener('click', sendToRework);
 
 // ===== Clear button =====
 
@@ -709,6 +757,376 @@ document.getElementById('quality').addEventListener('input', () => {
   infSteps.value = _QUALITY_STEPS_MAP[val];
   updateSlider(infSteps);
 });
+
+// ===== Waveform Timeline =====
+
+let _waveformData = null;     // Float32Array of downsampled peaks
+let _waveformDuration = 0;    // audio duration in seconds
+let _waveformSections = [];   // [{name, start, end, bars}]
+let _waveformAudioUrl = '';   // current audio URL for the waveform
+let _waveformAnimFrame = null;
+
+const waveformCanvas    = document.getElementById('waveform-canvas');
+const waveformCtx       = waveformCanvas.getContext('2d');
+const waveformSelection = document.getElementById('waveform-selection');
+const waveformPlayhead  = document.getElementById('waveform-playhead');
+const wfRegionStart     = document.getElementById('wf-region-start');
+const wfRegionEnd       = document.getElementById('wf-region-end');
+const wfSelectionInfo   = document.getElementById('wf-selection-info');
+const waveformContainer = document.querySelector('.waveform-container');
+
+function getComputedColor(varName) {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
+
+async function renderWaveform(audioUrl) {
+  if (!audioUrl) return;
+  _waveformAudioUrl = audioUrl;
+
+  const loadingEl = document.getElementById('waveform-loading');
+  loadingEl.classList.remove('hidden');
+
+  try {
+    const resp = await fetch(audioUrl);
+    if (!resp.ok) throw new Error(resp.statusText);
+    const arrayBuf = await resp.arrayBuffer();
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+    audioCtx.close();
+
+    _waveformDuration = audioBuf.duration;
+
+    // Mono mixdown
+    const channels = audioBuf.numberOfChannels;
+    const length = audioBuf.length;
+    const mono = new Float32Array(length);
+    for (let ch = 0; ch < channels; ch++) {
+      const data = audioBuf.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        mono[i] += data[i] / channels;
+      }
+    }
+
+    // Downsample to canvas width (one peak per 2-3 pixels)
+    resizeCanvas();
+    const barCount = Math.floor(waveformCanvas.width / (2 * (window.devicePixelRatio || 1)));
+    const samplesPerBar = Math.floor(length / barCount);
+    _waveformData = new Float32Array(barCount);
+    for (let i = 0; i < barCount; i++) {
+      let peak = 0;
+      const offset = i * samplesPerBar;
+      for (let j = 0; j < samplesPerBar; j++) {
+        const abs = Math.abs(mono[offset + j] || 0);
+        if (abs > peak) peak = abs;
+      }
+      _waveformData[i] = peak;
+    }
+
+    drawWaveform();
+  } catch (err) {
+    console.error('Waveform decode error:', err);
+  } finally {
+    loadingEl.classList.add('hidden');
+  }
+}
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = waveformCanvas.parentElement.getBoundingClientRect();
+  waveformCanvas.width = rect.width * dpr;
+  waveformCanvas.height = rect.height * dpr;
+  waveformCanvas.style.width = rect.width + 'px';
+  waveformCanvas.style.height = rect.height + 'px';
+  waveformCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawWaveform() {
+  if (!_waveformData) return;
+
+  const w = waveformCanvas.parentElement.getBoundingClientRect().width;
+  const h = waveformCanvas.parentElement.getBoundingClientRect().height;
+  const barCount = _waveformData.length;
+  if (barCount === 0) return;
+
+  const barWidth = w / barCount;
+  const selStart = Number(wfRegionStart.value) || 0;
+  const selEnd = Number(wfRegionEnd.value) || 0;
+  const hasSelection = selEnd > selStart;
+
+  const mutedColor = getComputedColor('--text-muted');
+  const accentColor = getComputedColor('--accent');
+
+  waveformCtx.clearRect(0, 0, w, h);
+
+  const midY = h / 2;
+  const maxBarH = h * 0.85;
+
+  for (let i = 0; i < barCount; i++) {
+    const x = i * barWidth;
+    const barH = Math.max(1, _waveformData[i] * maxBarH);
+
+    // Determine if this bar is in the selected region
+    const barSecs = (i / barCount) * _waveformDuration;
+    const inSelection = hasSelection && barSecs >= selStart && barSecs <= selEnd;
+
+    waveformCtx.fillStyle = inSelection ? accentColor : mutedColor;
+    waveformCtx.fillRect(x, midY - barH / 2, Math.max(1, barWidth - 0.5), barH);
+  }
+}
+
+function renderSections(sections) {
+  _waveformSections = sections;
+  const container = document.getElementById('waveform-sections');
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  if (!sections.length || !_waveformDuration) return;
+
+  sections.forEach((sec, i) => {
+    // Section stripe (alternating background)
+    const stripe = document.createElement('div');
+    stripe.className = 'waveform-section-stripe';
+    stripe.style.left = (sec.start / _waveformDuration * 100) + '%';
+    stripe.style.width = ((sec.end - sec.start) / _waveformDuration * 100) + '%';
+    container.appendChild(stripe);
+
+    // Section label pill
+    const label = document.createElement('div');
+    label.className = 'waveform-section-label';
+    label.textContent = sec.name;
+    label.style.left = (sec.start / _waveformDuration * 100) + '%';
+    label.dataset.index = i;
+    label.addEventListener('click', (e) => {
+      if (e.shiftKey && _waveformSections.length > 0) {
+        // Shift+click: extend selection
+        const curStart = Number(wfRegionStart.value) || 0;
+        const curEnd = Number(wfRegionEnd.value) || 0;
+        const newStart = Math.min(curStart, sec.start);
+        const newEnd = Math.max(curEnd, sec.end);
+        setWaveformRegion(newStart, newEnd);
+      } else {
+        setWaveformRegion(sec.start, sec.end);
+      }
+    });
+    container.appendChild(label);
+  });
+}
+
+// --- Waveform region selection (drag + input sync) ---
+
+function setWaveformRegion(start, end) {
+  start = Math.max(0, Math.round(start * 10) / 10);
+  end = Math.min(_waveformDuration, Math.round(end * 10) / 10);
+  if (end < start) end = start;
+
+  wfRegionStart.value = start.toFixed(1);
+  wfRegionEnd.value = end.toFixed(1);
+
+  // Sync with rework panel region inputs (bidirectional)
+  document.getElementById('region-start').value = start.toFixed(1);
+  document.getElementById('region-end').value = end.toFixed(1);
+
+  updateWaveformVisuals();
+}
+
+function updateWaveformVisuals() {
+  const start = Number(wfRegionStart.value) || 0;
+  const end = Number(wfRegionEnd.value) || 0;
+
+  if (end > start && _waveformDuration > 0) {
+    const leftPct = (start / _waveformDuration) * 100;
+    const widthPct = ((end - start) / _waveformDuration) * 100;
+    waveformSelection.style.left = leftPct + '%';
+    waveformSelection.style.width = widthPct + '%';
+    waveformSelection.classList.remove('hidden');
+
+    // Selection info text
+    const durSecs = end - start;
+    const sectionNames = _waveformSections
+      .filter(s => s.start >= start - 0.5 && s.end <= end + 0.5)
+      .map(s => s.name);
+    const secLabel = sectionNames.length ? sectionNames.join(' + ') + ' \u00b7 ' : '';
+    wfSelectionInfo.textContent = secLabel + formatTimecode(start) + ' \u2013 ' + formatTimecode(end) + ' (' + durSecs.toFixed(1) + 's)';
+  } else {
+    waveformSelection.classList.add('hidden');
+    wfSelectionInfo.textContent = '';
+  }
+
+  drawWaveform();
+}
+
+function formatTimecode(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  const frac = Math.round((secs % 1) * 10);
+  return m + ':' + String(s).padStart(2, '0') + '.' + frac;
+}
+
+// Drag-to-select on waveform canvas
+let _wfDragging = false;
+let _wfDragStart = 0;
+let _wfHandleDrag = null; // 'left' | 'right' | null
+
+waveformContainer.addEventListener('mousedown', (e) => {
+  // Check if drag started on a handle
+  const target = e.target;
+  if (target.classList.contains('waveform-handle-left')) {
+    _wfHandleDrag = 'left';
+    e.preventDefault();
+    return;
+  }
+  if (target.classList.contains('waveform-handle-right')) {
+    _wfHandleDrag = 'right';
+    e.preventDefault();
+    return;
+  }
+
+  if (target.classList.contains('waveform-section-label')) return;
+
+  _wfDragging = true;
+  const rect = waveformCanvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+  _wfDragStart = (x / rect.width) * _waveformDuration;
+  setWaveformRegion(_wfDragStart, _wfDragStart);
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!_wfDragging && !_wfHandleDrag) return;
+
+  const rect = waveformCanvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+  const secs = (x / rect.width) * _waveformDuration;
+
+  if (_wfHandleDrag === 'left') {
+    const end = Number(wfRegionEnd.value) || 0;
+    setWaveformRegion(Math.min(secs, end), end);
+  } else if (_wfHandleDrag === 'right') {
+    const start = Number(wfRegionStart.value) || 0;
+    setWaveformRegion(start, Math.max(secs, start));
+  } else if (_wfDragging) {
+    const start = Math.min(_wfDragStart, secs);
+    const end = Math.max(_wfDragStart, secs);
+    setWaveformRegion(start, end);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  _wfDragging = false;
+  _wfHandleDrag = null;
+});
+
+// Number input -> waveform sync
+wfRegionStart.addEventListener('input', () => {
+  document.getElementById('region-start').value = wfRegionStart.value;
+  updateWaveformVisuals();
+});
+
+wfRegionEnd.addEventListener('input', () => {
+  document.getElementById('region-end').value = wfRegionEnd.value;
+  updateWaveformVisuals();
+});
+
+// Rework panel region inputs -> waveform sync (bidirectional)
+document.getElementById('region-start').addEventListener('input', () => {
+  wfRegionStart.value = document.getElementById('region-start').value;
+  updateWaveformVisuals();
+});
+
+document.getElementById('region-end').addEventListener('input', () => {
+  wfRegionEnd.value = document.getElementById('region-end').value;
+  updateWaveformVisuals();
+});
+
+// Playhead tracking
+function startPlayheadTracking(audioEl) {
+  stopPlayheadTracking();
+  waveformPlayhead.classList.add('active');
+
+  function update() {
+    if (audioEl.paused && !audioEl.seeking) {
+      waveformPlayhead.classList.remove('active');
+      return;
+    }
+    if (_waveformDuration > 0) {
+      const pct = (audioEl.currentTime / _waveformDuration) * 100;
+      waveformPlayhead.style.left = pct + '%';
+    }
+    _waveformAnimFrame = requestAnimationFrame(update);
+  }
+  _waveformAnimFrame = requestAnimationFrame(update);
+}
+
+function stopPlayheadTracking() {
+  if (_waveformAnimFrame) {
+    cancelAnimationFrame(_waveformAnimFrame);
+    _waveformAnimFrame = null;
+  }
+  waveformPlayhead.classList.remove('active');
+}
+
+// Hook playhead into rework panel's audio preview
+audioPreview.addEventListener('play', () => startPlayheadTracking(audioPreview));
+audioPreview.addEventListener('pause', stopPlayheadTracking);
+audioPreview.addEventListener('ended', stopPlayheadTracking);
+
+// Resize handling
+const debouncedWaveformResize = debounce(() => {
+  if (_waveformData) {
+    resizeCanvas();
+    drawWaveform();
+  }
+}, 200);
+window.addEventListener('resize', debouncedWaveformResize);
+
+// --- Integration: load waveform when audio loads in rework mode ---
+
+async function loadWaveformForRework(audioPath, duration, lyrics) {
+  if (!audioPath) return;
+  const audioUrl = '/audio?path=' + encodeURIComponent(audioPath);
+  setOutputState('waveform');
+
+  // Set max on waveform inputs
+  if (duration) {
+    wfRegionEnd.max = Math.round(duration * 10) / 10;
+    wfRegionStart.max = Math.round(duration * 10) / 10;
+  }
+
+  await renderWaveform(audioUrl);
+
+  // Fetch section estimates if we have lyrics
+  if (lyrics && lyrics.trim()) {
+    try {
+      const bpmVal = document.getElementById('bpm').value.trim();
+      const timeSig = document.getElementById('time-sig').value;
+      const res = await fetch('/estimate-sections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lyrics: lyrics,
+          duration: _waveformDuration || duration || 30,
+          bpm: bpmVal ? parseInt(bpmVal, 10) : null,
+          time_signature: timeSig,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        renderSections(data.sections || []);
+      }
+    } catch (_) { /* section labels are optional */ }
+  }
+}
+
+function clearWaveform() {
+  _waveformData = null;
+  _waveformDuration = 0;
+  _waveformSections = [];
+  _waveformAudioUrl = '';
+  stopPlayheadTracking();
+  waveformSelection.classList.add('hidden');
+  wfSelectionInfo.textContent = '';
+  const container = document.getElementById('waveform-sections');
+  while (container.firstChild) container.removeChild(container.firstChild);
+}
 
 // ===== Generate — validation & ready state =====
 

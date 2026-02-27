@@ -795,10 +795,26 @@ html, body {
   overflow-y: auto;
 }
 
+.lyrics-audio-preview {
+  width: 100%;
+  height: 32px;
+  flex-shrink: 0;
+}
+
 .lyrics-preview-actions {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.send-to-rework-btn {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.send-to-rework-btn:hover {
+  background: var(--accent-dim) !important;
 }
 
 .use-lyrics-meta-btn {
@@ -1164,6 +1180,178 @@ details[open] > .advanced-toggle {
 .card-actions {
   display: flex;
   gap: 6px;
+}
+
+/* ============================================================
+   Waveform Timeline
+   ============================================================ */
+.waveform-container {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+#waveform-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.waveform-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--surface-raised);
+  z-index: 5;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Section labels */
+.waveform-sections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.waveform-section-label {
+  position: absolute;
+  top: 3px;
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.15s;
+  z-index: 3;
+}
+
+.waveform-section-label:hover {
+  background: rgba(245, 158, 11, 0.3);
+}
+
+.waveform-section-stripe {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+}
+
+.waveform-section-stripe:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* Selection overlay */
+.waveform-selection {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 2px solid var(--accent);
+  border-right: 2px solid var(--accent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.waveform-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  pointer-events: auto;
+  z-index: 4;
+}
+
+.waveform-handle-left {
+  left: -5px;
+}
+
+.waveform-handle-right {
+  right: -5px;
+}
+
+/* Playhead */
+.waveform-playhead {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--accent-bright);
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.waveform-playhead.active {
+  opacity: 1;
+}
+
+/* Controls row below waveform */
+.waveform-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+
+.waveform-time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wf-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wf-time-input {
+  width: 72px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.waveform-selection-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* Waveform output body — override centered layout */
+#output-waveform {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
 }
 
 /* ============================================================

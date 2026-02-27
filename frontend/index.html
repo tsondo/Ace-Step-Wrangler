@@ -273,10 +273,12 @@
 
         <div class="lyrics-preview hidden" id="lyrics-preview">
           <div class="lyrics-preview-meta" id="lyrics-preview-meta"></div>
+          <audio id="lyrics-audio-preview" class="lyrics-audio-preview hidden" controls></audio>
           <pre class="lyrics-preview-text" id="lyrics-preview-text"></pre>
           <div class="lyrics-preview-actions">
             <button class="ghost-btn" id="use-lyrics-btn" type="button">Use These Lyrics</button>
             <button class="ghost-btn use-lyrics-meta-btn" id="use-lyrics-meta-btn" type="button">Use Lyrics + Apply Metadata</button>
+            <button class="ghost-btn send-to-rework-btn hidden" id="send-to-rework-btn" type="button">Send to Rework</button>
           </div>
         </div>
 
@@ -454,6 +456,32 @@
 
     <!-- State 3: Result cards -->
     <div class="output-cards hidden" id="output-cards"></div>
+
+    <!-- State 4: Waveform timeline (rework mode, audio loaded) -->
+    <div class="output-body hidden" id="output-waveform">
+      <div class="waveform-container">
+        <div class="waveform-loading hidden" id="waveform-loading">
+          <div class="spinner spinner-sm"></div>
+          <span>Decoding audio…</span>
+        </div>
+        <canvas id="waveform-canvas"></canvas>
+        <div class="waveform-sections" id="waveform-sections"></div>
+        <div class="waveform-selection hidden" id="waveform-selection">
+          <div class="waveform-handle waveform-handle-left"></div>
+          <div class="waveform-handle waveform-handle-right"></div>
+        </div>
+        <div class="waveform-playhead" id="waveform-playhead"></div>
+      </div>
+      <div class="waveform-controls">
+        <div class="waveform-time-inputs">
+          <label class="wf-label">Start</label>
+          <input type="number" id="wf-region-start" class="number-input wf-time-input" step="0.1" min="0" value="0">
+          <label class="wf-label">End</label>
+          <input type="number" id="wf-region-end" class="number-input wf-time-input" step="0.1" min="0" value="0">
+        </div>
+        <span class="waveform-selection-info" id="wf-selection-info"></span>
+      </div>
+    </div>
   </footer>
 
 </div>
