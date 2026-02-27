@@ -1,6 +1,6 @@
 # ACE-Step-Wrangler
 
-A creative-friendly web UI for [AceStep 1.5](https://github.com/ace-step/AceStep), designed for musicians and producers — not ML researchers.
+A creative-friendly web UI for [AceStep 1.5](https://github.com/ace-step/ACE-Step-1.5), designed for musicians and producers — not ML researchers.
 
 ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspired UI that abstracts complex model parameters behind intuitive controls. If you know what a compressor does but not what a guidance scale is, this is for you.
 
@@ -18,44 +18,100 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 
 ## Requirements
 
-- Python 3.11+
-- A running AceStep 1.5 instance with its REST API enabled (see [AceStep 1.5 docs](https://github.com/ace-step/ACE-Step-1.5))
+- Python 3.11 or 3.12
+- A CUDA-capable GPU (for AceStep — Wrangler itself has no GPU requirements)
 - A modern browser
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-ACE-Step-Wrangler runs in its own virtual environment and communicates with AceStep over its local REST API. You do not need to install AceStep into the same environment.
+ACE-Step 1.5 is bundled as a git submodule — no separate installation needed.
 
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/ACE-Step-Wrangler.git
+git clone --recursive https://github.com/yourusername/ACE-Step-Wrangler.git
 cd ACE-Step-Wrangler
 uv sync
 ```
 
-That's it. uv will create the virtual environment and install all dependencies automatically.
+The `--recursive` flag pulls in the ACE-Step 1.5 submodule. If you already cloned without it:
+
+```bash
+git submodule update --init --recursive
+uv sync
+```
+
+`uv sync` creates a virtual environment and installs everything — Wrangler's lightweight dependencies and ACE-Step's full ML stack (PyTorch, transformers, etc.).
 
 ## Usage
 
-First, make sure AceStep 1.5 is running with its API enabled:
 ```bash
-# In your AceStep directory
-uv run acestep-api  # default: http://localhost:8001
+uv run python run.py
 ```
 
-Then start ACE-Step-Wrangler:
+This starts both servers:
+- **AceStep API** on `http://localhost:8001` (loads models, runs inference on GPU)
+- **Wrangler UI** on `http://localhost:7860` (serves the web interface, no GPU)
+
+Open `http://localhost:7860` in your browser and start making music.
+
+Ctrl+C shuts down both servers gracefully.
+
+### GPU Selection
+
+ACE-Step is a single-GPU model — it does not do multi-GPU inference, but `CUDA_VISIBLE_DEVICES` controls which GPU it uses.
+
+```bash
+# Use a specific GPU (e.g. GPU 1)
+uv run python run.py --gpu 1
+
+# Equivalent using environment variable
+ACESTEP_GPU=1 uv run python run.py
+```
+
+The `--gpu` flag takes priority over `ACESTEP_GPU`. If neither is set, AceStep uses its default auto-detection.
+
+The Wrangler UI server never sees `CUDA_VISIBLE_DEVICES` — it has no GPU requirements.
+
+### Advanced GPU Configuration
+
+ACE-Step supports several environment variables for fine-tuning GPU behavior. These are forwarded to the AceStep subprocess if set:
+
+| Variable | Description |
+|---|---|
+| `ACESTEP_DEVICE` | Override compute device (e.g. `cuda`, `cpu`, `mps`) |
+| `MAX_CUDA_VRAM` | Limit VRAM usage (in GB) |
+| `ACESTEP_VAE_ON_CPU` | Run VAE decoding on CPU to save VRAM (`true`/`false`) |
+| `ACESTEP_LM_BACKEND` | LLM inference backend override |
+| `ACESTEP_INIT_LLM` | Force LLM initialization even if VRAM is tight (`true`/`false`) |
+
+Example:
+
+```bash
+MAX_CUDA_VRAM=14 ACESTEP_VAE_ON_CPU=true uv run python run.py --gpu 0
+```
+
+See the [ACE-Step 1.5 documentation](https://github.com/ace-step/ACE-Step-1.5) for full details on GPU compatibility and these variables.
+
+### Using a Separate AceStep Instance
+
+If you already have AceStep running elsewhere (different machine, custom setup, etc.), you can skip `run.py` and start only the Wrangler UI:
+
 ```bash
 uv run python backend/main.py
 ```
 
-Then open your browser to `http://localhost:7860`.
+This connects to AceStep's API at `http://localhost:8001` by default. Open `http://localhost:7860` in your browser.
 
 ## Project Structure
 
 ```
 ACE-Step-Wrangler/
+├── run.py                    # Unified launcher (both servers)
 ├── pyproject.toml            # Project dependencies (managed by uv)
+├── vendor/
+│   └── ACE-Step-1.5/        # Git submodule — upstream ACE-Step
 ├── backend/
-│   ├── main.py               # FastAPI server
+│   ├── main.py               # FastAPI server (Wrangler UI)
 │   └── acestep_wrapper.py    # AceStep API wrapper
 ├── frontend/
 │   ├── index.html
@@ -64,6 +120,15 @@ ACE-Step-Wrangler/
 └── docs/
     └── PROJECT_PLAN.md       # Full design spec and build plan
 ```
+
+## Compatibility
+
+- **Python:** 3.11–3.12
+- **CUDA:** up to 13 (via ACE-Step's PyTorch pins)
+- **PyTorch:** up to 2.10 (pinned by ACE-Step per platform)
+- **Platforms:** Linux x86_64, Linux aarch64, macOS Apple Silicon, Windows
+
+Wrangler itself has no GPU dependencies — GPU/platform support comes entirely from ACE-Step.
 
 ## Status
 

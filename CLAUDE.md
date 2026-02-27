@@ -6,13 +6,15 @@ This file provides context and instructions for Claude Code when working on this
 
 ACE-Step-Wrangler is a creative-friendly web UI for AceStep 1.5. It replaces the default Gradio interface with a dark, DAW-inspired HTML/CSS/JS frontend backed by a FastAPI Python server. The goal is to make AI music generation usable by musicians and creatives, not just ML researchers.
 
+ACE-Step 1.5 is bundled as a git submodule in `vendor/ACE-Step-1.5/`, giving users a single-clone install. At runtime, AceStep still runs as a separate API server process — the vendoring unifies installation, not the runtime boundary. `run.py` launches both servers.
+
 See `docs/PROJECT_PLAN.md` for full architecture, layout, build order, and design principles.
 
 ## Tech Stack
 
 - **Frontend:** Vanilla HTML, CSS, JavaScript — no framework, no build step
 - **Backend:** FastAPI (Python)
-- **AceStep:** Called via its Python API from the backend
+- **AceStep:** Vendored submodule, called via REST API from the backend
 - **Styling target:** Dark pro audio / DAW aesthetic
 
 ## Project Structure
@@ -21,8 +23,11 @@ See `docs/PROJECT_PLAN.md` for full architecture, layout, build order, and desig
 ACE-Step-Wrangler/
 ├── CLAUDE.md               ← you are here
 ├── README.md
+├── run.py                  ← unified launcher (both servers)
 ├── pyproject.toml          ← managed by uv, do not hand-edit
 ├── uv.lock                 ← auto-generated, commit this
+├── vendor/
+│   └── ACE-Step-1.5/      ← git submodule — upstream ACE-Step (do not modify)
 ├── docs/
 │   └── PROJECT_PLAN.md     ← full design spec, read this first
 ├── backend/
@@ -42,6 +47,7 @@ ACE-Step-Wrangler/
 - **Use uv for all dependency management.** Do not create or edit `requirements.txt`. Add dependencies via `uv add <package>` which updates `pyproject.toml` and `uv.lock` automatically.
 - **Backend is thin.** The FastAPI backend should do minimal logic — its job is to relay requests to AceStep's REST API cleanly, not to reimplement AceStep features.
 - **AceStep is a separate process.** Never import AceStep directly. All communication goes through its local REST API (default: `http://localhost:8001`).
+- **ACE-Step is vendored as a git submodule** in `vendor/ACE-Step-1.5/`. Do not modify files inside `vendor/` — pull upstream changes with `git submodule update --remote`. All communication with AceStep is still via its REST API.
 - **Friendly labels only in the main UI.** ML jargon (guidance scale, inference steps, scheduler) belongs exclusively in the advanced panel.
 - **Warn early.** Validation and warnings (e.g. lyrics too long for duration) should fire in the frontend before the user hits Generate, not after.
 
@@ -91,6 +97,17 @@ When batch_size is locked to 1, show a concise inline note in the advanced panel
 Check `docs/PROJECT_PLAN.md` build order. Update this line when a stage is complete:
 
 **Current stage: Complete — all 9 stages shipped**
+
+## GPU Selection
+
+`run.py` manages device isolation between the two servers:
+
+- **AceStep subprocess** gets `CUDA_VISIBLE_DEVICES` set if the user passes `--gpu N` or sets `ACESTEP_GPU=N`. This controls which GPU AceStep uses for inference.
+- **Wrangler subprocess** has `CUDA_VISIBLE_DEVICES` explicitly removed from its environment — it has no GPU requirements and must never trigger CUDA initialization.
+
+The following AceStep environment variables are forwarded to the AceStep subprocess if set in the parent environment (never set by default): `ACESTEP_DEVICE`, `MAX_CUDA_VRAM`, `ACESTEP_VAE_ON_CPU`, `ACESTEP_LM_BACKEND`, `ACESTEP_INIT_LLM`.
+
+When modifying `run.py`, preserve this separation — Wrangler code should never depend on GPU availability.
 
 ## What to Avoid
 

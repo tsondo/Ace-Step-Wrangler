@@ -1,10 +1,53 @@
 [project]
 name = "ace-step-wrangler"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.11"
+description = "Creative-friendly web UI for AceStep 1.5"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "fastapi>=0.133.1",
     "httpx>=0.28.1",
     "uvicorn>=0.41.0",
+    # ACE-Step and all its GPU/ML dependencies — resolved via [tool.uv.sources]
+    "ace-step",
+]
+
+# ---------------------------------------------------------------------------
+# uv configuration — must mirror ACE-Step's [tool.uv] because uv only reads
+# tool config from the root project, not from path dependencies.
+# ---------------------------------------------------------------------------
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
+[tool.uv.sources]
+ace-step = { path = "vendor/ACE-Step-1.5", editable = true }
+# ACE-Step's local dependency — path adjusted relative to this project root
+nano-vllm = { path = "vendor/ACE-Step-1.5/acestep/third_parts/nano-vllm" }
+# PyTorch custom indexes — match ACE-Step's platform-specific CUDA wheels
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')" },
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+]
+torchvision = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')" },
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+]
+torchaudio = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')" },
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]

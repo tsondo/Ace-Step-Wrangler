@@ -6,10 +6,21 @@ ACE-Step-Wrangler is a creative-friendly web UI for AceStep 1.5, designed to rep
 
 ## Architecture
 
-**Frontend:** Vanilla HTML, CSS, JavaScript (no framework, no build toolchain)  
-**Backend:** FastAPI (Python) — thin wrapper around the AceStep Python API  
-**Communication:** `fetch()` with polling or Server-Sent Events for generation progress  
-**Aesthetic:** Dark pro audio / DAW-like  
+**Frontend:** Vanilla HTML, CSS, JavaScript (no framework, no build toolchain)
+**Backend:** FastAPI (Python) — thin wrapper that relays requests to AceStep's REST API
+**AceStep:** Vendored as a git submodule in `vendor/ACE-Step-1.5/`, runs as a separate API server process
+**Communication:** `fetch()` with polling or Server-Sent Events for generation progress
+**Launcher:** `run.py` starts both the AceStep API server (port 8001) and the Wrangler UI server (port 7860)
+**Aesthetic:** Dark pro audio / DAW-like
+
+### Vendored Dependencies
+
+ACE-Step 1.5 is included as a git submodule rather than assumed to be a separate installation. This gives users a single-clone, single-command setup while keeping upstream compatibility — we track ACE-Step's releases without maintaining a fork.
+
+- The submodule lives at `vendor/ACE-Step-1.5/` and is referenced as an editable path dependency in `pyproject.toml`.
+- `uv sync` installs ACE-Step and all its ML dependencies (PyTorch, transformers, etc.) into the same venv as Wrangler.
+- At runtime, AceStep still runs as a **separate process** — communication is via its REST API on localhost. The vendoring only unifies the installation, not the runtime boundary.
+- Do not modify files inside `vendor/` — pull upstream changes with `git submodule update --remote`.  
 
 ## Layout
 
