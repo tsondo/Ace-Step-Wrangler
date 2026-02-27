@@ -109,6 +109,42 @@ The following AceStep environment variables are forwarded to the AceStep subproc
 
 When modifying `run.py`, preserve this separation — Wrangler code should never depend on GPU availability.
 
+This project uses vanilla HTML, CSS, and JavaScript. No framework, no build step, no exceptions.
+HTML
+
+All markup lives in frontend/index.html
+New UI components are added as semantic HTML within the existing grid structure
+Use <section class="panel"> for major panels, <div class="control-group"> for control blocks
+Show/hide content with the .hidden class (adds display: none !important), not by creating/destroying DOM nodes
+Tooltips, tabs, and mode switches should use existing HTML elements with class toggling, not third-party libraries
+
+CSS
+
+All styles live in frontend/style.css
+Never use inline styles
+All colors, spacing, fonts, and layout values come from CSS custom properties defined in :root
+New components must use the existing design tokens: --bg, --surface, --accent, --text-primary, --border, etc.
+Follow the existing class naming: .panel, .field-group, .field-label, .control-group, .control-label-row, .ghost-btn, .tag, .slider, .select-input, .number-input, .text-input
+The app layout is a CSS grid on #app (rows) and #main (columns). Column widths are controlled by CSS variables. Do not replace the grid with flexbox or a different layout system.
+When adding new panel variants (e.g. Rework mode), create new content inside the existing grid cells rather than restructuring the grid itself
+
+JavaScript
+
+All JS lives in frontend/app.js as a single file loaded via <script> tag
+No ES modules, no import statements, no bundlers
+State lives in the DOM: active classes on elements, input values, data- attributes. There is no central JS state object or store.
+Pattern: query elements at the top of a section, attach event listeners, call update functions that read DOM state and sync the UI
+Use the existing updateSlider() function for any new range inputs
+Use the existing debounce() utility for input handlers that trigger API calls
+New API calls follow the existing fetch() pattern with async/await, JSON body, and error handling that displays messages in the relevant hint/warning element
+Do not add jQuery, Alpine, HTMX, or any JS library
+
+Backend ↔ Frontend Contract
+
+All communication is fetch() to FastAPI endpoints on the same origin
+Request bodies are JSON, responses are JSON
+New endpoints follow the existing pattern: Pydantic BaseModel for the request schema, async def handler, errors raised as HTTPException
+File uploads (e.g. audio for Rework mode) use multipart/form-data, not JSON
 ## What to Avoid
 
 - Do not add features not in the build plan without discussing first
