@@ -104,6 +104,10 @@ class GenerateRequest(BaseModel):
     audio_guidance_scale: Optional[float] = None
     inference_steps_raw:  Optional[int]   = None
 
+    # AI lyrics generation (sample_query mode — LM writes lyrics from style description)
+    sample_query:   Optional[str] = None
+    vocal_language: str           = "en"
+
     # Rework mode
     task_type:             str             = "text2music"  # text2music | cover | repaint
     src_audio_path:        Optional[str]   = None
@@ -158,6 +162,10 @@ def _build_payload(req: GenerateRequest) -> dict:
 
     if req.audio_guidance_scale is not None:
         payload["audio_guidance_scale"] = req.audio_guidance_scale
+
+    if req.sample_query:
+        payload["sample_query"]   = req.sample_query
+        payload["vocal_language"] = req.vocal_language
 
     model_name = _GEN_MODEL.get(req.gen_model)
     if model_name:

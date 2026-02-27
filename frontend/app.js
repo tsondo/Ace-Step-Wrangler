@@ -525,177 +525,32 @@ function checkLyricsWarning() {
   }
 }
 
-// ===== Lyrics tabs (Write / Generate) =====
+// ===== Lyrics mode (With Lyrics / Instrumental) =====
 
-const lyricsTabBtns     = document.querySelectorAll('.lyrics-tab');
-const lyricsTabWrite    = document.getElementById('lyrics-tab-write');
-const lyricsTabGenerate = document.getElementById('lyrics-tab-generate');
-const writeTabActions   = document.getElementById('write-tab-actions');
+let _lyricsMode = 'lyrics'; // 'lyrics' | 'instrumental'
 
-let _lyricsGenResult = null; // cached result from last generation
+const lyricsModeTabs   = document.querySelectorAll('.lyrics-mode-tab');
+const lyricsWriteArea  = document.getElementById('lyrics-write-area');
+const lyricsActions    = document.getElementById('lyrics-actions');
+const instrumentalNote = document.getElementById('instrumental-note');
 
-function switchLyricsTab(tab) {
-  lyricsTabBtns.forEach(btn => {
-    const isActive = btn.dataset.tab === tab;
+function switchLyricsMode(mode) {
+  _lyricsMode = mode;
+  lyricsModeTabs.forEach(btn => {
+    const isActive = btn.dataset.mode === mode;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-selected', isActive);
   });
-  lyricsTabWrite.classList.toggle('hidden', tab !== 'write');
-  lyricsTabGenerate.classList.toggle('hidden', tab !== 'generate');
-  writeTabActions.classList.toggle('hidden', tab !== 'write');
-  // Dim style + controls panels when Generate tab is active — they're not inputs to lyrics gen
-  document.getElementById('main').classList.toggle('lyrics-gen-mode', tab === 'generate');
-}
-
-lyricsTabBtns.forEach(btn =>
-  btn.addEventListener('click', () => switchLyricsTab(btn.dataset.tab))
-);
-
-// --- Generate Lyrics ---
-
-const generateLyricsBtn = document.getElementById('generate-lyrics-btn');
-const lyricsGenStatus   = document.getElementById('lyrics-gen-status');
-const lyricsPreview     = document.getElementById('lyrics-preview');
-const lyricsPreviewMeta = document.getElementById('lyrics-preview-meta');
-const lyricsPreviewText = document.getElementById('lyrics-preview-text');
-const lyricsGenHint     = document.getElementById('lyrics-gen-hint');
-
-function createMetaBadge(label, value) {
-  const badge = document.createElement('span');
-  badge.className = 'meta-badge';
-  const labelSpan = document.createElement('span');
-  labelSpan.className = 'meta-badge-label';
-  labelSpan.textContent = label;
-  badge.appendChild(labelSpan);
-  badge.appendChild(document.createTextNode(' ' + value));
-  return badge;
-}
-
-async function generateLyrics() {
-  const description = document.getElementById('lyrics-description').value.trim();
-  if (!description) {
-    lyricsGenHint.textContent = 'Enter a description first.';
-    return;
-  }
-
-  lyricsGenHint.textContent = '';
-  generateLyricsBtn.disabled = true;
-  generateLyricsBtn.textContent = 'Generating…';
-  lyricsGenStatus.classList.remove('hidden');
-  lyricsPreview.classList.add('hidden');
-
-  // Combine description with the assembled style prompt so the LM gets the full picture
-  const styleContext = [getStylePrompt(), getSongParamsSummary()].filter(Boolean).join(', ');
-  const fullDescription = styleContext ? `${description}. Style: ${styleContext}` : description;
-
-  try {
-    const res = await fetch('/generate-lyrics', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        description: fullDescription,
-        vocal_language: document.getElementById('lyrics-language').value,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(err.detail || res.statusText);
-    }
-    _lyricsGenResult = await res.json();
-
-    // Populate preview
-    lyricsPreviewText.textContent = _lyricsGenResult.lyrics || '(no lyrics returned)';
-
-    // Metadata badges
-    lyricsPreviewMeta.textContent = '';
-    const badges = [
-      ['BPM', _lyricsGenResult.bpm],
-      ['Key', _lyricsGenResult.key_scale],
-      ['Time', _lyricsGenResult.time_signature],
-      ['Duration', _lyricsGenResult.duration ? `${_lyricsGenResult.duration}s` : null],
-    ];
-    for (const [label, value] of badges) {
-      if (value) lyricsPreviewMeta.appendChild(createMetaBadge(label, value));
-    }
-
-    // Audio preview
-    const lyricsAudio = document.getElementById('lyrics-audio-preview');
-    const sendToReworkBtn = document.getElementById('send-to-rework-btn');
-    const lyricsPlayer = document.getElementById('lyrics-player');
-    if (_lyricsGenResult.audio_path) {
-      lyricsAudio.src = '/audio?path=' + encodeURIComponent(_lyricsGenResult.audio_path);
-      lyricsPlayer.classList.remove('hidden');
-      sendToReworkBtn.classList.remove('hidden');
-    } else {
-      lyricsAudio.src = '';
-      lyricsPlayer.classList.add('hidden');
-      sendToReworkBtn.classList.add('hidden');
-    }
-
-    lyricsPreview.classList.remove('hidden');
-  } catch (err) {
-    lyricsGenHint.textContent = `Error: ${err.message}`;
-  } finally {
-    generateLyricsBtn.disabled = false;
-    generateLyricsBtn.textContent = 'Generate Lyrics';
-    lyricsGenStatus.classList.add('hidden');
-  }
-}
-
-generateLyricsBtn.addEventListener('click', generateLyrics);
-
-// --- Use generated lyrics ---
-
-function useLyrics(applyMeta) {
-  if (!_lyricsGenResult) return;
-
-  lyricsText.value = _lyricsGenResult.lyrics || '';
-  updateLyricsCount();
-  checkLyricsWarning();
+  const isInstrumental = mode === 'instrumental';
+  lyricsWriteArea.classList.toggle('hidden', isInstrumental);
+  lyricsActions.classList.toggle('hidden', isInstrumental);
+  instrumentalNote.classList.toggle('hidden', !isInstrumental);
   updateGenerateState();
-
-  if (applyMeta) {
-    // BPM
-    if (_lyricsGenResult.bpm) {
-      document.getElementById('bpm').value = _lyricsGenResult.bpm;
-    }
-    // Key (e.g. "C major" → root="C", mode="major")
-    if (_lyricsGenResult.key_scale) {
-      const parts = _lyricsGenResult.key_scale.trim().split(/\s+/);
-      if (parts.length >= 2) {
-        const rootEl = document.getElementById('key-root');
-        const modeEl = document.getElementById('key-mode');
-        const rootOpts = [...rootEl.options].map(o => o.value.toLowerCase());
-        const matchIdx = rootOpts.indexOf(parts[0].toLowerCase());
-        if (matchIdx >= 0) rootEl.selectedIndex = matchIdx;
-        const modeLower = parts.slice(1).join(' ').toLowerCase();
-        if (modeLower.includes('minor')) modeEl.value = 'minor';
-        else modeEl.value = 'major';
-      }
-    }
-    // Time signature
-    if (_lyricsGenResult.time_signature) {
-      const tsEl = document.getElementById('time-sig');
-      const tsOpts = [...tsEl.options].map(o => o.value);
-      if (tsOpts.includes(_lyricsGenResult.time_signature)) {
-        tsEl.value = _lyricsGenResult.time_signature;
-      }
-    }
-    // Duration
-    if (_lyricsGenResult.duration) {
-      const dur = Math.max(10, Math.min(600, Math.round(Number(_lyricsGenResult.duration) / 5) * 5));
-      const durationSlider = document.getElementById('duration');
-      durationSlider.value = dur;
-      updateSlider(durationSlider);
-    }
-    updateStyleState();
-  }
-
-  switchLyricsTab('write');
 }
 
-document.getElementById('use-lyrics-btn').addEventListener('click', () => useLyrics(false));
-document.getElementById('use-lyrics-meta-btn').addEventListener('click', () => useLyrics(true));
+lyricsModeTabs.forEach(btn =>
+  btn.addEventListener('click', () => switchLyricsMode(btn.dataset.mode))
+);
 
 // --- Load any audio path into Rework mode ---
 
@@ -731,23 +586,6 @@ function loadAudioIntoRework(audioPath, label, lyrics, knownDuration) {
   updateGenerateState();
   loadWaveformForRework(audioPath, _uploadedAudioDuration || null, lyrics || '');
 }
-
-// --- Send generated audio to Rework ---
-
-function sendToRework() {
-  if (!_lyricsGenResult || !_lyricsGenResult.audio_path) return;
-  const lyricsAudio = document.getElementById('lyrics-audio-preview');
-  const dur = _lyricsGenResult.duration ||
-    (isFinite(lyricsAudio.duration) ? lyricsAudio.duration : null);
-  loadAudioIntoRework(
-    _lyricsGenResult.audio_path,
-    'Generated audio',
-    _lyricsGenResult.lyrics,
-    dur ? Number(dur) : null,
-  );
-}
-
-document.getElementById('send-to-rework-btn').addEventListener('click', sendToRework);
 
 // ===== Clear button =====
 
@@ -1303,7 +1141,7 @@ function updateGenerateState() {
 function buildSharedPayload() {
   const seedRaw = document.getElementById('seed').value.trim();
   return {
-    lyrics:          lyricsText.value,
+    lyrics:          (_currentMode === 'create' && _lyricsMode === 'instrumental') ? '' : lyricsText.value,
     duration:        Number(document.getElementById('duration').value),
     lyric_adherence: Number(document.getElementById('lyric-adherence').value),
     creativity:      Number(document.getElementById('creativity').value),
@@ -1323,13 +1161,25 @@ function buildCreatePayload() {
   const bpmRaw  = document.getElementById('bpm').value.trim();
   const keyRoot = document.getElementById('key-root').value;
   const keyMode = document.getElementById('key-mode').value;
-  return {
+  const payload = {
     ...buildSharedPayload(),
-    style:           getStylePrompt(),
-    key:             keyRoot ? `${keyRoot} ${keyMode}` : '',
-    bpm:             bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
-    time_signature:  document.getElementById('time-sig').value,
+    style:          getStylePrompt(),
+    key:            keyRoot ? `${keyRoot} ${keyMode}` : '',
+    bpm:            bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
+    time_signature: document.getElementById('time-sig').value,
   };
+
+  // With Lyrics + empty textarea → ask AceStep's LM to generate lyrics from style.
+  // Controls are still forwarded; AceStep may adjust duration, BPM, key to fit.
+  if (_lyricsMode === 'lyrics' && !lyricsText.value.trim()) {
+    const styleContext = [getStylePrompt(), getSongParamsSummary()].filter(Boolean).join(', ');
+    if (styleContext) {
+      payload.sample_query   = styleContext;
+      payload.vocal_language = document.getElementById('lyrics-language').value;
+    }
+  }
+
+  return payload;
 }
 
 function buildReworkPayload() {
@@ -1457,8 +1307,7 @@ function createResultCard(taskId, index, result, total, fmt) {
   sendBtn.type = 'button';
   sendBtn.textContent = 'Send to Rework';
   sendBtn.addEventListener('click', () => {
-    const lyricsText = document.getElementById('lyrics-input');
-    loadAudioIntoRework(result.audio_url, 'Generated audio', lyricsText ? lyricsText.value : '');
+    loadAudioIntoRework(result.audio_url, 'Generated audio', lyricsText.value);
   });
 
   actions.appendChild(dlAudio);
@@ -1471,10 +1320,9 @@ function createResultCard(taskId, index, result, total, fmt) {
 function showResultCards(taskId, results, fmt) {
   // Track most recent generation for Rework auto-load
   if (results.length > 0) {
-    const lyricsText = document.getElementById('lyrics-input');
     _lastGenResult = {
       audioPath: results[0].audio_url,
-      lyrics: lyricsText ? lyricsText.value : '',
+      lyrics: lyricsText.value,
     };
   }
 

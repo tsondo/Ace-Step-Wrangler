@@ -157,8 +157,12 @@ html, body {
   to   { opacity: 1; }
 }
 
-.lyrics-tab-content:not(.hidden) {
-  animation: fadeIn 0.15s ease-out;
+#lyrics-write-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Duration lock note (shown in rework mode) */
@@ -529,12 +533,6 @@ html, body {
   display: none !important;
 }
 
-/* Dim controls panel while Lyrics > Generate tab is active (style panel stays live) */
-#main.lyrics-gen-mode #controls-panel {
-  opacity: 0.25;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
 
 /* ============================================================
    Rework Panel — Audio Upload & Approach
@@ -660,14 +658,14 @@ html, body {
 }
 
 /* ============================================================
-   Lyrics Tabs
+   Lyrics Mode Tabs (With Lyrics / Instrumental)
    ============================================================ */
-.lyrics-tabs {
+.lyrics-mode-tabs {
   display: flex;
   gap: 0;
 }
 
-.lyrics-tab {
+.lyrics-mode-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -682,28 +680,13 @@ html, body {
   transition: color 0.15s, border-color 0.15s;
 }
 
-.lyrics-tab:hover {
+.lyrics-mode-tab:hover {
   color: var(--text-secondary);
 }
 
-.lyrics-tab.active {
+.lyrics-mode-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
-}
-
-.lyrics-tab-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Generate lyrics row */
-.generate-lyrics-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
 }
 
 .select-narrow-lang {
@@ -714,92 +697,13 @@ html, body {
   font-size: 12px;
 }
 
-.generate-lyrics-btn {
-  flex: 1;
-  padding: 8px 14px;
-  background: var(--accent);
-  color: #0a0a0d;
-  border: none;
-  border-radius: var(--radius);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-}
-
-.generate-lyrics-btn:hover { background: var(--accent-bright); }
-.generate-lyrics-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* Status spinner */
-.lyrics-gen-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.spinner-sm {
-  width: 14px;
-  height: 14px;
-  border-width: 2px;
-}
-
-/* Lyrics preview */
-.lyrics-preview {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.lyrics-preview-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.meta-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-radius: 12px;
-  padding: 2px 9px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-}
-
-.meta-badge-label {
-  color: var(--text-muted);
-  font-weight: 400;
-  font-family: var(--font-ui);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.lyrics-preview-text {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
+.instrumental-note {
   margin: 0;
+  padding: 14px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 /* ============================================================
@@ -867,31 +771,6 @@ html, body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.lyrics-preview-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.send-to-rework-btn {
-  border-color: var(--accent) !important;
-  color: var(--accent) !important;
-}
-
-.send-to-rework-btn:hover {
-  background: var(--accent-dim) !important;
-}
-
-.use-lyrics-meta-btn {
-  border-color: var(--accent) !important;
-  color: var(--accent) !important;
-}
-
-.use-lyrics-meta-btn:hover {
-  background: var(--accent-dim) !important;
 }
 
 /* ============================================================
