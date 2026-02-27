@@ -390,6 +390,14 @@ function buildPayload() {
 
 let _pollInterval = null;
 
+// Ctrl/Cmd+Enter keyboard shortcut — trigger Generate from anywhere in the UI
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    generateBtn.click();
+  }
+});
+
 // Manage the three output panel states: idle / generating / cards
 function setOutputState(state) {
   document.getElementById('output-idle').classList.toggle('hidden', state !== 'idle');
@@ -402,6 +410,13 @@ function setGenerating(on) {
   generateBtn.disabled    = on;
   if (on) setOutputState('generating');
 }
+
+document.getElementById('cancel-btn').addEventListener('click', () => {
+  if (_pollInterval) clearInterval(_pollInterval);
+  _pollInterval = null;
+  setGenerating(false);
+  setOutputState('idle');
+});
 
 function createResultCard(taskId, index, result, total, fmt) {
   const card = document.createElement('div');

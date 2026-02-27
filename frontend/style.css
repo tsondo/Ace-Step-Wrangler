@@ -536,6 +536,20 @@ html, body {
   box-shadow: 0 0 0 1px var(--accent), 0 0 8px var(--accent-dim);
 }
 
+.slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+  transform: none;
+}
+
+.slider:disabled::-moz-range-thumb {
+  cursor: not-allowed;
+}
+
 .slider-bounds {
   display: flex;
   justify-content: space-between;

@@ -76,7 +76,7 @@
         <span class="tag-group-label">Song Parameters</span>
 
         <div class="key-inputs">
-          <select id="key-root" class="select-input select-narrow">
+          <select id="key-root" class="select-input select-narrow" aria-label="Key root">
             <option value="">Key</option>
             <option value="C">C</option>
             <option value="C#">C#</option>
@@ -91,14 +91,14 @@
             <option value="A#">A#</option>
             <option value="B">B</option>
           </select>
-          <select id="key-mode" class="select-input">
+          <select id="key-mode" class="select-input" aria-label="Key mode">
             <option value="major">Major</option>
             <option value="minor">Minor</option>
           </select>
         </div>
 
         <div class="song-param-grid">
-          <input type="number" id="bpm" class="number-input" min="40" max="300" step="1" placeholder="BPM">
+          <input type="number" id="bpm" class="number-input" min="40" max="300" step="1" placeholder="BPM" autocomplete="off" aria-label="BPM">
           <select id="time-sig" class="select-input">
             <option value="4/4" selected>4/4</option>
             <option value="3/4">3/4</option>
@@ -148,7 +148,7 @@
 
       <div class="lyrics-meta">
         <span class="lyrics-count" id="lyrics-count">0 lines · 0 chars</span>
-        <span class="lyrics-warning hidden" id="lyrics-warning">⚠ May be too long for selected duration</span>
+        <span class="lyrics-warning hidden" id="lyrics-warning" aria-live="polite">⚠ May be too long for selected duration</span>
       </div>
     </section>
 
@@ -198,7 +198,7 @@
       </div>
 
       <button class="generate-btn" id="generate-btn">&#9654; Generate</button>
-      <div class="generate-hint" id="generate-hint"></div>
+      <div class="generate-hint" id="generate-hint" aria-live="assertive"></div>
 
       <!-- Advanced panel (collapsed by default) -->
       <details class="advanced-panel">
@@ -257,7 +257,7 @@
           <!-- Raw generation params -->
           <div class="control-group">
             <label class="field-label" for="seed">Seed</label>
-            <input type="number" id="seed" class="number-input" placeholder="Random" min="0" max="2147483647">
+            <input type="number" id="seed" class="number-input" placeholder="Random" min="0" max="2147483647" autocomplete="off">
           </div>
 
           <div class="control-group">
@@ -317,6 +317,7 @@
     <div class="output-body hidden" id="output-generating">
       <div class="spinner"></div>
       <span class="output-generating-label">Generating…</span>
+      <button class="ghost-btn" id="cancel-btn">Cancel</button>
     </div>
 
     <!-- State 3: Result cards -->

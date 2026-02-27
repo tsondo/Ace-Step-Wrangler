@@ -109,7 +109,7 @@ Passed to AceStep as the `audio_format` payload field. The download filename ext
 6. **Progress + output panel** — polling, per-result cards, playback, download (see Stage 6 spec below) ✓
 7. **Warnings system** — duration vs. lyrics length heuristic, other validation ✓
 8. **Advanced panel** — raw AceStep params, seed, scheduler (collapsed by default) ✓
-9. **Polish pass** — transitions, error states, keyboard shortcuts, accessibility
+9. **Polish pass** — transitions, error states, keyboard shortcuts, accessibility ✓
 
 ## Stage 6 — Progress + Output Panel (Detailed Spec)
 
