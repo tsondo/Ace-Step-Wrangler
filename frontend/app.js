@@ -80,6 +80,13 @@ function switchMode(mode) {
   });
   createPanel.classList.toggle('hidden', mode !== 'create');
   reworkPanel.classList.toggle('hidden', mode !== 'rework');
+
+  // Waveform: clear when switching to create; rework waveform loads via upload/sendToRework
+  if (mode === 'create') {
+    clearWaveform();
+    setOutputState('idle');
+  }
+
   updateControlsForMode(mode);
   updateGenerateState();
 }
@@ -163,6 +170,7 @@ function handleAudioUpload(file) {
     .then(data => {
       _uploadedAudioPath = data.path;
       updateGenerateState();
+      loadWaveformForRework(data.path, _uploadedAudioDuration, lyricsText.value);
     })
     .catch(err => {
       removeAudio();
@@ -185,6 +193,8 @@ function removeAudio() {
   document.getElementById('upload-duration').textContent = '';
   uploadPrompt.classList.remove('hidden');
   uploadLoaded.classList.add('hidden');
+  clearWaveform();
+  setOutputState('idle');
   updateGenerateState();
 }
 
@@ -234,6 +244,18 @@ function switchApproach(approach) {
   approachBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.approach === approach));
   coverStrengthGroup.classList.toggle('hidden', approach !== 'cover');
   regionInputs.classList.toggle('hidden', approach !== 'repaint');
+
+  // Update waveform selection visibility: show handles for Fix & Blend, hide for Reimagine
+  if (_waveformData && _waveformDuration > 0) {
+    if (approach === 'repaint') {
+      updateWaveformVisuals();
+    } else {
+      waveformSelection.classList.add('hidden');
+      wfSelectionInfo.textContent = '';
+      drawWaveform(); // redraw without selection highlight
+    }
+  }
+
   updateControlsForMode(_currentMode);
   updateGenerateState();
 }
@@ -600,6 +622,9 @@ function sendToRework() {
   switchMode('rework');
   updateControlsForMode('rework');
   updateGenerateState();
+
+  // Load waveform with lyrics context
+  loadWaveformForRework(_lyricsGenResult.audio_path, _uploadedAudioDuration, _lyricsGenResult.lyrics);
 }
 
 document.getElementById('send-to-rework-btn').addEventListener('click', sendToRework);
@@ -1219,11 +1244,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Manage the three output panel states: idle / generating / cards
+// Manage the four output panel states: idle / generating / cards / waveform
 function setOutputState(state) {
   document.getElementById('output-idle').classList.toggle('hidden', state !== 'idle');
   document.getElementById('output-generating').classList.toggle('hidden', state !== 'generating');
   document.getElementById('output-cards').classList.toggle('hidden', state !== 'cards');
+  document.getElementById('output-waveform').classList.toggle('hidden', state !== 'waveform');
 }
 
 function getGenerateLabel() {
