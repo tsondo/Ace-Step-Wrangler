@@ -28,7 +28,7 @@ ACE-Step 1.5 is bundled as a git submodule — no separate installation needed.
 ## Installation
 
 ```bash
-git clone --recursive https://github.com/yourusername/ACE-Step-Wrangler.git
+git clone --recursive https://github.com/tsondo/ACE-Step-Wrangler.git
 cd ACE-Step-Wrangler
 uv sync
 ```
