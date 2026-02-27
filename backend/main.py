@@ -323,6 +323,20 @@ async def api_health():
         raise HTTPException(status_code=503, detail=str(exc))
 
 
+def _resolve_audio_path(path: str) -> str:
+    """Extract the real filesystem path from an AceStep audio path or URL.
+
+    AceStep sometimes returns audio paths in URL format:
+      /v1/audio?path=%2Fdata%2Fprojects%2F...mp3
+    We need the raw filesystem path for file operations.
+    """
+    if "?" in path:
+        qs = parse_qs(urlparse(path).query)
+        if "path" in qs:
+            return qs["path"][0]
+    return path
+
+
 def _ensure_in_tmp(path: str) -> str:
     """Copy a file to the system temp dir if it isn't already there.
 
@@ -332,6 +346,7 @@ def _ensure_in_tmp(path: str) -> str:
     them to /tmp before forwarding the path.
     """
     import os
+    path = _resolve_audio_path(path)
     system_temp = os.path.realpath(tempfile.gettempdir())
     real = os.path.realpath(path)
     try:
