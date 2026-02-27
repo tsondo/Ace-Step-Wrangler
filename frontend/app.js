@@ -205,8 +205,18 @@ function updateControlsForMode(mode) {
   }
 }
 
+let _lastGenResult = null; // { audioPath, lyrics } — most recent completed generation
+
 modeBtns.forEach(btn =>
-  btn.addEventListener('click', () => switchMode(btn.dataset.mode))
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    // Clicking Rework with nothing loaded auto-loads the last generation
+    if (mode === 'rework' && !_uploadedAudioPath && _lastGenResult) {
+      loadAudioIntoRework(_lastGenResult.audioPath, 'Generated audio', _lastGenResult.lyrics);
+    } else {
+      switchMode(mode);
+    }
+  })
 );
 
 // ===== Rework panel — audio upload, approach selector =====
@@ -681,40 +691,54 @@ function useLyrics(applyMeta) {
 document.getElementById('use-lyrics-btn').addEventListener('click', () => useLyrics(false));
 document.getElementById('use-lyrics-meta-btn').addEventListener('click', () => useLyrics(true));
 
+// --- Load any audio path into Rework mode ---
+
+function loadAudioIntoRework(audioPath, label, lyrics, knownDuration) {
+  _uploadedAudioPath = audioPath;
+  audioPreview.src = '/audio?path=' + encodeURIComponent(audioPath);
+
+  function applyDuration(dur) {
+    if (!dur || !isFinite(dur)) return;
+    _uploadedAudioDuration = dur;
+    document.getElementById('upload-duration').textContent = formatDuration(dur);
+    const d = Math.round(dur * 10) / 10;
+    document.getElementById('region-end').value = d;
+    document.getElementById('region-end').max = d;
+    document.getElementById('region-start').max = d;
+  }
+
+  if (knownDuration) {
+    applyDuration(knownDuration);
+  } else {
+    audioPreview.addEventListener('loadedmetadata', function onMeta() {
+      applyDuration(audioPreview.duration);
+      audioPreview.removeEventListener('loadedmetadata', onMeta);
+    });
+  }
+
+  document.getElementById('upload-filename').textContent = label || 'Generated audio';
+  uploadPrompt.classList.add('hidden');
+  uploadLoaded.classList.remove('hidden');
+
+  switchMode('rework');
+  updateControlsForMode('rework');
+  updateGenerateState();
+  loadWaveformForRework(audioPath, _uploadedAudioDuration || null, lyrics || '');
+}
+
 // --- Send generated audio to Rework ---
 
 function sendToRework() {
   if (!_lyricsGenResult || !_lyricsGenResult.audio_path) return;
-
-  // Set server-side audio path (no upload needed — already on disk)
-  _uploadedAudioPath = _lyricsGenResult.audio_path;
-
-  // Set audio preview in rework panel
-  audioPreview.src = '/audio?path=' + encodeURIComponent(_lyricsGenResult.audio_path);
-
-  // Get duration from metadata or from the lyrics audio player
   const lyricsAudio = document.getElementById('lyrics-audio-preview');
-  const dur = _lyricsGenResult.duration || (lyricsAudio.duration && isFinite(lyricsAudio.duration) ? lyricsAudio.duration : null);
-  if (dur) {
-    _uploadedAudioDuration = Number(dur);
-    document.getElementById('upload-duration').textContent = formatDuration(_uploadedAudioDuration);
-    document.getElementById('region-end').value = Math.round(_uploadedAudioDuration * 10) / 10;
-    document.getElementById('region-end').max = Math.round(_uploadedAudioDuration * 10) / 10;
-    document.getElementById('region-start').max = Math.round(_uploadedAudioDuration * 10) / 10;
-  }
-
-  // Update upload UI to show loaded state
-  document.getElementById('upload-filename').textContent = 'Generated audio';
-  uploadPrompt.classList.add('hidden');
-  uploadLoaded.classList.remove('hidden');
-
-  // Switch to rework mode
-  switchMode('rework');
-  updateControlsForMode('rework');
-  updateGenerateState();
-
-  // Load waveform with lyrics context
-  loadWaveformForRework(_lyricsGenResult.audio_path, _uploadedAudioDuration, _lyricsGenResult.lyrics);
+  const dur = _lyricsGenResult.duration ||
+    (isFinite(lyricsAudio.duration) ? lyricsAudio.duration : null);
+  loadAudioIntoRework(
+    _lyricsGenResult.audio_path,
+    'Generated audio',
+    _lyricsGenResult.lyrics,
+    dur ? Number(dur) : null,
+  );
 }
 
 document.getElementById('send-to-rework-btn').addEventListener('click', sendToRework);
@@ -1422,13 +1446,32 @@ function createResultCard(taskId, index, result, total, fmt) {
   dlJson.download  = `acestep-${taskId.slice(0, 8)}-${index + 1}.json`;
   dlJson.textContent = 'Download JSON';
 
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'ghost-btn';
+  sendBtn.type = 'button';
+  sendBtn.textContent = 'Send to Rework';
+  sendBtn.addEventListener('click', () => {
+    const lyricsText = document.getElementById('lyrics-input');
+    loadAudioIntoRework(result.audio_url, 'Generated audio', lyricsText ? lyricsText.value : '');
+  });
+
   actions.appendChild(dlAudio);
   actions.appendChild(dlJson);
+  actions.appendChild(sendBtn);
   card.appendChild(actions);
   return card;
 }
 
 function showResultCards(taskId, results, fmt) {
+  // Track most recent generation for Rework auto-load
+  if (results.length > 0) {
+    const lyricsText = document.getElementById('lyrics-input');
+    _lastGenResult = {
+      audioPath: results[0].audio_url,
+      lyrics: lyricsText ? lyricsText.value : '',
+    };
+  }
+
   const container = document.getElementById('output-cards');
   container.innerHTML = '';
   results.forEach((result, i) => {
