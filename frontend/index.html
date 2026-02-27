@@ -71,6 +71,44 @@
         <button class="ghost-btn" id="clear-tags-btn">Clear all</button>
       </div>
 
+      <!-- Song Parameters -->
+      <div class="song-params">
+        <span class="tag-group-label">Song Parameters</span>
+
+        <div class="key-inputs">
+          <select id="key-root" class="select-input select-narrow">
+            <option value="">Key</option>
+            <option value="C">C</option>
+            <option value="C#">C#</option>
+            <option value="D">D</option>
+            <option value="D#">D#</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="F#">F#</option>
+            <option value="G">G</option>
+            <option value="G#">G#</option>
+            <option value="A">A</option>
+            <option value="A#">A#</option>
+            <option value="B">B</option>
+          </select>
+          <select id="key-mode" class="select-input">
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+          </select>
+        </div>
+
+        <div class="song-param-grid">
+          <input type="number" id="bpm" class="number-input" min="40" max="300" step="1" placeholder="BPM">
+          <select id="time-sig" class="select-input">
+            <option value="4/4" selected>4/4</option>
+            <option value="3/4">3/4</option>
+            <option value="6/8">6/8</option>
+            <option value="5/4">5/4</option>
+            <option value="7/8">7/8</option>
+          </select>
+        </div>
+      </div>
+
       <div class="section-divider"></div>
 
       <!-- Free text override -->
@@ -121,7 +159,10 @@
       <div class="control-group">
         <div class="control-label-row">
           <label class="field-label" for="duration">Duration</label>
-          <span class="control-value" id="duration-value">30s</span>
+          <div class="duration-right">
+            <button class="auto-btn" id="auto-duration-btn" title="Compute duration from lyrics and tempo">Auto</button>
+            <span class="control-value" id="duration-value">30s</span>
+          </div>
         </div>
         <input type="range" id="duration" class="slider" min="10" max="240" value="30" step="5">
         <div class="slider-bounds"><span>10s</span><span>4 min</span></div>

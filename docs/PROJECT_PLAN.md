@@ -155,6 +155,54 @@ Two new download endpoints to add to `main.py`:
 - The existing `/audio` proxy endpoint can remain for legacy compatibility but the new card-based UI should use `/download/` for downloads.
 - Cards should render in order (index 0 first). If only one result, omit the "Result N of N" label.
 
+---
+
+## Song Parameters — Style Panel Addition
+
+Three always-visible controls placed between the Mood tags and the Custom description field:
+
+| Control | HTML element | Range / options | Default |
+|---|---|---|---|
+| Key root | `<select id="key-root">` | C, C#, D, D#, E, F, F#, G, G#, A, A#, B | (none) |
+| Key mode | `<select id="key-mode">` | Major, Minor | Major |
+| BPM | `<input type="number" id="bpm">` | 40–300, step 1 | (empty) |
+| Time signature | `<select id="time-sig">` | 4/4, 3/4, 6/8, 5/4, 7/8 | 4/4 |
+
+**Style preview:** `getSongParamsSummary()` generates "C major, 120 BPM, 4/4 time" (only non-empty fields; time sig only included when key or BPM is also set). Combined with style tags/custom text in the preview using " · " separator.
+
+**Payload:** Sent as separate `key`, `bpm`, `time_signature` fields in `GenerateRequest`. The backend's `_build_payload()` appends them to the AceStep `prompt` string (e.g. "…, C major, 120 BPM, 4/4 time") and stores all three in the download JSON.
+
+---
+
+## Auto Duration Toggle
+
+An **Auto** button sits to the left of the Duration value label. Default: off.
+
+- **Auto OFF:** Duration slider is interactive (normal behaviour).
+- **Auto ON:** Slider is disabled and automatically set to the result of `POST /estimate-duration` whenever lyrics, BPM, or time signature change (debounced 600 ms). The button gains `.active` styling (amber fill).
+
+### `POST /estimate-duration`
+
+**Request:**
+```json
+{ "lyrics": "...", "bpm": 120, "time_signature": "4/4", "lm_model": "1.7b" }
+```
+
+**Response:**
+```json
+{ "seconds": 180, "method": "lm" | "heuristic", "assumed_bpm": 120 }
+```
+(`assumed_bpm` only present when `bpm` was not supplied and the heuristic defaulted to 120.)
+
+**Primary path (lm_model != "none"):** Calls AceStep's `/format_input` endpoint and attempts to extract a `duration` field from the response. If successful, snaps to nearest 5 s and clamps to 10–240 s.
+
+**Fallback — heuristic:**
+1. Parse `[Section Header]` lines from lyrics with a regex.
+2. Map each header to a bar count (Verse = 16, Intro/Chorus/Bridge/Outro/all others = 8). Unknown headers default to 8.
+3. If no headers found, assume 2 verses + 2 choruses (total 48 bars).
+4. Formula: `total_bars × time_sig_numerator / BPM × 60`
+5. Snap to nearest 5 s, clamp to 10–240 s.
+
 ## Key Design Principles
 
 - **Abstract, don't hide.** Advanced params are always accessible, just not in the way.

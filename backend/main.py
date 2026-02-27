@@ -13,6 +13,7 @@ Static frontend is served from /  (catch-all, mounted last).
 """
 
 import json
+import re
 import uvicorn
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,7 @@ from acestep_wrapper import (
     release_task,
     query_result,
     get_audio_bytes,
+    format_input,
 )
 
 app = FastAPI(title="ACE-Step Wrangler")
@@ -81,6 +83,11 @@ class GenerateRequest(BaseModel):
     scheduler:    str           = "euler"
     audio_format: str           = "mp3"   # mp3 | wav | flac
 
+    # Song parameters (from style panel)
+    key:            str          = ""     # e.g. "C major" — appended to AceStep prompt
+    bpm:            Optional[int] = None
+    time_signature: str          = "4/4"
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -93,8 +100,21 @@ def _build_payload(req: GenerateRequest) -> dict:
     # Creativity → shift (inverse): restrained (0%) = 5.0, wild (100%) = 1.0
     shift = round(5.0 - (creativity / 100.0) * 4.0, 2)
 
+    # Build AceStep prompt: style + optional song parameter suffix
+    song_parts = []
+    if req.key:
+        song_parts.append(req.key)
+    if req.bpm:
+        song_parts.append(f"{req.bpm} BPM")
+    if song_parts:
+        song_parts.append(f"{req.time_signature} time")
+        suffix = ", ".join(song_parts)
+        prompt = f"{req.style}, {suffix}" if req.style else suffix
+    else:
+        prompt = req.style
+
     payload = {
-        "prompt":          req.style,
+        "prompt":          prompt,
         "lyrics":          req.lyrics,
         "audio_duration":  req.duration,
         "guidance_scale":  _LYRIC_ADHERENCE[lyric_adherence],
@@ -112,6 +132,62 @@ def _build_payload(req: GenerateRequest) -> dict:
         payload["model"] = model_name
 
     return payload
+
+# ---------------------------------------------------------------------------
+# Duration estimation — heuristic fallback
+# ---------------------------------------------------------------------------
+
+# Default bar counts per common section header keyword
+_SECTION_BARS: dict[str, int] = {
+    "intro":        8,
+    "verse":       16,
+    "pre-chorus":   8,
+    "prechorus":    8,
+    "pre chorus":   8,
+    "chorus":       8,
+    "hook":         8,
+    "bridge":       8,
+    "outro":        8,
+    "instrumental": 8,
+    "break":        8,
+    "interlude":    8,
+    "refrain":      8,
+    "drop":         8,
+    "build":        8,
+    "solo":         8,
+}
+
+_SECTION_RE = re.compile(r"^\[([^\]]+)\]", re.MULTILINE | re.IGNORECASE)
+
+
+def _heuristic_seconds(lyrics: str, bpm: int, time_signature: str) -> float:
+    """Estimate song duration from section headers, bar counts, BPM, and time sig."""
+    headers = _SECTION_RE.findall(lyrics)
+
+    try:
+        num = int(time_signature.split("/")[0])
+    except (ValueError, IndexError):
+        num = 4
+
+    if not headers:
+        # No section markers — assume generic 2-verse / 2-chorus structure
+        total_bars = 16 * 2 + 8 * 2
+    else:
+        total_bars = sum(
+            _SECTION_BARS.get(h.strip().lower(), 8) for h in headers
+        )
+
+    seconds = total_bars * num / bpm * 60
+    seconds = round(seconds / 5) * 5          # snap to nearest 5 s
+    return max(10.0, min(240.0, seconds))
+
+
+class EstimateDurationRequest(BaseModel):
+    lyrics:         str          = ""
+    bpm:            Optional[int] = None
+    time_signature: str          = "4/4"
+    lm_model:       str          = "1.7b"
+
 
 # ---------------------------------------------------------------------------
 # API routes  (must come before the static-files catch-all)
@@ -166,6 +242,42 @@ async def audio_proxy(path: str):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Audio fetch error: {exc}")
     return Response(content=data, media_type=content_type)
+
+
+@app.post("/estimate-duration")
+async def estimate_duration(req: EstimateDurationRequest):
+    """
+    Estimate audio duration from lyrics, BPM, and time signature.
+
+    Primary path: call AceStep's /format_input LM endpoint (if lm_model != "none").
+    Fallback: regex-based section-header heuristic.
+    """
+    bpm = req.bpm if req.bpm else 120
+
+    # Primary: LM-assisted estimation
+    if req.lm_model != "none" and req.lyrics.strip():
+        try:
+            result = await format_input(req.lyrics)
+            # Navigate into nested response — AceStep wraps results in "data"
+            body = result if isinstance(result, dict) else {}
+            for key in ("data", "result"):
+                if isinstance(body.get(key), dict):
+                    body = body[key]
+                    break
+            if "duration" in body:
+                secs = float(body["duration"])
+                secs = round(secs / 5) * 5
+                secs = max(10.0, min(240.0, secs))
+                return {"seconds": secs, "method": "lm"}
+        except Exception:
+            pass  # fall through to heuristic
+
+    # Fallback: heuristic
+    secs = _heuristic_seconds(req.lyrics, bpm, req.time_signature)
+    resp: dict = {"seconds": secs, "method": "heuristic"}
+    if not req.bpm:
+        resp["assumed_bpm"] = 120
+    return resp
 
 
 @app.get("/download/{job_id}/{index}/audio")

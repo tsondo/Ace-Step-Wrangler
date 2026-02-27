@@ -1,5 +1,11 @@
 // ACE-Step Wrangler — app.js
-// Stage 4: Controls validation — ready state, inline hint, content change hooks.
+
+// ===== Utility =====
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
 
 // ===== Slider display & fill =====
 
@@ -50,19 +56,36 @@ document.querySelectorAll('.slider').forEach(slider => {
   slider.addEventListener('input', () => updateSlider(slider));
 });
 
-// ===== Style panel — tags, count, preview =====
+// ===== Style panel — tags, count, song params, preview =====
 
 const tagsStatus   = document.getElementById('tags-status');
 const tagsCountEl  = document.getElementById('tags-count');
 const previewText  = document.getElementById('style-preview-text');
 const styleText    = document.getElementById('style-text');
 
-/** Returns the combined style prompt (tags + custom text) for use in stage 5. */
+/** Returns the combined style prompt (tags + custom text) for the AceStep `style` field. */
 function getStylePrompt() {
   const tags   = [...document.querySelectorAll('.tag.active')].map(t => t.textContent.trim()).join(', ');
   const custom = styleText.value.trim();
   if (tags && custom) return `${tags} — ${custom}`;
   return tags || custom;
+}
+
+/**
+ * Returns a summary of non-empty song parameters, e.g. "C major, 120 BPM, 4/4 time".
+ * Time signature is only appended when key or BPM is also set.
+ */
+function getSongParamsSummary() {
+  const root    = document.getElementById('key-root').value;
+  const mode    = document.getElementById('key-mode').value;
+  const bpmVal  = document.getElementById('bpm').value.trim();
+  const timeSig = document.getElementById('time-sig').value;
+
+  const parts = [];
+  if (root)   parts.push(`${root} ${mode}`);
+  if (bpmVal) parts.push(`${bpmVal} BPM`);
+  if (parts.length > 0) parts.push(`${timeSig} time`);
+  return parts.join(', ');
 }
 
 function updateStyleState() {
@@ -77,10 +100,16 @@ function updateStyleState() {
     tagsStatus.classList.add('hidden');
   }
 
-  // Style preview
-  const prompt = getStylePrompt();
-  if (prompt) {
-    previewText.textContent = prompt;
+  // Style preview — combine tags/custom text with song params
+  const stylePrompt = getStylePrompt();
+  const songParams  = getSongParamsSummary();
+  const parts = [];
+  if (stylePrompt) parts.push(stylePrompt);
+  if (songParams)  parts.push(songParams);
+  const preview = parts.join(' · ');
+
+  if (preview) {
+    previewText.textContent = preview;
     previewText.classList.remove('empty');
   } else {
     previewText.textContent = 'Nothing set — add tags or a description';
@@ -254,6 +283,9 @@ function updateGenerateState() {
 // Collect the full request payload from all UI controls
 function buildPayload() {
   const seedRaw = document.getElementById('seed').value.trim();
+  const bpmRaw  = document.getElementById('bpm').value.trim();
+  const keyRoot = document.getElementById('key-root').value;
+  const keyMode = document.getElementById('key-mode').value;
   return {
     style:           getStylePrompt(),
     lyrics:          lyricsText.value,
@@ -266,6 +298,9 @@ function buildPayload() {
     batch_size:      Number(document.getElementById('batch-size').value),
     scheduler:       document.getElementById('scheduler').value,
     audio_format:    document.getElementById('audio-format').value,
+    key:             keyRoot ? `${keyRoot} ${keyMode}` : '',
+    bpm:             bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
+    time_signature:  document.getElementById('time-sig').value,
   };
 }
 
@@ -386,13 +421,81 @@ generateBtn.addEventListener('click', async () => {
   }, 2000);
 });
 
-// Keep state in sync with all content-affecting inputs
-lyricsText.addEventListener('input', updateGenerateState);
-styleText.addEventListener('input', updateGenerateState);
+// ===== Auto Duration =====
+
+const autoDurationBtn = document.getElementById('auto-duration-btn');
+const durationSlider  = document.getElementById('duration');
+let _autoOn = false;
+
+async function computeAutoDuration() {
+  if (!_autoOn) return;
+  const bpmRaw  = document.getElementById('bpm').value.trim();
+  const timeSig = document.getElementById('time-sig').value;
+  const lmModel = document.getElementById('lm-model').value;
+  try {
+    const res = await fetch('/estimate-duration', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        lyrics:         lyricsText.value,
+        bpm:            bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
+        time_signature: timeSig,
+        lm_model:       lmModel,
+      }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const secs = Math.max(10, Math.min(240, Math.round(data.seconds / 5) * 5));
+    durationSlider.value = secs;
+    updateSlider(durationSlider);
+  } catch (_) {
+    // Silently fail — leave slider as-is
+  }
+}
+
+const debouncedComputeAutoDuration = debounce(computeAutoDuration, 600);
+
+autoDurationBtn.addEventListener('click', () => {
+  _autoOn = !_autoOn;
+  autoDurationBtn.classList.toggle('active', _autoOn);
+  durationSlider.disabled = _autoOn;
+  if (_autoOn) computeAutoDuration();
+});
+
+// ===== Event wiring — keep all state in sync =====
+
+lyricsText.addEventListener('input', () => {
+  updateLyricsCount();
+  updateGenerateState();
+  debouncedComputeAutoDuration();
+});
+
+styleText.addEventListener('input', () => {
+  updateStyleState();
+  updateGenerateState();
+});
+
 document.querySelectorAll('.tag').forEach(tag =>
   tag.addEventListener('click', updateGenerateState)
 );
 document.getElementById('clear-tags-btn').addEventListener('click', updateGenerateState);
-document.getElementById('clear-btn').addEventListener('click', updateGenerateState);
+document.getElementById('clear-btn').addEventListener('click', () => {
+  updateLyricsCount();
+  updateGenerateState();
+});
+
+// Song parameter changes → update preview, generate state, and auto duration
+['key-root', 'key-mode', 'time-sig'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    updateStyleState();
+    updateGenerateState();
+    debouncedComputeAutoDuration();
+  });
+});
+document.getElementById('bpm').addEventListener('input', () => {
+  updateStyleState();
+  updateGenerateState();
+  debouncedComputeAutoDuration();
+});
 
 updateGenerateState();

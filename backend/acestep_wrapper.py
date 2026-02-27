@@ -69,6 +69,18 @@ async def query_result(task_id: str) -> dict:
     }
 
 
+async def format_input(lyrics: str) -> dict:
+    """Call AceStep's /format_input LM endpoint for structured lyrics analysis.
+    Returns the raw response body as a dict."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/format_input",
+            json={"lyrics": lyrics},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 async def get_audio_bytes(path: str) -> tuple[bytes, str]:
     """
     Download audio from AceStep and return (bytes, content_type).

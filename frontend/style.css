@@ -311,6 +311,75 @@ html, body {
 }
 
 /* ============================================================
+   Song Parameters (style panel)
+   ============================================================ */
+.song-params {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.key-inputs {
+  display: flex;
+  gap: 6px;
+}
+
+/* Narrow root-note select (2–3 chars wide) */
+.select-narrow {
+  flex: 0 0 62px;
+  padding-left: 8px;
+  padding-right: 20px;
+  background-position: right 5px center;
+}
+
+.key-inputs .select-input:not(.select-narrow) {
+  flex: 1;
+  min-width: 0;
+}
+
+.song-param-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* ============================================================
+   Auto Duration Button + Duration row right-side cluster
+   ============================================================ */
+.duration-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--font-ui);
+  line-height: 1.6;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.auto-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.auto-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================================================
    Divider
    ============================================================ */
 .section-divider {
