@@ -21,7 +21,7 @@ The interface is a three-column layout with an output panel across the bottom.
 | Column | Contents |
 |---|---|
 | Left | **Style** (Create mode) or **Rework** controls |
-| Centre | **Lyrics** — write or generate |
+| Centre | **Lyrics** — write, leave blank for AI-generated lyrics, or switch to Instrumental |
 | Right | **Controls** — duration, quality, generate button |
 | Bottom | **Output** — generated audio, waveform editor |
 
@@ -43,25 +43,35 @@ Build a style description by combining tags and free text. The assembled prompt 
 
 ### Lyrics Panel (centre column)
 
-**Write tab**
+The panel header has two mode buttons:
 
-Type or paste lyrics directly. Use `[Section]` headers on their own line to mark song structure — the model uses these to shape the arrangement.
+**With Lyrics** (default)
 
-```
-[Verse 1]
-Lines go here
+The textarea is active. You have two options:
 
-[Chorus]
-Lines go here
-```
+- **Write lyrics** — type or paste directly. Use `[Section]` headers on their own line to mark song structure:
 
-You can also drag and drop a `.txt` or `.lrc` file onto the panel, or use **Load file**.
+  ```
+  [Verse 1]
+  Lines go here
+
+  [Chorus]
+  Lines go here
+  ```
+
+  You can also drag and drop a `.txt` or `.lrc` file onto the panel, or use **Load file**.
+
+- **Leave blank** — AceStep's language model will generate lyrics from your style settings (tags, key, BPM, custom description). The small language selector in the header controls the vocal language. A note in the placeholder text explains that when AI writes the lyrics, duration, BPM, and key may be adjusted to fit the generated content.
 
 A character count and a lyrics-too-long warning appear as you type. If the lyrics are likely too long for the chosen duration, adjust the Duration slider before generating.
 
-**Generate tab**
+**Instrumental**
 
-Let the AI write lyrics for you — see [Lyrics Generator](#lyrics-generator) below.
+The textarea hides. AceStep generates a purely instrumental track from your style settings — no lyrics are generated or expected.
+
+#### Language selector
+
+The **EN / ZH / JA / …** dropdown (visible in With Lyrics mode) tells AceStep which language to use for the vocals when it is generating lyrics. It has no effect when you supply your own lyrics — the model follows whatever language you write.
 
 ### Controls Panel (right column)
 
@@ -77,7 +87,7 @@ Let the AI write lyrics for you — see [Lyrics Generator](#lyrics-generator) be
 
 While generating, an elapsed timer and a **Cancel** button are shown.
 
-On completion, one card per result appears. Each card has a custom audio player and download links for the audio file and a JSON metadata file.
+On completion, one card per result appears. Each card has a custom audio player, download links for the audio file and a JSON metadata file, and a **Send to Rework** button that loads the result directly into Rework mode.
 
 ---
 
@@ -88,7 +98,8 @@ Rework takes an existing audio file and transforms part or all of it.
 ### Loading Audio
 
 - **Drag and drop** an audio file onto the upload zone, or click **Browse**
-- Or use **Send to Rework** after generating lyrics (see below) — no re-upload needed
+- Or use **Send to Rework** on any result card after generating — no re-upload needed
+- Or click the **Rework** tab immediately after a generation — it auto-loads the most recent result
 
 Once loaded, the filename, duration, and an audio player appear. The output panel shows a **waveform timeline** of the audio.
 
@@ -127,28 +138,9 @@ The output panel stays on the waveform view with the reworked audio loaded. You 
 
 ---
 
-## Lyrics Generator
-
-The **Generate** tab in the Lyrics panel lets the AI compose full structured lyrics from a short description, then generates a complete song from them.
-
-1. Describe the song you want in plain language
-2. Choose a **language** for the vocals (EN, ZH, JA, KO, ES, FR, DE, PT, IT, RU, AR, HI)
-3. Click **Generate Lyrics** — this runs a full generation, so it takes a moment
-4. The preview shows the lyrics, detected BPM, key, time signature, and duration, plus a playable audio preview
-
-From the preview you can:
-
-| Button | Action |
-|---|---|
-| **Use These Lyrics** | Copies lyrics to the Write tab only |
-| **Use Lyrics + Apply Metadata** | Copies lyrics and also sets BPM, key, time signature, and duration sliders |
-| **Send to Rework** | Loads the generated audio directly into Rework mode — no re-upload |
-
----
-
 ## Playback Controls
 
-Every audio player in the app (lyrics preview, rework audio, result cards) uses the same transport controls. The behaviour is intentionally DAW-style rather than standard media-player style.
+Every audio player in the app uses the same transport controls. The behaviour is intentionally DAW-style rather than standard media-player style.
 
 | Control | Label | Behaviour |
 |---|---|---|
@@ -207,6 +199,8 @@ When the batch size is locked, an inline note explains why.
 
 - **Section headers in lyrics matter.** `[Verse]`, `[Chorus]`, `[Bridge]` etc. help the model structure the arrangement correctly and enable the Auto Duration estimate.
 - **Auto Duration** works best when BPM is set and the lyrics have section headers.
-- **Send to Rework** after Lyrics Generate is the fastest path to iterating on a generated song — the audio is already on the server, no upload needed.
+- **Leave the lyrics blank** when you want the AI to write them. Your style panel settings (tags, key, BPM) feed directly into what the LM generates — set those first for better results.
+- **Instrumental mode** is the fastest path to background music or loop generation — no lyrics needed, just set the style and hit Generate.
+- **Send to Rework** after generating is the fastest path to iterating on a song — the audio is already on the server, no upload needed. The Rework tab also auto-loads the last result if nothing is uploaded yet.
 - **Fix & Blend on small regions** works better than trying to repaint large portions of a song. For a big change, use Reimagine instead.
 - **Seed** is your best friend for reproducibility. Once you have a result you like, note the seed from the downloaded JSON before running variations.

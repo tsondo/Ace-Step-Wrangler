@@ -1,5 +1,7 @@
 # ACE-Step-Wrangler — Project Plan
 
+> **Note:** This document reflects the original design spec. The shipped implementation has evolved beyond it — see `docs/USER_GUIDE.md` for current behaviour and `CLAUDE.md` for current architecture notes.
+
 ## Overview
 
 ACE-Step-Wrangler is a creative-friendly web UI for AceStep 1.5, designed to replace the default Gradio interface. The goal is to make AI music generation accessible to musicians and creatives — not just researchers — by abstracting complex ML parameters behind intuitive, music-production-oriented controls.

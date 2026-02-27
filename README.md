@@ -10,8 +10,12 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 - **Genre + mood tag picker** — click presets or type your own style description
 - **Song parameters** — set key (e.g. A minor), BPM, and time signature; appended to the AceStep prompt automatically
 - **Auto duration** — estimates song length from your lyrics and tempo using AceStep's LM planner, with a heuristic fallback
-- **Lyrics panel** — type, paste, or load from a file; counts lines and characters
+- **Lyrics panel** — write lyrics, leave blank for AI-generated lyrics, or switch to Instrumental mode
+- **AI lyrics generation** — leave the lyrics field empty and AceStep's LM writes them from your style settings (single-shot; no separate step)
+- **Instrumental mode** — generate purely instrumental tracks with one click
 - **Smart warnings** — get notified if your song duration is too short for your lyrics before you generate
+- **Rework mode** — reimagine a full song or fix and blend a selected region using the waveform editor
+- **DAW-style audio transport** — Rewind / Play / Stop / scrubber on every player, consistent across all result cards and previews
 - **Elapsed-time counter** — shows how long generation has been running so you know it hasn't stalled
 - **Advanced panel** — raw AceStep parameters (guidance scale, inference steps, scheduler, seed, batch size, audio format) still accessible for power users
 - **Dark DAW aesthetic** — feels at home next to your other music tools
