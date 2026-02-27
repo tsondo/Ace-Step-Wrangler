@@ -56,6 +56,9 @@ document.querySelectorAll('.slider').forEach(slider => {
   slider.addEventListener('input', () => updateSlider(slider));
 });
 
+// Duration changes may affect the lyrics-too-long warning
+document.getElementById('duration').addEventListener('input', checkLyricsWarning);
+
 // ===== Style panel — tags, count, song params, preview =====
 
 const tagsStatus   = document.getElementById('tags-status');
@@ -135,8 +138,9 @@ updateStyleState();
 
 // ===== Lyrics line/char count =====
 
-const lyricsText = document.getElementById('lyrics-text');
-const lyricsCount = document.getElementById('lyrics-count');
+const lyricsText   = document.getElementById('lyrics-text');
+const lyricsCount  = document.getElementById('lyrics-count');
+const lyricsWarning = document.getElementById('lyrics-warning');
 
 function updateLyricsCount() {
   const text = lyricsText.value;
@@ -147,6 +151,42 @@ function updateLyricsCount() {
 
 lyricsText.addEventListener('input', updateLyricsCount);
 updateLyricsCount();
+
+// ===== Lyrics warnings =====
+
+let _fileErrorTimer = null;
+
+/**
+ * Show or hide the "lyrics may be too long" warning.
+ * Heuristic: count words in non-section-header lines, assume 100 wpm singing
+ * pace (0.6 s/word). If estimated minimum duration > selected duration, warn.
+ * Does nothing if a file-error message is currently showing.
+ */
+function checkLyricsWarning() {
+  if (_fileErrorTimer) return; // file-error overrides — let its timer handle restore
+
+  const text = lyricsText.value;
+  if (!text.trim()) {
+    lyricsWarning.classList.add('hidden');
+    return;
+  }
+
+  const contentLines = text.split('\n').filter(
+    line => line.trim() && !line.trim().startsWith('[')
+  );
+  const wordCount = contentLines.join(' ')
+    .split(/\s+/).filter(w => w.length > 0).length;
+
+  const duration = Number(document.getElementById('duration').value);
+  const minSeconds = wordCount * 0.6; // 100 wpm → 0.6 s/word
+
+  if (wordCount > 0 && minSeconds > duration) {
+    lyricsWarning.textContent = '⚠ May be too long for selected duration';
+    lyricsWarning.classList.remove('hidden');
+  } else {
+    lyricsWarning.classList.add('hidden');
+  }
+}
 
 // ===== Clear button =====
 
@@ -169,6 +209,7 @@ function loadTextFile(file) {
   reader.onload = (e) => {
     lyricsText.value = e.target.result;
     updateLyricsCount();
+    checkLyricsWarning();
     updateGenerateState();
     lyricsText.focus();
   };
@@ -177,12 +218,12 @@ function loadTextFile(file) {
 }
 
 function showFileError(msg) {
-  const warning = document.getElementById('lyrics-warning');
-  warning.textContent = '⚠ ' + msg;
-  warning.classList.remove('hidden');
-  setTimeout(() => {
-    warning.textContent = '⚠ May be too long for selected duration';
-    warning.classList.add('hidden');
+  if (_fileErrorTimer) clearTimeout(_fileErrorTimer);
+  lyricsWarning.textContent = '⚠ ' + msg;
+  lyricsWarning.classList.remove('hidden');
+  _fileErrorTimer = setTimeout(() => {
+    _fileErrorTimer = null;
+    checkLyricsWarning(); // restore correct warning state
   }, 4000);
 }
 
@@ -466,6 +507,7 @@ autoDurationBtn.addEventListener('click', () => {
 
 lyricsText.addEventListener('input', () => {
   updateLyricsCount();
+  checkLyricsWarning();
   updateGenerateState();
   debouncedComputeAutoDuration();
 });
@@ -481,6 +523,7 @@ document.querySelectorAll('.tag').forEach(tag =>
 document.getElementById('clear-tags-btn').addEventListener('click', updateGenerateState);
 document.getElementById('clear-btn').addEventListener('click', () => {
   updateLyricsCount();
+  checkLyricsWarning();
   updateGenerateState();
 });
 
