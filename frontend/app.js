@@ -232,6 +232,8 @@ const audioPreview    = document.getElementById('audio-preview');
 
 // Initialise custom player for the rework audio preview
 initAudioPlayer(audioPreview, document.getElementById('audio-preview-player'));
+// Also wire the transport bar in the waveform output panel
+initAudioPlayer(audioPreview, document.getElementById('wf-transport'));
 
 function handleAudioUpload(file) {
   if (!file || !file.type.startsWith('audio/')) {
@@ -944,7 +946,8 @@ function formatTimecode(secs) {
 
 // Click-to-seek + drag-to-select on waveform canvas
 let _wfDragging = false;
-let _wfDragStart = 0;
+let _wfDragFraction = 0;    // click/drag start position as a fraction 0–1
+let _wfDragStartSecs = 0;   // drag start in seconds (for region dragging)
 let _wfDragMoved = false;   // true once mouse has moved far enough to be a drag
 let _wfMouseDownX = 0;
 let _wfHandleDrag = null;   // 'left' | 'right' | null
@@ -969,7 +972,8 @@ waveformContainer.addEventListener('mousedown', (e) => {
   _wfMouseDownX = e.clientX;
   const rect = waveformCanvas.getBoundingClientRect();
   const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-  _wfDragStart = (x / rect.width) * _waveformDuration;
+  _wfDragFraction = rect.width > 0 ? x / rect.width : 0;
+  _wfDragStartSecs = _wfDragFraction * _waveformDuration;
   // Don't start a region yet — wait to see if it's a click or a real drag
 });
 
@@ -990,20 +994,24 @@ document.addEventListener('mousemove', (e) => {
     // Require >4px movement before treating as a drag (avoids accidental region clear)
     if (!_wfDragMoved && Math.abs(e.clientX - _wfMouseDownX) > 4) {
       _wfDragMoved = true;
-      setWaveformRegion(_wfDragStart, _wfDragStart);
+      setWaveformRegion(_wfDragStartSecs, _wfDragStartSecs);
     }
     if (_wfDragMoved) {
-      setWaveformRegion(Math.min(_wfDragStart, secs), Math.max(_wfDragStart, secs));
+      setWaveformRegion(Math.min(_wfDragStartSecs, secs), Math.max(_wfDragStartSecs, secs));
     }
   }
 });
 
 document.addEventListener('mouseup', () => {
-  if (_wfDragging && !_wfDragMoved && _waveformDuration > 0) {
-    // Pure click — seek to position already computed on mousedown and play
-    audioPreview.currentTime = _wfDragStart;
-    _stopOthers(audioPreview);
-    audioPreview.play();
+  if (_wfDragging && !_wfDragMoved) {
+    // Pure click — seek using fraction × live duration
+    const dur = isFinite(audioPreview.duration) ? audioPreview.duration
+              : (_waveformDuration > 0 ? _waveformDuration : 0);
+    if (dur > 0) {
+      audioPreview.currentTime = _wfDragFraction * dur;
+      _stopOthers(audioPreview);
+      audioPreview.play();
+    }
   }
   _wfDragging = false;
   _wfHandleDrag = null;
