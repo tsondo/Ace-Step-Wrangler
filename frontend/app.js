@@ -230,12 +230,8 @@ const uploadPrompt    = document.getElementById('upload-prompt');
 const uploadLoaded    = document.getElementById('upload-loaded');
 const audioPreview    = document.getElementById('audio-preview');
 
-// Initialise custom players for the two static audio elements
+// Initialise custom player for the rework audio preview
 initAudioPlayer(audioPreview, document.getElementById('audio-preview-player'));
-initAudioPlayer(
-  document.getElementById('lyrics-audio-preview'),
-  document.getElementById('lyrics-player'),
-);
 
 function handleAudioUpload(file) {
   if (!file || !file.type.startsWith('audio/')) {
