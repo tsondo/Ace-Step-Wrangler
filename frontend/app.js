@@ -462,6 +462,10 @@ function showResultCards(taskId, results, fmt) {
     container.appendChild(createResultCard(taskId, i, result, results.length, fmt));
   });
   setOutputState('cards');
+  // Brief amber pulse on the output panel to draw the user's eye downward
+  const panel = document.getElementById('output-panel');
+  panel.classList.add('results-ready');
+  setTimeout(() => panel.classList.remove('results-ready'), 1200);
 }
 
 generateBtn.addEventListener('click', async () => {
@@ -502,8 +506,8 @@ generateBtn.addEventListener('click', async () => {
 
       if (data.status === 'done') {
         clearInterval(_pollInterval);
-        setGenerating(false);
         showResultCards(taskId, data.results, payload.audio_format);
+        setGenerating(false);
       } else if (data.status === 'error') {
         clearInterval(_pollInterval);
         setGenerating(false);
@@ -547,6 +551,7 @@ async function computeAutoDuration() {
     const secs = Math.max(10, Math.min(240, Math.round(data.seconds / 5) * 5));
     durationSlider.value = secs;
     updateSlider(durationSlider);
+    checkLyricsWarning();
   } catch (_) {
     // Silently fail — leave slider as-is
   }
@@ -557,6 +562,7 @@ const debouncedComputeAutoDuration = debounce(computeAutoDuration, 600);
 autoDurationBtn.addEventListener('click', () => {
   _autoOn = !_autoOn;
   autoDurationBtn.classList.toggle('active', _autoOn);
+  autoDurationBtn.textContent = _autoOn ? 'Auto ✓' : 'Auto';
   durationSlider.disabled = _autoOn;
   if (_autoOn) computeAutoDuration();
 });

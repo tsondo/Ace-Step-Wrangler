@@ -736,6 +736,17 @@ details[open] > .advanced-toggle {
   font-style: italic;
 }
 
+/* Output panel — brief amber pulse when results arrive */
+@keyframes results-pulse {
+  0%   { border-top-color: var(--border); }
+  40%  { border-top-color: var(--accent); box-shadow: 0 -2px 12px var(--accent-dim); }
+  100% { border-top-color: var(--border); box-shadow: none; }
+}
+
+#output-panel.results-ready {
+  animation: results-pulse 1.2s ease-out forwards;
+}
+
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }
 
