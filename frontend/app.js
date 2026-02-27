@@ -1149,6 +1149,7 @@ function clearWaveform() {
   stopPlayheadTracking();
   waveformSelection.classList.add('hidden');
   wfSelectionInfo.textContent = '';
+  document.getElementById('waveform-result-actions').classList.add('hidden');
   const container = document.getElementById('waveform-sections');
   while (container.firstChild) container.removeChild(container.firstChild);
 }
@@ -1380,8 +1381,27 @@ generateBtn.addEventListener('click', async () => {
 
       if (data.status === 'done') {
         clearInterval(_pollInterval);
-        showResultCards(taskId, data.results, payload.audio_format);
         setGenerating(false);
+        if (_currentMode === 'rework') {
+          // Stay in waveform view — load the result as the new source audio
+          const result = data.results[0];
+          _uploadedAudioPath = result.audio_url;
+          audioPreview.src = '/audio?path=' + encodeURIComponent(result.audio_url);
+          document.getElementById('upload-filename').textContent = 'Reworked audio';
+          loadWaveformForRework(result.audio_url, null, payload.lyrics || '');
+
+          // Wire download links
+          const fmt = payload.audio_format || 'mp3';
+          const dlAudio = document.getElementById('wf-download-audio');
+          const dlJson  = document.getElementById('wf-download-json');
+          dlAudio.href     = `/download/${taskId}/0/audio`;
+          dlAudio.download = `acestep-${taskId.slice(0, 8)}-rework.${fmt}`;
+          dlJson.href      = `/download/${taskId}/0/json`;
+          dlJson.download  = `acestep-${taskId.slice(0, 8)}-rework.json`;
+          document.getElementById('waveform-result-actions').classList.remove('hidden');
+        } else {
+          showResultCards(taskId, data.results, payload.audio_format);
+        }
       } else if (data.status === 'error') {
         clearInterval(_pollInterval);
         setGenerating(false);

@@ -1324,6 +1324,12 @@ details[open] > .advanced-toggle {
   gap: 6px;
 }
 
+.waveform-result-actions {
+  display: flex;
+  gap: 8px;
+  padding: 6px 2px 0;
+}
+
 .wf-label {
   font-size: 10px;
   font-weight: 600;

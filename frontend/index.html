@@ -262,6 +262,14 @@
             <option value="zh">ZH</option>
             <option value="ja">JA</option>
             <option value="ko">KO</option>
+            <option value="es">ES</option>
+            <option value="fr">FR</option>
+            <option value="de">DE</option>
+            <option value="pt">PT</option>
+            <option value="it">IT</option>
+            <option value="ru">RU</option>
+            <option value="ar">AR</option>
+            <option value="hi">HI</option>
           </select>
           <button class="generate-lyrics-btn" id="generate-lyrics-btn" type="button">Generate Lyrics</button>
         </div>
@@ -480,6 +488,10 @@
           <input type="number" id="wf-region-end" class="number-input wf-time-input" step="0.1" min="0" value="0">
         </div>
         <span class="waveform-selection-info" id="wf-selection-info"></span>
+      </div>
+      <div class="waveform-result-actions hidden" id="waveform-result-actions">
+        <a class="ghost-btn" id="wf-download-audio" download>Download audio</a>
+        <a class="ghost-btn" id="wf-download-json" download>Download JSON</a>
       </div>
     </div>
   </footer>
