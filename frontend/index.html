@@ -160,7 +160,7 @@
         <div class="control-label-row">
           <label class="field-label" for="duration">Duration</label>
           <div class="duration-right">
-            <button class="auto-btn" id="auto-duration-btn" title="Compute duration from lyrics and tempo">Auto</button>
+            <button class="auto-btn" id="auto-duration-btn" type="button" title="Compute duration from lyrics and tempo">Auto</button>
             <span class="control-value" id="duration-value">30s</span>
           </div>
         </div>
@@ -316,8 +316,8 @@
     <!-- State 2: Generating -->
     <div class="output-body hidden" id="output-generating">
       <div class="spinner"></div>
-      <span class="output-generating-label">Generating…</span>
-      <button class="ghost-btn" id="cancel-btn">Cancel</button>
+      <span class="output-generating-label">Generating… <span id="generating-timer" class="generating-timer"></span></span>
+      <button class="ghost-btn" id="cancel-btn" type="button">Cancel</button>
     </div>
 
     <!-- State 3: Result cards -->

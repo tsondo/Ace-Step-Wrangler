@@ -389,6 +389,7 @@ function buildPayload() {
 }
 
 let _pollInterval = null;
+let _timerInterval = null;
 
 // Ctrl/Cmd+Enter keyboard shortcut — trigger Generate from anywhere in the UI
 document.addEventListener('keydown', (e) => {
@@ -408,12 +409,29 @@ function setOutputState(state) {
 function setGenerating(on) {
   generateBtn.textContent = on ? 'Generating…' : '▶ Generate';
   generateBtn.disabled    = on;
-  if (on) setOutputState('generating');
+  if (on) {
+    setOutputState('generating');
+    // Start elapsed-time counter
+    const timerEl = document.getElementById('generating-timer');
+    const startTime = Date.now();
+    timerEl.textContent = '';
+    _timerInterval = setInterval(() => {
+      const secs = Math.floor((Date.now() - startTime) / 1000);
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      timerEl.textContent = m > 0
+        ? `${m}m ${String(s).padStart(2, '0')}s`
+        : `${s}s`;
+    }, 1000);
+  } else {
+    clearInterval(_timerInterval);
+    _timerInterval = null;
+    document.getElementById('generating-timer').textContent = '';
+  }
 }
 
 document.getElementById('cancel-btn').addEventListener('click', () => {
-  if (_pollInterval) clearInterval(_pollInterval);
-  _pollInterval = null;
+  if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
   setGenerating(false);
   setOutputState('idle');
 });
@@ -535,6 +553,9 @@ async function computeAutoDuration() {
   const bpmRaw  = document.getElementById('bpm').value.trim();
   const timeSig = document.getElementById('time-sig').value;
   const lmModel = document.getElementById('lm-model').value;
+
+  autoDurationBtn.textContent = 'Computing…';
+  autoDurationBtn.disabled = true;
   try {
     const res = await fetch('/estimate-duration', {
       method:  'POST',
@@ -554,6 +575,9 @@ async function computeAutoDuration() {
     checkLyricsWarning();
   } catch (_) {
     // Silently fail — leave slider as-is
+  } finally {
+    autoDurationBtn.textContent = _autoOn ? 'Auto ✓' : 'Auto';
+    autoDurationBtn.disabled = false;
   }
 }
 

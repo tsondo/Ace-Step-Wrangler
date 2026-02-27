@@ -765,6 +765,12 @@ details[open] > .advanced-toggle {
   color: var(--text-secondary);
 }
 
+.generating-timer {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 /* Result cards row */
 .output-cards {
   flex: 1;
