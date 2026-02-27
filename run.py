@@ -5,9 +5,9 @@ Starts the AceStep API server (GPU, port 8001) and the Wrangler FastAPI UI
 server (no GPU, port 7860) as subprocesses, with graceful shutdown on Ctrl+C.
 
 Usage:
-    uv run python run.py              # auto GPU detection
-    uv run python run.py --gpu 1      # use GPU 1
-    ACESTEP_GPU=0 uv run python run.py
+    uv run wrangler                   # auto GPU detection
+    uv run wrangler --gpu 1           # use GPU 1
+    ACESTEP_GPU=0 uv run wrangler
 """
 
 import argparse

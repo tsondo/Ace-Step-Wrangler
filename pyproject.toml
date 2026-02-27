@@ -11,6 +11,9 @@ dependencies = [
     "ace-step",
 ]
 
+[project.scripts]
+wrangler = "run:main"
+
 # ---------------------------------------------------------------------------
 # uv configuration — must mirror ACE-Step's [tool.uv] because uv only reads
 # tool config from the root project, not from path dependencies.
