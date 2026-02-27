@@ -73,7 +73,7 @@ Early development — frontend shell is in place but generation is not yet wired
 | 3 | Style panel (tags, mood, preview) | Done |
 | 4 | Controls column (sliders, validation) | Done |
 | 5 | FastAPI backend + AceStep wiring | Done |
-| 6 | Progress + output panel | Pending |
+| 6 | Progress + output panel | Done |
 | 7 | Warnings system | Pending |
 | 8 | Advanced panel | Pending |
 | 9 | Polish pass | Pending |

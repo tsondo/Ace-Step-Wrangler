@@ -265,35 +265,69 @@ function buildPayload() {
     gen_model:       document.getElementById('gen-model').value,
     batch_size:      Number(document.getElementById('batch-size').value),
     scheduler:       document.getElementById('scheduler').value,
+    audio_format:    document.getElementById('audio-format').value,
   };
 }
 
 let _pollInterval = null;
 
+// Manage the three output panel states: idle / generating / cards
+function setOutputState(state) {
+  document.getElementById('output-idle').classList.toggle('hidden', state !== 'idle');
+  document.getElementById('output-generating').classList.toggle('hidden', state !== 'generating');
+  document.getElementById('output-cards').classList.toggle('hidden', state !== 'cards');
+}
+
 function setGenerating(on) {
   generateBtn.textContent = on ? 'Generating…' : '▶ Generate';
   generateBtn.disabled    = on;
+  if (on) setOutputState('generating');
 }
 
-function showAudio(audioUrl) {
-  const waveform = document.getElementById('waveform');
-  waveform.innerHTML = '';
+function createResultCard(taskId, index, result, total, fmt) {
+  const card = document.createElement('div');
+  card.className = 'result-card';
+
+  if (total > 1) {
+    const label = document.createElement('div');
+    label.className = 'card-label';
+    label.textContent = `Result ${index + 1} of ${total}`;
+    card.appendChild(label);
+  }
 
   const audio = document.createElement('audio');
   audio.controls = true;
-  audio.src      = '/audio?path=' + encodeURIComponent(audioUrl);
-  audio.style.width = '100%';
-  waveform.appendChild(audio);
+  audio.src = '/audio?path=' + encodeURIComponent(result.audio_url);
+  card.appendChild(audio);
 
-  // Enable download button
-  const dlBtn = document.getElementById('download-btn');
-  dlBtn.disabled = false;
-  dlBtn.onclick = () => {
-    const a = document.createElement('a');
-    a.href     = audio.src;
-    a.download = 'acestep-output.mp3';
-    a.click();
-  };
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  const dlAudio = document.createElement('a');
+  dlAudio.className = 'ghost-btn';
+  dlAudio.href      = `/download/${taskId}/${index}/audio`;
+  dlAudio.download  = `acestep-${taskId.slice(0, 8)}-${index + 1}.${fmt}`;
+  dlAudio.textContent = 'Download audio';
+
+  const dlJson = document.createElement('a');
+  dlJson.className = 'ghost-btn';
+  dlJson.href      = `/download/${taskId}/${index}/json`;
+  dlJson.download  = `acestep-${taskId.slice(0, 8)}-${index + 1}.json`;
+  dlJson.textContent = 'Download JSON';
+
+  actions.appendChild(dlAudio);
+  actions.appendChild(dlJson);
+  card.appendChild(actions);
+  return card;
+}
+
+function showResultCards(taskId, results, fmt) {
+  const container = document.getElementById('output-cards');
+  container.innerHTML = '';
+  results.forEach((result, i) => {
+    container.appendChild(createResultCard(taskId, i, result, results.length, fmt));
+  });
+  setOutputState('cards');
 }
 
 generateBtn.addEventListener('click', async () => {
@@ -303,6 +337,7 @@ generateBtn.addEventListener('click', async () => {
   }
   generateHint.textContent = '';
 
+  const payload = buildPayload();
   setGenerating(true);
 
   let taskId;
@@ -310,7 +345,7 @@ generateBtn.addEventListener('click', async () => {
     const res = await fetch('/generate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(buildPayload()),
+      body:    JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -320,6 +355,7 @@ generateBtn.addEventListener('click', async () => {
   } catch (err) {
     generateHint.textContent = `Error: ${err.message}`;
     setGenerating(false);
+    setOutputState('idle');
     return;
   }
 
@@ -333,16 +369,18 @@ generateBtn.addEventListener('click', async () => {
       if (data.status === 'done') {
         clearInterval(_pollInterval);
         setGenerating(false);
-        showAudio(data.audio_url);
+        showResultCards(taskId, data.results, payload.audio_format);
       } else if (data.status === 'error') {
         clearInterval(_pollInterval);
         setGenerating(false);
+        setOutputState('idle');
         generateHint.textContent = 'Generation failed. Check AceStep logs.';
       }
       // 'processing' → keep polling
     } catch (err) {
       clearInterval(_pollInterval);
       setGenerating(false);
+      setOutputState('idle');
       generateHint.textContent = `Polling error: ${err.message}`;
     }
   }, 2000);

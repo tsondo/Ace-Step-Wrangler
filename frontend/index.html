@@ -202,6 +202,15 @@
             <p class="batch-note hidden" id="batch-note"></p>
           </div>
 
+          <div class="control-group">
+            <label class="field-label" for="audio-format">Audio format</label>
+            <select id="audio-format" class="select-input">
+              <option value="mp3" selected>MP3 (default)</option>
+              <option value="wav">WAV</option>
+              <option value="flac">FLAC</option>
+            </select>
+          </div>
+
           <div class="section-divider"></div>
 
           <!-- Raw generation params -->
@@ -256,14 +265,21 @@
   <footer id="output-panel">
     <div class="output-header">
       <span class="output-title">Output</span>
-      <div class="output-controls">
-        <button class="icon-btn output-play-btn" id="play-btn" disabled aria-label="Play">&#9654;</button>
-        <button class="ghost-btn" id="download-btn" disabled>Download</button>
-      </div>
     </div>
-    <div class="waveform-container" id="waveform">
-      <span class="waveform-hint">Generated audio will appear here</span>
+
+    <!-- State 1: Idle -->
+    <div class="output-body" id="output-idle">
+      <span class="output-hint">Generated audio will appear here</span>
     </div>
+
+    <!-- State 2: Generating -->
+    <div class="output-body hidden" id="output-generating">
+      <div class="spinner"></div>
+      <span class="output-generating-label">Generating…</span>
+    </div>
+
+    <!-- State 3: Result cards -->
+    <div class="output-cards hidden" id="output-cards"></div>
   </footer>
 
 </div>

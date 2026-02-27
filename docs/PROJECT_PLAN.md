@@ -106,7 +106,7 @@ Passed to AceStep as the `audio_format` payload field. The download filename ext
 3. **Style panel** — clickable genre preset tags + free text override field ✓
 4. **Controls column** — friendly sliders, Generate button, basic validation ✓
 5. **FastAPI backend** — `/generate`, `/status`, `/cancel` endpoints wired to AceStep ✓
-6. **Progress + output panel** — polling, per-result cards, playback, download (see Stage 6 spec below)
+6. **Progress + output panel** — polling, per-result cards, playback, download (see Stage 6 spec below) ✓
 7. **Warnings system** — duration vs. lyrics length heuristic, other validation
 8. **Advanced panel** — raw AceStep params, seed, scheduler (collapsed by default)
 9. **Polish pass** — transitions, error states, keyboard shortcuts, accessibility

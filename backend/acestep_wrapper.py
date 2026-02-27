@@ -37,8 +37,10 @@ async def query_result(task_id: str) -> dict:
     """
     Poll a task. Returns a normalised dict:
       { "status": "processing" | "done" | "error",
-        "audio_url": str | None,   # relative URL, only when done
-        "meta": dict | None }      # metas dict from AceStep, only when done
+        "results": list[{"audio_url": str, "meta": dict|None}] | None }
+
+    NOTE: AceStep returns `result` as a JSON *string* — we parse it here.
+    For batch_size > 1 the list contains one entry per generated item.
     """
     async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
         r = await client.post(
@@ -51,18 +53,19 @@ async def query_result(task_id: str) -> dict:
         code  = entry["status"]   # 0=running, 1=succeeded, 2=failed
 
     if code == 0:
-        return {"status": "processing", "audio_url": None, "meta": None}
+        return {"status": "processing", "results": None}
 
     if code == 2:
-        return {"status": "error", "audio_url": None, "meta": None}
+        return {"status": "error", "results": None}
 
     # status == 1: result is a JSON string — parse it
-    results = json.loads(entry["result"])
-    first   = results[0]
+    items = json.loads(entry["result"])
     return {
-        "status":    "done",
-        "audio_url": first["file"],   # already a relative URL e.g. /v1/audio?path=...
-        "meta":      first.get("metas"),
+        "status": "done",
+        "results": [
+            {"audio_url": item["file"], "meta": item.get("metas")}
+            for item in items
+        ],
     }
 
 
