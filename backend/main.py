@@ -14,15 +14,20 @@ Static frontend is served from /  (catch-all, mounted last).
 
 import json
 import re
+import shutil
+import tempfile
+import uuid
 import uvicorn
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+import asyncio
 
 from acestep_wrapper import (
     health_check,
@@ -30,6 +35,7 @@ from acestep_wrapper import (
     query_result,
     get_audio_bytes,
     format_input,
+    create_sample,
 )
 
 app = FastAPI(title="ACE-Step Wrangler")
@@ -43,6 +49,10 @@ _jobs: dict[str, dict] = {}
 
 # task_id → { "params": dict, "format": str }  (pending, before results arrive)
 _pending: dict[str, dict] = {}
+
+# upload_id → { "path": str, "filename": str }
+_uploads: dict[str, dict] = {}
+_upload_dir = Path(tempfile.mkdtemp(prefix="wrangler-uploads-"))
 
 # ---------------------------------------------------------------------------
 # Parameter mapping tables
@@ -92,6 +102,13 @@ class GenerateRequest(BaseModel):
     guidance_scale_raw:   Optional[float] = None
     audio_guidance_scale: Optional[float] = None
     inference_steps_raw:  Optional[int]   = None
+
+    # Rework mode
+    task_type:             str             = "text2music"  # text2music | cover | repaint
+    src_audio_path:        Optional[str]   = None
+    audio_cover_strength:  Optional[float] = None          # 0.0–1.0 for cover
+    repainting_start:      Optional[float] = None          # seconds, for repaint
+    repainting_end:        Optional[float] = None          # seconds, for repaint
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -144,6 +161,19 @@ def _build_payload(req: GenerateRequest) -> dict:
     model_name = _GEN_MODEL.get(req.gen_model)
     if model_name:
         payload["model"] = model_name
+
+    # Rework params
+    if req.task_type in ("cover", "repaint"):
+        payload["task_type"] = req.task_type
+        if req.src_audio_path:
+            payload["src_audio_path"] = req.src_audio_path
+        if req.task_type == "cover" and req.audio_cover_strength is not None:
+            payload["audio_cover_strength"] = req.audio_cover_strength
+        if req.task_type == "repaint":
+            if req.repainting_start is not None:
+                payload["repainting_start"] = req.repainting_start
+            if req.repainting_end is not None:
+                payload["repainting_end"] = req.repainting_end
 
     return payload
 
@@ -236,6 +266,53 @@ async def generate(req: GenerateRequest):
         "format": req.audio_format,
     }
     return {"task_id": task_id}
+
+
+class GenerateLyricsRequest(BaseModel):
+    description: str
+    vocal_language: str = "en"
+
+
+@app.post("/generate-lyrics")
+async def generate_lyrics(req: GenerateLyricsRequest):
+    """Generate structured lyrics from a natural language description.
+
+    Uses AceStep's LM via /release_task with analysis_only=true, then polls
+    server-side until complete (typically ~5-10s, LM-only — no DiT inference).
+    """
+    if not req.description.strip():
+        raise HTTPException(status_code=422, detail="Description cannot be empty")
+
+    try:
+        task_id = await create_sample(req.description, req.vocal_language)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+    # Server-side polling — the LM call is fast enough to block
+    for _ in range(30):  # 30 × 1s = 30s timeout
+        await asyncio.sleep(1)
+        try:
+            data = await query_result(task_id)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"AceStep poll error: {exc}")
+
+        if data["status"] == "done":
+            results = data.get("results") or []
+            if not results:
+                raise HTTPException(status_code=502, detail="No results returned")
+            meta = results[0].get("meta") or {}
+            return {
+                "caption": meta.get("prompt", ""),
+                "lyrics": meta.get("lyrics", ""),
+                "bpm": meta.get("bpm"),
+                "key_scale": meta.get("key_scale", ""),
+                "time_signature": meta.get("time_signature", "4/4"),
+                "duration": meta.get("duration"),
+            }
+        elif data["status"] == "error":
+            raise HTTPException(status_code=502, detail="Lyrics generation failed")
+
+    raise HTTPException(status_code=504, detail="Lyrics generation timed out")
 
 
 @app.get("/status/{task_id}")
@@ -340,6 +417,22 @@ async def download_json(job_id: str, index: int):
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.post("/upload-audio")
+async def upload_audio(file: UploadFile):
+    """Accept an audio file upload, save to temp dir, return server-side path."""
+    if not file.content_type or not file.content_type.startswith("audio/"):
+        raise HTTPException(status_code=422, detail="Only audio files are supported")
+
+    upload_id = uuid.uuid4().hex[:12]
+    suffix = Path(file.filename or "audio").suffix or ".wav"
+    dest = _upload_dir / f"{upload_id}{suffix}"
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    _uploads[upload_id] = {"path": str(dest), "filename": file.filename or "audio"}
+    return {"upload_id": upload_id, "path": str(dest), "filename": file.filename}
 
 
 # ---------------------------------------------------------------------------

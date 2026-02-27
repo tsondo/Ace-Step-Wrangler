@@ -59,6 +59,222 @@ document.querySelectorAll('.slider').forEach(slider => {
 // Duration changes may affect the lyrics-too-long warning
 document.getElementById('duration').addEventListener('input', checkLyricsWarning);
 
+// ===== Mode selector (Create / Rework) =====
+
+let _currentMode = 'create';
+
+const modeBtns     = document.querySelectorAll('.mode-btn');
+const createPanel  = document.getElementById('create-panel');
+const reworkPanel  = document.getElementById('rework-panel');
+
+function switchMode(mode) {
+  // Block mode switch during active generation
+  const genBtn = document.getElementById('generate-btn');
+  if (genBtn && genBtn.disabled) return;
+
+  _currentMode = mode;
+  modeBtns.forEach(btn => {
+    const isActive = btn.dataset.mode === mode;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive);
+  });
+  createPanel.classList.toggle('hidden', mode !== 'create');
+  reworkPanel.classList.toggle('hidden', mode !== 'rework');
+  updateControlsForMode(mode);
+  updateGenerateState();
+}
+
+function updateControlsForMode(mode) {
+  const genBtn = document.getElementById('generate-btn');
+  if (genBtn && !genBtn.disabled) {
+    if (mode === 'create') {
+      genBtn.textContent = '▶ Generate';
+    } else {
+      genBtn.textContent = _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Repaint';
+    }
+  }
+
+  // Lock duration to source audio length in rework mode
+  const durationEl = document.getElementById('duration');
+  let lockNote = document.getElementById('duration-lock-note');
+  if (mode === 'rework' && _uploadedAudioDuration) {
+    const dur = Math.max(10, Math.min(240, Math.round(_uploadedAudioDuration / 5) * 5));
+    durationEl.value = dur;
+    updateSlider(durationEl);
+    durationEl.disabled = true;
+    if (!lockNote) {
+      lockNote = document.createElement('p');
+      lockNote.id = 'duration-lock-note';
+      lockNote.className = 'duration-lock-note';
+      durationEl.parentElement.appendChild(lockNote);
+    }
+    lockNote.textContent = 'Locked to source audio length';
+    lockNote.classList.remove('hidden');
+  } else {
+    if (mode === 'create') durationEl.disabled = _autoOn;
+    if (lockNote) lockNote.classList.add('hidden');
+  }
+}
+
+modeBtns.forEach(btn =>
+  btn.addEventListener('click', () => switchMode(btn.dataset.mode))
+);
+
+// ===== Rework panel — audio upload, approach selector =====
+
+let _uploadedAudioPath = null;
+let _uploadedAudioDuration = null;
+let _reworkApproach = 'cover';
+
+const audioUploadZone = document.getElementById('audio-upload-zone');
+const uploadPrompt    = document.getElementById('upload-prompt');
+const uploadLoaded    = document.getElementById('upload-loaded');
+const audioPreview    = document.getElementById('audio-preview');
+
+function handleAudioUpload(file) {
+  if (!file || !file.type.startsWith('audio/')) {
+    const hint = document.getElementById('generate-hint');
+    if (hint) hint.textContent = 'Only audio files are supported.';
+    return;
+  }
+
+  // Client-side preview
+  const objUrl = URL.createObjectURL(file);
+  audioPreview.src = objUrl;
+  audioPreview.onloadedmetadata = () => {
+    _uploadedAudioDuration = audioPreview.duration;
+    document.getElementById('upload-duration').textContent =
+      formatDuration(audioPreview.duration);
+    // Set region end to audio duration
+    document.getElementById('region-end').value = Math.round(audioPreview.duration * 10) / 10;
+    document.getElementById('region-end').max = Math.round(audioPreview.duration * 10) / 10;
+    document.getElementById('region-start').max = Math.round(audioPreview.duration * 10) / 10;
+  };
+
+  document.getElementById('upload-filename').textContent = file.name;
+  uploadPrompt.classList.add('hidden');
+  uploadLoaded.classList.remove('hidden');
+
+  // Upload to server
+  const formData = new FormData();
+  formData.append('file', file);
+  fetch('/upload-audio', { method: 'POST', body: formData })
+    .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+    .then(data => {
+      _uploadedAudioPath = data.path;
+      updateGenerateState();
+    })
+    .catch(err => {
+      removeAudio();
+      const hint = document.getElementById('generate-hint');
+      if (hint) hint.textContent = `Upload failed: ${err.message}`;
+    });
+}
+
+function formatDuration(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
+}
+
+function removeAudio() {
+  _uploadedAudioPath = null;
+  _uploadedAudioDuration = null;
+  audioPreview.src = '';
+  document.getElementById('upload-filename').textContent = '';
+  document.getElementById('upload-duration').textContent = '';
+  uploadPrompt.classList.remove('hidden');
+  uploadLoaded.classList.add('hidden');
+  updateGenerateState();
+}
+
+document.getElementById('browse-audio-btn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'audio/*';
+  input.addEventListener('change', () => {
+    if (input.files[0]) handleAudioUpload(input.files[0]);
+  });
+  input.click();
+});
+
+document.getElementById('remove-audio-btn').addEventListener('click', removeAudio);
+
+// Drag-and-drop on upload zone
+audioUploadZone.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  audioUploadZone.classList.add('drag-over');
+});
+
+audioUploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+
+audioUploadZone.addEventListener('dragleave', (e) => {
+  if (!audioUploadZone.contains(e.relatedTarget)) {
+    audioUploadZone.classList.remove('drag-over');
+  }
+});
+
+audioUploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  audioUploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleAudioUpload(file);
+});
+
+// Approach selector
+const approachBtns       = document.querySelectorAll('.approach-btn');
+const coverStrengthGroup = document.getElementById('cover-strength-group');
+const regionInputs       = document.getElementById('region-inputs');
+
+function switchApproach(approach) {
+  _reworkApproach = approach;
+  approachBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.approach === approach));
+  coverStrengthGroup.classList.toggle('hidden', approach !== 'cover');
+  regionInputs.classList.toggle('hidden', approach !== 'repaint');
+  updateControlsForMode(_currentMode);
+  updateGenerateState();
+}
+
+// Region validation (start < end, end ≤ duration)
+function validateRegion() {
+  const start = Number(document.getElementById('region-start').value);
+  const end   = Number(document.getElementById('region-end').value);
+  const hint  = document.getElementById('generate-hint');
+  if (_currentMode === 'rework' && _reworkApproach === 'repaint') {
+    if (start >= end && end > 0) {
+      hint.textContent = 'Region start must be before end.';
+      return false;
+    }
+    if (_uploadedAudioDuration && end > _uploadedAudioDuration) {
+      hint.textContent = 'Region end exceeds audio duration.';
+      return false;
+    }
+  }
+  return true;
+}
+
+document.getElementById('region-start').addEventListener('input', validateRegion);
+document.getElementById('region-end').addEventListener('input', validateRegion);
+
+approachBtns.forEach(btn =>
+  btn.addEventListener('click', () => switchApproach(btn.dataset.approach))
+);
+
+// Cover strength slider
+const coverStrengthSlider = document.getElementById('cover-strength');
+const coverStrengthValue  = document.getElementById('cover-strength-value');
+coverStrengthSlider.addEventListener('input', () => {
+  const val = Number(coverStrengthSlider.value);
+  const pct = ((val - Number(coverStrengthSlider.min)) / (Number(coverStrengthSlider.max) - Number(coverStrengthSlider.min))) * 100;
+  coverStrengthSlider.style.setProperty('--fill', pct + '%');
+  coverStrengthValue.textContent = `${val}%`;
+});
+// Init fill
+coverStrengthSlider.dispatchEvent(new Event('input'));
+
 // ===== Style panel — tags, count, song params, preview =====
 
 const tagsStatus   = document.getElementById('tags-status');
@@ -187,6 +403,158 @@ function checkLyricsWarning() {
     lyricsWarning.classList.add('hidden');
   }
 }
+
+// ===== Lyrics tabs (Write / Generate) =====
+
+const lyricsTabBtns     = document.querySelectorAll('.lyrics-tab');
+const lyricsTabWrite    = document.getElementById('lyrics-tab-write');
+const lyricsTabGenerate = document.getElementById('lyrics-tab-generate');
+const writeTabActions   = document.getElementById('write-tab-actions');
+
+let _lyricsGenResult = null; // cached result from last generation
+
+function switchLyricsTab(tab) {
+  lyricsTabBtns.forEach(btn => {
+    const isActive = btn.dataset.tab === tab;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive);
+  });
+  lyricsTabWrite.classList.toggle('hidden', tab !== 'write');
+  lyricsTabGenerate.classList.toggle('hidden', tab !== 'generate');
+  writeTabActions.classList.toggle('hidden', tab !== 'write');
+}
+
+lyricsTabBtns.forEach(btn =>
+  btn.addEventListener('click', () => switchLyricsTab(btn.dataset.tab))
+);
+
+// --- Generate Lyrics ---
+
+const generateLyricsBtn = document.getElementById('generate-lyrics-btn');
+const lyricsGenStatus   = document.getElementById('lyrics-gen-status');
+const lyricsPreview     = document.getElementById('lyrics-preview');
+const lyricsPreviewMeta = document.getElementById('lyrics-preview-meta');
+const lyricsPreviewText = document.getElementById('lyrics-preview-text');
+const lyricsGenHint     = document.getElementById('lyrics-gen-hint');
+
+function createMetaBadge(label, value) {
+  const badge = document.createElement('span');
+  badge.className = 'meta-badge';
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'meta-badge-label';
+  labelSpan.textContent = label;
+  badge.appendChild(labelSpan);
+  badge.appendChild(document.createTextNode(' ' + value));
+  return badge;
+}
+
+async function generateLyrics() {
+  const description = document.getElementById('lyrics-description').value.trim();
+  if (!description) {
+    lyricsGenHint.textContent = 'Enter a description first.';
+    return;
+  }
+
+  lyricsGenHint.textContent = '';
+  generateLyricsBtn.disabled = true;
+  generateLyricsBtn.textContent = 'Generating…';
+  lyricsGenStatus.classList.remove('hidden');
+  lyricsPreview.classList.add('hidden');
+
+  try {
+    const res = await fetch('/generate-lyrics', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        description,
+        vocal_language: document.getElementById('lyrics-language').value,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    _lyricsGenResult = await res.json();
+
+    // Populate preview
+    lyricsPreviewText.textContent = _lyricsGenResult.lyrics || '(no lyrics returned)';
+
+    // Metadata badges
+    lyricsPreviewMeta.textContent = '';
+    const badges = [
+      ['BPM', _lyricsGenResult.bpm],
+      ['Key', _lyricsGenResult.key_scale],
+      ['Time', _lyricsGenResult.time_signature],
+      ['Duration', _lyricsGenResult.duration ? `${_lyricsGenResult.duration}s` : null],
+    ];
+    for (const [label, value] of badges) {
+      if (value) lyricsPreviewMeta.appendChild(createMetaBadge(label, value));
+    }
+
+    lyricsPreview.classList.remove('hidden');
+  } catch (err) {
+    lyricsGenHint.textContent = `Error: ${err.message}`;
+  } finally {
+    generateLyricsBtn.disabled = false;
+    generateLyricsBtn.textContent = 'Generate Lyrics';
+    lyricsGenStatus.classList.add('hidden');
+  }
+}
+
+generateLyricsBtn.addEventListener('click', generateLyrics);
+
+// --- Use generated lyrics ---
+
+function useLyrics(applyMeta) {
+  if (!_lyricsGenResult) return;
+
+  lyricsText.value = _lyricsGenResult.lyrics || '';
+  updateLyricsCount();
+  checkLyricsWarning();
+  updateGenerateState();
+
+  if (applyMeta) {
+    // BPM
+    if (_lyricsGenResult.bpm) {
+      document.getElementById('bpm').value = _lyricsGenResult.bpm;
+    }
+    // Key (e.g. "C major" → root="C", mode="major")
+    if (_lyricsGenResult.key_scale) {
+      const parts = _lyricsGenResult.key_scale.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const rootEl = document.getElementById('key-root');
+        const modeEl = document.getElementById('key-mode');
+        const rootOpts = [...rootEl.options].map(o => o.value.toLowerCase());
+        const matchIdx = rootOpts.indexOf(parts[0].toLowerCase());
+        if (matchIdx >= 0) rootEl.selectedIndex = matchIdx;
+        const modeLower = parts.slice(1).join(' ').toLowerCase();
+        if (modeLower.includes('minor')) modeEl.value = 'minor';
+        else modeEl.value = 'major';
+      }
+    }
+    // Time signature
+    if (_lyricsGenResult.time_signature) {
+      const tsEl = document.getElementById('time-sig');
+      const tsOpts = [...tsEl.options].map(o => o.value);
+      if (tsOpts.includes(_lyricsGenResult.time_signature)) {
+        tsEl.value = _lyricsGenResult.time_signature;
+      }
+    }
+    // Duration
+    if (_lyricsGenResult.duration) {
+      const dur = Math.max(10, Math.min(240, Math.round(Number(_lyricsGenResult.duration) / 5) * 5));
+      const durationSlider = document.getElementById('duration');
+      durationSlider.value = dur;
+      updateSlider(durationSlider);
+    }
+    updateStyleState();
+  }
+
+  switchLyricsTab('write');
+}
+
+document.getElementById('use-lyrics-btn').addEventListener('click', () => useLyrics(false));
+document.getElementById('use-lyrics-meta-btn').addEventListener('click', () => useLyrics(true));
 
 // ===== Clear button =====
 
@@ -348,6 +716,9 @@ const generateBtn  = document.getElementById('generate-btn');
 const generateHint = document.getElementById('generate-hint');
 
 function hasContent() {
+  if (_currentMode === 'rework') {
+    return !!_uploadedAudioPath;
+  }
   return lyricsText.value.trim().length > 0 || getStylePrompt().length > 0;
 }
 
@@ -357,17 +728,16 @@ function updateGenerateState() {
     generateHint.textContent = '';
   } else {
     generateBtn.classList.remove('ready');
+    if (_currentMode === 'rework') {
+      generateHint.textContent = 'Upload audio to get started.';
+    }
   }
 }
 
-// Collect the full request payload from all UI controls
-function buildPayload() {
+// Collect shared controls (used by both Create and Rework)
+function buildSharedPayload() {
   const seedRaw = document.getElementById('seed').value.trim();
-  const bpmRaw  = document.getElementById('bpm').value.trim();
-  const keyRoot = document.getElementById('key-root').value;
-  const keyMode = document.getElementById('key-mode').value;
   return {
-    style:           getStylePrompt(),
     lyrics:          lyricsText.value,
     duration:        Number(document.getElementById('duration').value),
     lyric_adherence: Number(document.getElementById('lyric-adherence').value),
@@ -378,14 +748,46 @@ function buildPayload() {
     batch_size:      Number(document.getElementById('batch-size').value),
     scheduler:       document.getElementById('scheduler').value,
     audio_format:    document.getElementById('audio-format').value,
-    key:             keyRoot ? `${keyRoot} ${keyMode}` : '',
-    bpm:             bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
-    time_signature:  document.getElementById('time-sig').value,
-    // Raw advanced slider values — override the friendly preset mappings
     guidance_scale_raw:   Number(document.getElementById('guidance-lyric').value),
     audio_guidance_scale: Number(document.getElementById('guidance-audio').value),
     inference_steps_raw:  Number(document.getElementById('inference-steps').value),
   };
+}
+
+function buildCreatePayload() {
+  const bpmRaw  = document.getElementById('bpm').value.trim();
+  const keyRoot = document.getElementById('key-root').value;
+  const keyMode = document.getElementById('key-mode').value;
+  return {
+    ...buildSharedPayload(),
+    style:           getStylePrompt(),
+    key:             keyRoot ? `${keyRoot} ${keyMode}` : '',
+    bpm:             bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
+    time_signature:  document.getElementById('time-sig').value,
+  };
+}
+
+function buildReworkPayload() {
+  const taskType = _reworkApproach === 'cover' ? 'cover' : 'repaint';
+  const payload = {
+    ...buildSharedPayload(),
+    style:          document.getElementById('rework-direction').value.trim(),
+    task_type:      taskType,
+    src_audio_path: _uploadedAudioPath,
+  };
+
+  if (taskType === 'cover') {
+    payload.audio_cover_strength = Number(coverStrengthSlider.value) / 100;
+  } else {
+    payload.repainting_start = Number(document.getElementById('region-start').value);
+    payload.repainting_end   = Number(document.getElementById('region-end').value);
+  }
+
+  return payload;
+}
+
+function buildPayload() {
+  return _currentMode === 'rework' ? buildReworkPayload() : buildCreatePayload();
 }
 
 let _pollInterval = null;
@@ -406,8 +808,15 @@ function setOutputState(state) {
   document.getElementById('output-cards').classList.toggle('hidden', state !== 'cards');
 }
 
+function getGenerateLabel() {
+  if (_currentMode === 'rework') {
+    return _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Repaint';
+  }
+  return '▶ Generate';
+}
+
 function setGenerating(on) {
-  generateBtn.textContent = on ? 'Generating…' : '▶ Generate';
+  generateBtn.textContent = on ? 'Generating…' : getGenerateLabel();
   generateBtn.disabled    = on;
   if (on) {
     setOutputState('generating');
@@ -488,9 +897,12 @@ function showResultCards(taskId, results, fmt) {
 
 generateBtn.addEventListener('click', async () => {
   if (!hasContent()) {
-    generateHint.textContent = 'Add some lyrics or a style description first.';
+    generateHint.textContent = _currentMode === 'rework'
+      ? 'Upload audio to get started.'
+      : 'Add some lyrics or a style description first.';
     return;
   }
+  if (!validateRegion()) return;
   generateHint.textContent = '';
 
   const payload = buildPayload();

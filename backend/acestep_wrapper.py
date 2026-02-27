@@ -69,6 +69,23 @@ async def query_result(task_id: str) -> dict:
     }
 
 
+async def create_sample(query: str, language: str = "en") -> str:
+    """Submit a lyrics-generation task via /release_task with analysis_only=true.
+    Returns the task_id string for polling with query_result()."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/release_task",
+            json={
+                "sample_query": query,
+                "analysis_only": True,
+                "vocal_language": language,
+            },
+        )
+        r.raise_for_status()
+        body = r.json()
+        return body["data"]["task_id"]
+
+
 async def format_input(lyrics: str) -> dict:
     """Call AceStep's /format_input LM endpoint for structured lyrics analysis.
     Returns the raw response body as a dict."""

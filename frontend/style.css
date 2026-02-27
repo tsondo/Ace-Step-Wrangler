@@ -109,6 +109,73 @@ html, body {
 }
 
 /* ============================================================
+   Mode Selector (header)
+   ============================================================ */
+.mode-selector {
+  display: flex;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.mode-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  letter-spacing: 0.04em;
+  transition: color 0.15s, background 0.15s;
+}
+
+.mode-btn:hover {
+  color: var(--text-secondary);
+  background: var(--surface-hover);
+}
+
+.mode-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* Mode panels inside left column */
+.mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Panel/tab content fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.lyrics-tab-content:not(.hidden) {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Duration lock note (shown in rework mode) */
+.duration-lock-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Fix & Blend tip */
+.repaint-tip {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ============================================================
    Buttons
    ============================================================ */
 .icon-btn {
@@ -183,7 +250,7 @@ html, body {
 }
 
 /* Subtle alternating panel tones */
-#style-panel    { background: var(--surface); }
+#left-column    { background: var(--surface); }
 #lyrics-panel   { background: #12121a; }
 #controls-panel { background: var(--surface); }
 
@@ -459,6 +526,287 @@ html, body {
 
 .hidden {
   display: none !important;
+}
+
+/* ============================================================
+   Rework Panel — Audio Upload & Approach
+   ============================================================ */
+.audio-upload-zone {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.audio-upload-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.upload-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-icon {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.upload-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.upload-loaded {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upload-file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.upload-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-duration {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.upload-loaded audio {
+  width: 100%;
+  height: 32px;
+}
+
+/* Approach selector */
+.approach-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.approach-btn {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.approach-btn:hover {
+  border-color: var(--accent);
+}
+
+.approach-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.approach-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.approach-btn.active .approach-name {
+  color: var(--accent);
+}
+
+.approach-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Region inputs */
+.region-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.region-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ============================================================
+   Lyrics Tabs
+   ============================================================ */
+.lyrics-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.lyrics-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.lyrics-tab:hover {
+  color: var(--text-secondary);
+}
+
+.lyrics-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.lyrics-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Generate lyrics row */
+.generate-lyrics-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.select-narrow-lang {
+  flex: 0 0 60px;
+  padding-left: 6px;
+  padding-right: 18px;
+  background-position: right 4px center;
+  font-size: 12px;
+}
+
+.generate-lyrics-btn {
+  flex: 1;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #0a0a0d;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.generate-lyrics-btn:hover { background: var(--accent-bright); }
+.generate-lyrics-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Status spinner */
+.lyrics-gen-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+/* Lyrics preview */
+.lyrics-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.lyrics-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 12px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.meta-badge-label {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lyrics-preview-text {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.lyrics-preview-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.use-lyrics-meta-btn {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.use-lyrics-meta-btn:hover {
+  background: var(--accent-dim) !important;
 }
 
 /* ============================================================
