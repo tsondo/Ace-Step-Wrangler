@@ -1298,12 +1298,21 @@ function createResultCard(taskId, index, result, total, fmt) {
   dlJson.download  = `acestep-${taskId.slice(0, 8)}-${index + 1}.json`;
   dlJson.textContent = 'Download JSON';
 
+  // Show AI-generated lyrics when user left the textarea blank
+  if (result.lyrics && !lyricsText.value.trim()) {
+    const lyricsEl = document.createElement('pre');
+    lyricsEl.className = 'card-lyrics';
+    lyricsEl.textContent = result.lyrics;
+    card.appendChild(lyricsEl);
+  }
+
   const sendBtn = document.createElement('button');
   sendBtn.className = 'ghost-btn';
   sendBtn.type = 'button';
   sendBtn.textContent = 'Send to Rework';
   sendBtn.addEventListener('click', () => {
-    loadAudioIntoRework(result.audio_url, 'Generated audio', lyricsText.value);
+    // Use AI-generated lyrics if user didn't write any
+    loadAudioIntoRework(result.audio_url, 'Generated audio', result.lyrics || lyricsText.value);
   });
 
   actions.appendChild(dlAudio);
@@ -1318,7 +1327,7 @@ function showResultCards(taskId, results, fmt) {
   if (results.length > 0) {
     _lastGenResult = {
       audioPath: results[0].audio_url,
-      lyrics: lyricsText.value,
+      lyrics: results[0].lyrics || lyricsText.value,
     };
   }
 

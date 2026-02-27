@@ -37,6 +37,7 @@ from acestep_wrapper import (
     get_audio_bytes,
     format_input,
     create_sample,
+    _LANG_LABELS,
 )
 
 app = FastAPI(title="ACE-Step Wrangler")
@@ -164,7 +165,11 @@ def _build_payload(req: GenerateRequest) -> dict:
         payload["audio_guidance_scale"] = req.audio_guidance_scale
 
     if req.sample_query:
-        payload["sample_query"]   = req.sample_query
+        # AceStep ignores vocal_language="en" in sample_query mode — embed the
+        # language label in the query text so _parse_description_hints() picks it up.
+        label = _LANG_LABELS.get(req.vocal_language, "")
+        enriched = f"{req.sample_query}. {label} vocals." if label else req.sample_query
+        payload["sample_query"]   = enriched
         payload["vocal_language"] = req.vocal_language
 
     model_name = _GEN_MODEL.get(req.gen_model)

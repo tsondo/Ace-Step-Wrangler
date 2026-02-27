@@ -1129,6 +1129,22 @@ details[open] > .advanced-toggle {
   gap: 6px;
 }
 
+.card-lyrics {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
 /* ============================================================
    Waveform Timeline
    ============================================================ */
