@@ -468,31 +468,8 @@
 
   <!-- ===== Output Panel ===== -->
   <footer id="output-panel">
-    <div class="output-header">
-      <span class="output-title" id="output-panel-title">Now Playing</span>
-    </div>
 
-    <!-- State 1: Now Playing bar (default) -->
-    <div class="output-body output-now-playing" id="now-playing-bar">
-      <span class="now-playing-label" id="now-playing-label">—</span>
-      <div class="audio-player" id="now-playing-player">
-        <button class="player-btn player-rewind" type="button" title="Rewind to start" disabled>⟪</button>
-        <button class="player-btn player-play"   type="button" title="Play" disabled>▶</button>
-        <button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>
-        <div class="player-scrubber"><div class="player-scrubber-fill"></div></div>
-        <span class="player-time">0:00 / 0:00</span>
-        <a class="player-btn player-save hidden" id="np-save-btn" title="Save audio">⬇</a>
-      </div>
-    </div>
-
-    <!-- State 2: Generating -->
-    <div class="output-body hidden" id="output-generating">
-      <div class="spinner"></div>
-      <span class="output-generating-label">Generating… <span id="generating-timer" class="generating-timer"></span></span>
-      <button class="ghost-btn" id="cancel-btn" type="button">Cancel</button>
-    </div>
-
-    <!-- State 3: Waveform timeline (rework mode, audio loaded) -->
+    <!-- Waveform timeline (rework mode, audio loaded) — shown above Now Playing -->
     <div class="hidden" id="output-waveform">
       <div class="waveform-container">
         <div class="waveform-loading hidden" id="waveform-loading">
@@ -531,6 +508,27 @@
         <a class="ghost-btn" id="wf-download-json" download>Download JSON</a>
       </div>
     </div>
+
+    <!-- Generating state — shown above Now Playing -->
+    <div class="output-body hidden" id="output-generating">
+      <div class="spinner"></div>
+      <span class="output-generating-label">Generating… <span id="generating-timer" class="generating-timer"></span></span>
+      <button class="ghost-btn" id="cancel-btn" type="button">Cancel</button>
+    </div>
+
+    <!-- Now Playing — always visible -->
+    <div class="now-playing-bar" id="now-playing-bar">
+      <span class="now-playing-label" id="now-playing-label">—</span>
+      <div class="audio-player" id="now-playing-player">
+        <button class="player-btn player-rewind" type="button" title="Rewind to start" disabled>⟪</button>
+        <button class="player-btn player-play"   type="button" title="Play" disabled>▶</button>
+        <button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>
+        <div class="player-scrubber"><div class="player-scrubber-fill"></div></div>
+        <span class="player-time">0:00 / 0:00</span>
+        <a class="player-btn player-save hidden" id="np-save-btn" title="Save audio">⬇</a>
+      </div>
+    </div>
+
   </footer>
 
 </div>

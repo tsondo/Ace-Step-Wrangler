@@ -1077,19 +1077,6 @@ details[open] > .advanced-toggle {
   border-top: 1px solid var(--border);
 }
 
-.output-header {
-  display: flex;
-  align-items: center;
-}
-
-.output-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
 /* Shared: generating centred body */
 .output-body {
   display: flex;
@@ -1097,9 +1084,14 @@ details[open] > .advanced-toggle {
   gap: 10px;
 }
 
-/* Now Playing bar — left-aligned with label + transport */
-.output-now-playing {
-  justify-content: flex-start;
+/* Now Playing — always-visible strip at bottom of footer */
+.now-playing-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 6px;
+  flex-shrink: 0;
 }
 
 .now-playing-label {

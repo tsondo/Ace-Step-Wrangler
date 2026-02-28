@@ -658,6 +658,17 @@ function switchCreateTab(tab) {
   document.getElementById('tab-my-lyrics').classList.toggle('hidden', tab !== 'my-lyrics');
   document.getElementById('tab-ai-lyrics').classList.toggle('hidden', tab !== 'ai-lyrics');
   document.getElementById('tab-instrumental').classList.toggle('hidden', tab !== 'instrumental');
+
+  // In Rework mode, switch the waveform to this tab's audio
+  if (_currentMode === 'rework') {
+    const tabResult = _tabAudio[tab];
+    if (tabResult) {
+      loadAudioIntoRework(tabResult.audioPath, _TAB_LABELS[tab] || 'Generated audio', tabResult.lyrics);
+    } else {
+      removeAudio();
+    }
+  }
+
   updateGenerateState();
 }
 
@@ -1453,15 +1464,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Manage the output panel footer states: now-playing / generating / waveform
+// Now Playing bar is always visible; only the dynamic content above it changes.
 function setOutputState(state) {
-  document.getElementById('now-playing-bar').classList.toggle('hidden',    state !== 'now-playing');
-  document.getElementById('output-generating').classList.toggle('hidden',  state !== 'generating');
-  document.getElementById('output-waveform').classList.toggle('hidden',    state !== 'waveform');
-  // Update header title
-  const titleEl = document.getElementById('output-panel-title');
-  if (titleEl) {
-    titleEl.textContent = state === 'waveform' ? 'Rework' : 'Now Playing';
-  }
+  document.getElementById('output-generating').classList.toggle('hidden', state !== 'generating');
+  document.getElementById('output-waveform').classList.toggle('hidden',   state !== 'waveform');
 }
 
 function getGenerateLabel() {
@@ -1625,6 +1631,12 @@ generateBtn.addEventListener('click', async () => {
           audioPreview.src = '/audio?path=' + encodeURIComponent(result.audio_url);
           document.getElementById('upload-filename').textContent = 'Reworked audio';
           loadWaveformForRework(result.audio_url, null, payload.lyrics || '');
+
+          // Save reworked audio back to the active tab so it becomes the new source
+          _tabAudio[_createTab] = {
+            audioPath: result.audio_url,
+            lyrics: payload.lyrics || (_tabAudio[_createTab] ? _tabAudio[_createTab].lyrics : ''),
+          };
 
           // Wire download links
           const fmt = payload.audio_format || 'mp3';
