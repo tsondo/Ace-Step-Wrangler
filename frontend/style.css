@@ -68,7 +68,7 @@ html, body {
    ============================================================ */
 #app {
   display: grid;
-  grid-template-rows: var(--header-h) 1fr var(--output-h);
+  grid-template-rows: var(--header-h) 1fr auto;
   height: 100vh;
 }
 
@@ -734,6 +734,28 @@ html, body {
   flex: 1;
 }
 
+/* Per-tab result card area — shown below tab content after generation */
+.tab-result-area {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  overflow-x: auto;
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 0 2px;
+}
+
+.tab-result-area .result-card {
+  min-width: 260px;
+  flex-shrink: 0;
+}
+
+/* Single card fills width */
+.tab-result-area:has(.result-card:only-child) .result-card {
+  min-width: 0;
+  flex: 1;
+}
+
 /* ============================================================
    Custom Audio Player
    ============================================================ */
@@ -1044,13 +1066,13 @@ details[open] > .advanced-toggle {
 }
 
 /* ============================================================
-   Output Panel
+   Output Panel / Now Playing Bar
    ============================================================ */
 #output-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 16px 12px;
+  gap: 6px;
+  padding: 8px 16px 10px;
   background: var(--surface);
   border-top: 1px solid var(--border);
 }
@@ -1068,29 +1090,45 @@ details[open] > .advanced-toggle {
   color: var(--text-muted);
 }
 
-/* Shared: idle + generating centred body */
+/* Shared: generating centred body */
 .output-body {
-  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
 }
 
-.output-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-style: italic;
+/* Now Playing bar — left-aligned with label + transport */
+.output-now-playing {
+  justify-content: flex-start;
 }
 
-/* Output panel — brief amber pulse when results arrive */
+.now-playing-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 96px;
+}
+
+#now-playing-player {
+  flex: 1;
+}
+
+/* Generating state — centred */
+#output-generating {
+  justify-content: center;
+}
+
+/* Tab result area — brief amber pulse when results arrive */
 @keyframes results-pulse {
-  0%   { border-top-color: var(--border); }
-  40%  { border-top-color: var(--accent); box-shadow: 0 -2px 12px var(--accent-dim); }
-  100% { border-top-color: var(--border); box-shadow: none; }
+  0%   { border-top-color: var(--border-subtle); }
+  40%  { border-top-color: var(--accent); }
+  100% { border-top-color: var(--border-subtle); }
 }
 
-#output-panel.results-ready {
+.tab-result-area.results-ready {
   animation: results-pulse 1.2s ease-out forwards;
 }
 
@@ -1118,16 +1156,6 @@ details[open] > .advanced-toggle {
   font-size: 11px;
 }
 
-/* Result cards row */
-.output-cards {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 2px 2px 4px;
-}
-
 .result-card {
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -1136,14 +1164,8 @@ details[open] > .advanced-toggle {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 300px;
+  min-width: 260px;
   flex-shrink: 0;
-}
-
-/* Single card fills the available width */
-.output-cards:has(.result-card:only-child) .result-card {
-  min-width: 0;
-  flex: 1;
 }
 
 .card-label {
@@ -1155,8 +1177,7 @@ details[open] > .advanced-toggle {
 }
 
 .result-card audio {
-  width: 100%;
-  height: 32px;
+  display: none;
 }
 
 .card-actions {
@@ -1183,6 +1204,15 @@ details[open] > .advanced-toggle {
 /* ============================================================
    Waveform Timeline
    ============================================================ */
+
+/* Waveform output body — needs enough space to fit the canvas + transport */
+#output-waveform {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 140px;
+}
+
 .waveform-container {
   position: relative;
   width: 100%;

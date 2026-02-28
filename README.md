@@ -7,6 +7,8 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 ## Features
 
 - **Three lyrics modes** — **My Lyrics** (write/paste/load), **AI Lyrics** (describe a song and let AceStep write the words), and **Instrumental** (no vocals)
+- **Per-tab results** — each lyrics tab keeps its own generated audio independently; switch tabs without losing your results
+- **Now Playing bar** — a persistent transport strip at the bottom shows what is playing and which tab it came from; works across all three tabs and Rework mode
 - **Friendly controls** — sliders like "Strictly follow lyrics" and "Creativity" instead of raw model parameters
 - **Genre + mood tag picker** — click presets or type your own style description
 - **Song parameters** — set key (e.g. A minor), BPM, and time signature; appended to the AceStep prompt automatically
@@ -16,7 +18,6 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 - **Rework mode** — reimagine a full song or fix and blend a selected region using the waveform editor; auto-loads from whichever lyrics tab is active
 - **DAW-style audio transport** — Play/Pause toggle, Stop, Rewind, scrubber, and save button on every player
 - **Waveform selection labels** — start/end timecodes displayed right on the waveform at selection edges
-- **Per-tab audio memory** — each lyrics tab remembers its last generated song independently
 - **Elapsed-time counter** — shows how long generation has been running so you know it hasn't stalled
 - **Advanced panel** — raw AceStep parameters (guidance scale, inference steps, scheduler, seed, batch size, audio format) still accessible for power users
 - **Dark DAW aesthetic** — feels at home next to your other music tools
@@ -69,10 +70,10 @@ ACE-Step is a single-GPU model — it does not do multi-GPU inference, but `CUDA
 
 ```bash
 # Use a specific GPU (e.g. GPU 1)
-uv run python run.py --gpu 1
+uv run wrangler --gpu 1
 
 # Equivalent using environment variable
-ACESTEP_GPU=1 uv run python run.py
+ACESTEP_GPU=1 uv run wrangler
 ```
 
 The `--gpu` flag takes priority over `ACESTEP_GPU`. If neither is set, AceStep uses its default auto-detection.
@@ -94,7 +95,7 @@ ACE-Step supports several environment variables for fine-tuning GPU behavior. Th
 Example:
 
 ```bash
-MAX_CUDA_VRAM=14 ACESTEP_VAE_ON_CPU=true uv run python run.py --gpu 0
+MAX_CUDA_VRAM=14 ACESTEP_VAE_ON_CPU=true uv run wrangler --gpu 0
 ```
 
 See the [ACE-Step 1.5 documentation](https://github.com/ace-step/ACE-Step-1.5) for full details on GPU compatibility and these variables.

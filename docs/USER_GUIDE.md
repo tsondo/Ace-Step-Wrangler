@@ -10,20 +10,26 @@ ACE-Step Wrangler is a DAW-style web UI for [AceStep 1.5](https://github.com/ace
 uv run wrangler
 ```
 
+To use a specific GPU:
+
+```bash
+uv run wrangler --gpu 1
+```
+
 Open **http://localhost:7860** in your browser. AceStep must finish loading its models before the first generation — the first run after startup may take a minute.
 
 ---
 
 ## Layout
 
-The interface is a three-column layout with an output panel across the bottom.
+The interface is a three-column layout with a persistent strip across the bottom.
 
 | Column | Contents |
 |---|---|
 | Left | **Style** (Create mode) or **Rework** controls |
-| Centre | **Lyrics** — three tabs: My Lyrics, AI Lyrics, Instrumental |
+| Centre | **Lyrics** — three tabs: My Lyrics, AI Lyrics, Instrumental; result cards appear below each tab's content after generation |
 | Right | **Controls** — duration, quality, generate button |
-| Bottom | **Output** — generated audio, waveform editor |
+| Bottom | **Now Playing** bar (Create mode) or **Rework** waveform timeline |
 
 Switch between **Create** and **Rework** mode using the tab buttons in the header.
 
@@ -88,11 +94,17 @@ AceStep generates a purely instrumental track from your style settings — no ly
 | **Quality** | Raw → fast (fewer steps); Polished → slower, more refined |
 | **▶ Generate** | Submit the job. Keyboard shortcut: **Ctrl/Cmd + Enter** |
 
-### Output Panel
+### Per-Tab Results
 
-While generating, an elapsed timer and a **Cancel** button are shown.
+While generating, an elapsed timer and a **Cancel** button appear in the bottom bar.
 
-On completion, one card per result appears. Each card has a custom audio player (with a save button for quick download), and download links for the audio file and a JSON metadata file. The result is automatically stored in the active tab — switching to Rework loads it.
+On completion, result cards appear at the bottom of the **active tab's content area** in the Lyrics panel. Each card has a custom audio player (with a save button for quick download) and download links for the audio file and a JSON metadata file.
+
+Each tab holds its own result independently — you can generate from My Lyrics, switch to AI Lyrics, generate again, and switch back without losing either result. Switching to Rework auto-loads from whichever tab is active.
+
+### Now Playing Bar
+
+A compact strip at the bottom of the screen shows which tab is currently playing and provides transport controls (Rewind, Play/Pause, Stop, scrubber, Save). It stays active across tab switches — start a song in AI Lyrics, switch to My Lyrics, and the Now Playing bar keeps tracking what is playing.
 
 ---
 
@@ -136,9 +148,9 @@ If you have lyrics in the Lyrics panel, they are sent to the model as guidance.
 
 ### After Generation
 
-The output panel stays on the waveform view with the reworked audio loaded. You can:
+The bottom bar stays on the waveform view with the reworked audio loaded. You can:
 
-- Play the result using the audio player in the upload area
+- Play the result using the audio player in the upload area or the waveform transport bar (both control the same audio)
 - Select a new region and rework again immediately
 - Download the result with **Download audio** / **Download JSON**
 
@@ -160,6 +172,7 @@ Additional behaviours:
 
 - **End of track** — playback stops and position resets to 0 automatically
 - **Exclusive playback** — starting any player pauses all other players
+- **Now Playing bar** — the bottom strip tracks whichever player is active. Its transport controls mirror the currently playing source. The label shows which tab or mode the audio came from.
 
 ---
 
@@ -208,8 +221,9 @@ When the batch size is locked, an inline note explains why.
 - **Auto Duration** works best when BPM is set and the lyrics have section headers.
 - **Use AI Lyrics** when you want the AI to write them. Describe the song you want and your style panel settings (tags, key, BPM) feed directly into what the LM generates — set those first for better results. Copy the generated lyrics to My Lyrics if you want to edit them.
 - **Instrumental mode** is the fastest path to background music or loop generation — no lyrics needed, just set the style and hit Generate.
-- **Each tab remembers its last song.** You can have a different result in My Lyrics, AI Lyrics, and Instrumental — switching to Rework auto-loads whichever tab is active.
+- **Each tab remembers its last song.** You can generate from My Lyrics, switch to AI Lyrics, generate something different, and switch back — both results are still there. Switching to Rework auto-loads from whichever tab is active.
 - **Load music** to rework existing tracks — load a WAV/FLAC/MP3 with its companion JSON to restore all the original settings, then switch to Rework.
 - **Fix & Blend on small regions** works better than trying to repaint large portions of a song. For a big change, use Reimagine instead.
-- **Save button (⬇)** on every player bar lets you quickly download audio at any point — useful in Rework for comparing versions.
+- **Now Playing bar** lets you control playback without scrolling or switching tabs — start a song in AI Lyrics, move to My Lyrics to edit, and the bottom bar keeps playing and lets you pause or rewind.
+- **Save button (⬇)** on every player bar (including Now Playing) lets you quickly download audio at any point.
 - **Seed** is your best friend for reproducibility. Once you have a result you like, note the seed from the downloaded JSON before running variations.

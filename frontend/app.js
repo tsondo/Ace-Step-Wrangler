@@ -17,7 +17,101 @@ function _fmtTime(s) {
   return m + ':' + String(Math.floor(s % 60)).padStart(2, '0');
 }
 
-function initAudioPlayer(audioEl, playerEl) {
+// ===== Now Playing Bar =====
+// Tracks whichever audio element is currently active across all tabs/modes.
+
+let _nowPlayingAudio = null;
+
+const _npPlayerEl  = document.getElementById('now-playing-player');
+const _npLabelEl   = document.getElementById('now-playing-label');
+const _npRewindBtn = _npPlayerEl.querySelector('.player-rewind');
+const _npPlayBtn   = _npPlayerEl.querySelector('.player-play');
+const _npStopBtn   = _npPlayerEl.querySelector('.player-stop');
+const _npScrubber  = _npPlayerEl.querySelector('.player-scrubber');
+const _npFill      = _npPlayerEl.querySelector('.player-scrubber-fill');
+const _npTimeEl    = _npPlayerEl.querySelector('.player-time');
+const _npSaveBtn   = document.getElementById('np-save-btn');
+
+function _updateNowPlayingProgress() {
+  if (!_nowPlayingAudio) return;
+  const cur = _nowPlayingAudio.currentTime || 0;
+  const dur = isFinite(_nowPlayingAudio.duration) ? _nowPlayingAudio.duration : 0;
+  _npFill.style.width = dur ? ((cur / dur) * 100) + '%' : '0%';
+  _npTimeEl.textContent = _fmtTime(cur) + ' / ' + _fmtTime(dur);
+}
+
+function _syncNowPlayingButtons() {
+  const hasAudio = _nowPlayingAudio !== null;
+  _npRewindBtn.disabled = !hasAudio;
+  _npPlayBtn.disabled   = !hasAudio;
+  if (!hasAudio) {
+    _npStopBtn.disabled = true;
+    _npPlayBtn.textContent = '\u25B6';
+    _npPlayBtn.title = 'Play';
+    return;
+  }
+  const paused = _nowPlayingAudio.paused;
+  _npStopBtn.disabled    = paused;
+  _npPlayBtn.textContent = paused ? '\u25B6' : '\u23F8';
+  _npPlayBtn.title       = paused ? 'Play' : 'Pause';
+}
+
+/**
+ * Wires the Now Playing bar to the given audio element.
+ * Called whenever an audio element starts playing.
+ * @param {HTMLAudioElement} audioEl
+ * @param {string} label  — e.g. "My Lyrics", "AI Lyrics", "Rework"
+ * @param {HTMLElement} playerEl  — the source player element (to read save link)
+ */
+function activateNowPlaying(audioEl, label, playerEl) {
+  _nowPlayingAudio = audioEl;
+  _npLabelEl.textContent = label || 'Playing';
+
+  // Sync save button from source player's save link
+  const saveLink = playerEl ? playerEl.querySelector('.player-save') : null;
+  if (saveLink && saveLink.href && saveLink.href !== window.location.href) {
+    _npSaveBtn.href     = saveLink.href;
+    _npSaveBtn.download = saveLink.download || '';
+    _npSaveBtn.classList.remove('hidden');
+  } else {
+    _npSaveBtn.classList.add('hidden');
+  }
+
+  _updateNowPlayingProgress();
+  _syncNowPlayingButtons();
+}
+
+// Now Playing transport event handlers
+_npPlayBtn.addEventListener('click', () => {
+  if (!_nowPlayingAudio) return;
+  if (_nowPlayingAudio.paused) { _stopOthers(_nowPlayingAudio); _nowPlayingAudio.play(); }
+  else { _nowPlayingAudio.pause(); }
+});
+
+_npStopBtn.addEventListener('click', () => {
+  if (_nowPlayingAudio) _nowPlayingAudio.pause();
+});
+
+_npRewindBtn.addEventListener('click', () => {
+  if (!_nowPlayingAudio) return;
+  _nowPlayingAudio.currentTime = 0;
+  _updateNowPlayingProgress();
+});
+
+_npScrubber.addEventListener('click', (e) => {
+  if (!_nowPlayingAudio) return;
+  const dur = _nowPlayingAudio.duration;
+  if (!dur || !isFinite(dur)) return;
+  const rect = _npScrubber.getBoundingClientRect();
+  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+  _nowPlayingAudio.currentTime = (x / rect.width) * dur;
+  _stopOthers(_nowPlayingAudio);
+  _nowPlayingAudio.play();
+});
+
+_syncNowPlayingButtons();
+
+function initAudioPlayer(audioEl, playerEl, label) {
   _playerRegistry.add(audioEl);
 
   const rewindBtn = playerEl.querySelector('.player-rewind');
@@ -80,10 +174,20 @@ function initAudioPlayer(audioEl, playerEl) {
     syncButtons();
   });
 
-  audioEl.addEventListener('play',        syncButtons);
-  audioEl.addEventListener('pause',       syncButtons);
-  audioEl.addEventListener('timeupdate',  updateProgress);
+  audioEl.addEventListener('play',           syncButtons);
+  audioEl.addEventListener('pause',          syncButtons);
+  audioEl.addEventListener('timeupdate',     updateProgress);
   audioEl.addEventListener('loadedmetadata', updateProgress);
+
+  // Now Playing bar sync — activate when this player plays; keep in sync while active
+  if (label !== undefined) {
+    audioEl.addEventListener('play', () => activateNowPlaying(audioEl, label, playerEl));
+  }
+  audioEl.addEventListener('play',   () => { if (audioEl === _nowPlayingAudio) _syncNowPlayingButtons(); });
+  audioEl.addEventListener('pause',  () => { if (audioEl === _nowPlayingAudio) _syncNowPlayingButtons(); });
+  audioEl.addEventListener('ended',  () => { if (audioEl === _nowPlayingAudio) { _syncNowPlayingButtons(); _updateNowPlayingProgress(); } });
+  audioEl.addEventListener('timeupdate',     () => { if (audioEl === _nowPlayingAudio) _updateNowPlayingProgress(); });
+  audioEl.addEventListener('loadedmetadata', () => { if (audioEl === _nowPlayingAudio) _updateNowPlayingProgress(); });
 
   syncButtons();
   updateProgress();
@@ -170,11 +274,10 @@ function switchMode(mode) {
   createPanel.classList.toggle('hidden', mode !== 'create');
   reworkPanel.classList.toggle('hidden', mode !== 'rework');
 
-  // Waveform: clear when switching to create; preserve cards if they exist
+  // Waveform: clear when switching to create
   if (mode === 'create') {
     clearWaveform();
-    const hasCards = document.getElementById('output-cards').children.length > 0;
-    setOutputState(hasCards ? 'cards' : 'idle');
+    setOutputState('now-playing');
   }
 
   updateControlsForMode(mode);
@@ -245,9 +348,9 @@ const uploadLoaded    = document.getElementById('upload-loaded');
 const audioPreview    = document.getElementById('audio-preview');
 
 // Initialise custom player for the rework audio preview
-initAudioPlayer(audioPreview, document.getElementById('audio-preview-player'));
+initAudioPlayer(audioPreview, document.getElementById('audio-preview-player'), 'Rework');
 // Also wire the transport bar in the waveform output panel
-initAudioPlayer(audioPreview, document.getElementById('wf-transport'));
+initAudioPlayer(audioPreview, document.getElementById('wf-transport'), 'Rework');
 
 function handleAudioUpload(file) {
   if (!file || !file.type.startsWith('audio/')) {
@@ -305,7 +408,7 @@ function removeAudio() {
   uploadPrompt.classList.remove('hidden');
   uploadLoaded.classList.add('hidden');
   clearWaveform();
-  setOutputState('idle');
+  setOutputState('now-playing');
   updateGenerateState();
 }
 
@@ -1349,12 +1452,16 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Manage the four output panel states: idle / generating / cards / waveform
+// Manage the output panel footer states: now-playing / generating / waveform
 function setOutputState(state) {
-  document.getElementById('output-idle').classList.toggle('hidden', state !== 'idle');
-  document.getElementById('output-generating').classList.toggle('hidden', state !== 'generating');
-  document.getElementById('output-cards').classList.toggle('hidden', state !== 'cards');
-  document.getElementById('output-waveform').classList.toggle('hidden', state !== 'waveform');
+  document.getElementById('now-playing-bar').classList.toggle('hidden',    state !== 'now-playing');
+  document.getElementById('output-generating').classList.toggle('hidden',  state !== 'generating');
+  document.getElementById('output-waveform').classList.toggle('hidden',    state !== 'waveform');
+  // Update header title
+  const titleEl = document.getElementById('output-panel-title');
+  if (titleEl) {
+    titleEl.textContent = state === 'waveform' ? 'Rework' : 'Now Playing';
+  }
 }
 
 function getGenerateLabel() {
@@ -1391,10 +1498,13 @@ function setGenerating(on) {
 document.getElementById('cancel-btn').addEventListener('click', () => {
   if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
   setGenerating(false);
-  setOutputState('idle');
+  setOutputState('now-playing');
 });
 
-function createResultCard(taskId, index, result, total, fmt) {
+const _TAB_LABELS = { 'my-lyrics': 'My Lyrics', 'ai-lyrics': 'AI Lyrics', 'instrumental': 'Instrumental' };
+const _TAB_RESULT_IDS = { 'my-lyrics': 'tab-my-lyrics-results', 'ai-lyrics': 'tab-ai-lyrics-results', 'instrumental': 'tab-instrumental-results' };
+
+function createResultCard(taskId, index, result, total, fmt, label) {
   const card = document.createElement('div');
   card.className = 'result-card';
 
@@ -1419,7 +1529,7 @@ function createResultCard(taskId, index, result, total, fmt) {
     '<span class="player-time">0:00 / 0:00</span>' +
     `<a class="player-btn player-save" title="Save audio" href="/download/${taskId}/${index}/audio" download="acestep-${taskId.slice(0, 8)}-${index + 1}.${fmt}">⬇</a>`;
   card.appendChild(player);
-  initAudioPlayer(audio, player);
+  initAudioPlayer(audio, player, label);
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
@@ -1451,16 +1561,19 @@ function showResultCards(taskId, results, fmt) {
     };
   }
 
-  const container = document.getElementById('output-cards');
+  const label = _TAB_LABELS[_createTab] || 'Result';
+  const containerId = _TAB_RESULT_IDS[_createTab];
+  const container = document.getElementById(containerId);
   container.innerHTML = '';
   results.forEach((result, i) => {
-    container.appendChild(createResultCard(taskId, i, result, results.length, fmt));
+    container.appendChild(createResultCard(taskId, i, result, results.length, fmt, label));
   });
-  setOutputState('cards');
-  // Brief amber pulse on the output panel to draw the user's eye downward
-  const panel = document.getElementById('output-panel');
-  panel.classList.add('results-ready');
-  setTimeout(() => panel.classList.remove('results-ready'), 1200);
+  container.classList.remove('hidden');
+  setOutputState('now-playing');
+
+  // Brief amber pulse on the tab result area
+  container.classList.add('results-ready');
+  setTimeout(() => container.classList.remove('results-ready'), 1200);
 }
 
 generateBtn.addEventListener('click', async () => {
@@ -1491,7 +1604,7 @@ generateBtn.addEventListener('click', async () => {
   } catch (err) {
     generateHint.textContent = `Error: ${err.message}`;
     setGenerating(false);
-    setOutputState('idle');
+    setOutputState('now-playing');
     return;
   }
 
@@ -1536,14 +1649,14 @@ generateBtn.addEventListener('click', async () => {
       } else if (data.status === 'error') {
         clearInterval(_pollInterval);
         setGenerating(false);
-        setOutputState('idle');
+        setOutputState('now-playing');
         generateHint.textContent = 'Generation failed. Check AceStep logs.';
       }
       // 'processing' → keep polling
     } catch (err) {
       clearInterval(_pollInterval);
       setGenerating(false);
-      setOutputState('idle');
+      setOutputState('now-playing');
       generateHint.textContent = `Polling error: ${err.message}`;
     }
   }, 2000);

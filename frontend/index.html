@@ -265,6 +265,7 @@
           <span class="lyrics-count" id="lyrics-count">0 lines · 0 chars</span>
           <span class="lyrics-warning hidden" id="lyrics-warning" aria-live="polite">⚠ May be too long for selected duration</span>
         </div>
+        <div class="tab-result-area hidden" id="tab-my-lyrics-results"></div>
       </div>
 
       <!-- Tab: AI Lyrics -->
@@ -305,11 +306,13 @@
             placeholder="Lyrics will appear here after generation…"
           ></textarea>
         </div>
+        <div class="tab-result-area hidden" id="tab-ai-lyrics-results"></div>
       </div>
 
       <!-- Tab: Instrumental -->
       <div id="tab-instrumental" class="create-tab-content hidden">
         <p class="instrumental-note">No lyrics — AceStep will generate an instrumental track from your style settings.</p>
+        <div class="tab-result-area hidden" id="tab-instrumental-results"></div>
       </div>
     </section>
 
@@ -466,12 +469,20 @@
   <!-- ===== Output Panel ===== -->
   <footer id="output-panel">
     <div class="output-header">
-      <span class="output-title">Output</span>
+      <span class="output-title" id="output-panel-title">Now Playing</span>
     </div>
 
-    <!-- State 1: Idle -->
-    <div class="output-body" id="output-idle">
-      <span class="output-hint">Generated audio will appear here</span>
+    <!-- State 1: Now Playing bar (default) -->
+    <div class="output-body output-now-playing" id="now-playing-bar">
+      <span class="now-playing-label" id="now-playing-label">—</span>
+      <div class="audio-player" id="now-playing-player">
+        <button class="player-btn player-rewind" type="button" title="Rewind to start" disabled>⟪</button>
+        <button class="player-btn player-play"   type="button" title="Play" disabled>▶</button>
+        <button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>
+        <div class="player-scrubber"><div class="player-scrubber-fill"></div></div>
+        <span class="player-time">0:00 / 0:00</span>
+        <a class="player-btn player-save hidden" id="np-save-btn" title="Save audio">⬇</a>
+      </div>
     </div>
 
     <!-- State 2: Generating -->
@@ -481,11 +492,8 @@
       <button class="ghost-btn" id="cancel-btn" type="button">Cancel</button>
     </div>
 
-    <!-- State 3: Result cards -->
-    <div class="output-cards hidden" id="output-cards"></div>
-
-    <!-- State 4: Waveform timeline (rework mode, audio loaded) -->
-    <div class="output-body hidden" id="output-waveform">
+    <!-- State 3: Waveform timeline (rework mode, audio loaded) -->
+    <div class="hidden" id="output-waveform">
       <div class="waveform-container">
         <div class="waveform-loading hidden" id="waveform-loading">
           <div class="spinner spinner-sm"></div>
