@@ -647,14 +647,14 @@ html, body {
 }
 
 /* ============================================================
-   Lyrics Mode Tabs (With Lyrics / Instrumental)
+   Create Tabs (My Lyrics / AI Lyrics / Instrumental)
    ============================================================ */
-.lyrics-mode-tabs {
+.create-tabs {
   display: flex;
   gap: 0;
 }
 
-.lyrics-mode-tab {
+.create-tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -669,13 +669,38 @@ html, body {
   transition: color 0.15s, border-color 0.15s;
 }
 
-.lyrics-mode-tab:hover {
+.create-tab:hover {
   color: var(--text-secondary);
 }
 
-.lyrics-mode-tab.active {
+.create-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+/* Tab content panels — flex-column, fill remaining panel height */
+.create-tab-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+}
+
+/* AI Lyrics — description field */
+.ai-description-input {
+  resize: vertical;
+  min-height: 52px;
+  max-height: 120px;
+}
+
+/* AI Lyrics — lyrics display group */
+.ai-lyrics-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 4px;
 }
 
 .select-narrow-lang {

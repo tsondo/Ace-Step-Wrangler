@@ -205,14 +205,20 @@ function updateControlsForMode(mode) {
   }
 }
 
-let _lastGenResult = null; // { audioPath, lyrics } — most recent completed generation
+// Per-tab audio results — each create tab remembers its own last generation
+const _tabAudio = { 'my-lyrics': null, 'ai-lyrics': null, 'instrumental': null };
 
 modeBtns.forEach(btn =>
   btn.addEventListener('click', () => {
     const mode = btn.dataset.mode;
-    // Clicking Rework with nothing loaded auto-loads the last generation
-    if (mode === 'rework' && !_uploadedAudioPath && _lastGenResult) {
-      loadAudioIntoRework(_lastGenResult.audioPath, 'Generated audio', _lastGenResult.lyrics);
+    // Clicking Rework auto-loads from the currently active create tab
+    if (mode === 'rework') {
+      const tabResult = _tabAudio[_createTab];
+      if (tabResult) {
+        loadAudioIntoRework(tabResult.audioPath, 'Generated audio', tabResult.lyrics);
+      } else {
+        switchMode(mode);
+      }
     } else {
       switchMode(mode);
     }
@@ -523,32 +529,33 @@ function checkLyricsWarning() {
   }
 }
 
-// ===== Lyrics mode (With Lyrics / Instrumental) =====
+// ===== Create tabs (My Lyrics / AI Lyrics / Instrumental) =====
 
-let _lyricsMode = 'lyrics'; // 'lyrics' | 'instrumental'
+let _createTab = 'my-lyrics'; // 'my-lyrics' | 'ai-lyrics' | 'instrumental'
 
-const lyricsModeTabs   = document.querySelectorAll('.lyrics-mode-tab');
-const lyricsWriteArea  = document.getElementById('lyrics-write-area');
-const lyricsActions    = document.getElementById('lyrics-actions');
-const instrumentalNote = document.getElementById('instrumental-note');
+const createTabBtns    = document.querySelectorAll('.create-tab');
+const aiDescription    = document.getElementById('ai-description');
+const aiLyricsDisplay  = document.getElementById('ai-lyrics-display');
 
-function switchLyricsMode(mode) {
-  _lyricsMode = mode;
-  lyricsModeTabs.forEach(btn => {
-    const isActive = btn.dataset.mode === mode;
+function switchCreateTab(tab) {
+  _createTab = tab;
+  createTabBtns.forEach(btn => {
+    const isActive = btn.dataset.tab === tab;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-selected', isActive);
   });
-  const isInstrumental = mode === 'instrumental';
-  lyricsWriteArea.classList.toggle('hidden', isInstrumental);
-  lyricsActions.classList.toggle('hidden', isInstrumental);
-  instrumentalNote.classList.toggle('hidden', !isInstrumental);
+  document.getElementById('tab-my-lyrics').classList.toggle('hidden', tab !== 'my-lyrics');
+  document.getElementById('tab-ai-lyrics').classList.toggle('hidden', tab !== 'ai-lyrics');
+  document.getElementById('tab-instrumental').classList.toggle('hidden', tab !== 'instrumental');
   updateGenerateState();
 }
 
-lyricsModeTabs.forEach(btn =>
-  btn.addEventListener('click', () => switchLyricsMode(btn.dataset.mode))
+createTabBtns.forEach(btn =>
+  btn.addEventListener('click', () => switchCreateTab(btn.dataset.tab))
 );
+
+// AI description input — update generate state as user types
+aiDescription.addEventListener('input', updateGenerateState);
 
 // --- Load any audio path into Rework mode ---
 
@@ -1141,7 +1148,13 @@ function hasContent() {
   if (_currentMode === 'rework') {
     return !!_uploadedAudioPath;
   }
-  return lyricsText.value.trim().length > 0 || getStylePrompt().length > 0;
+  if (_createTab === 'my-lyrics') {
+    return lyricsText.value.trim().length > 0 || getStylePrompt().length > 0;
+  }
+  if (_createTab === 'ai-lyrics') {
+    return aiDescription.value.trim().length > 0 || getStylePrompt().length > 0;
+  }
+  return true; // instrumental — always ready
 }
 
 function updateGenerateState() {
@@ -1160,7 +1173,7 @@ function updateGenerateState() {
 function buildSharedPayload() {
   const seedRaw = document.getElementById('seed').value.trim();
   return {
-    lyrics:          (_currentMode === 'create' && _lyricsMode === 'instrumental') ? '' : lyricsText.value,
+    lyrics:          (_currentMode === 'create' && _createTab !== 'my-lyrics') ? '' : lyricsText.value,
     duration:        Number(document.getElementById('duration').value),
     lyric_adherence: Number(document.getElementById('lyric-adherence').value),
     creativity:      Number(document.getElementById('creativity').value),
@@ -1188,13 +1201,15 @@ function buildCreatePayload() {
     time_signature: document.getElementById('time-sig').value,
   };
 
-  // With Lyrics + empty textarea → ask AceStep's LM to generate lyrics from style.
-  // Controls are still forwarded; AceStep may adjust duration, BPM, key to fit.
-  if (_lyricsMode === 'lyrics' && !lyricsText.value.trim()) {
+  // AI Lyrics tab — always send sample_query built from description + style context.
+  // AceStep generates lyrics; they come back in result.lyrics and populate the display.
+  if (_createTab === 'ai-lyrics') {
+    const desc = aiDescription.value.trim();
     const styleContext = [getStylePrompt(), getSongParamsSummary()].filter(Boolean).join(', ');
-    if (styleContext) {
-      payload.sample_query   = styleContext;
-      payload.vocal_language = document.getElementById('lyrics-language').value;
+    const query = [desc, styleContext].filter(Boolean).join('. ');
+    if (query) {
+      payload.sample_query   = query;
+      payload.vocal_language = document.getElementById('ai-language').value;
     }
   }
 
@@ -1321,36 +1336,18 @@ function createResultCard(taskId, index, result, total, fmt) {
   dlJson.download  = `acestep-${taskId.slice(0, 8)}-${index + 1}.json`;
   dlJson.textContent = 'Download JSON';
 
-  // Show AI-generated lyrics when user left the textarea blank
-  if (result.lyrics && !lyricsText.value.trim()) {
-    const lyricsEl = document.createElement('pre');
-    lyricsEl.className = 'card-lyrics';
-    lyricsEl.textContent = result.lyrics;
-    card.appendChild(lyricsEl);
-  }
-
-  const sendBtn = document.createElement('button');
-  sendBtn.className = 'ghost-btn';
-  sendBtn.type = 'button';
-  sendBtn.textContent = 'Send to Rework';
-  sendBtn.addEventListener('click', () => {
-    // Use AI-generated lyrics if user didn't write any
-    loadAudioIntoRework(result.audio_url, 'Generated audio', result.lyrics || lyricsText.value);
-  });
-
   actions.appendChild(dlAudio);
   actions.appendChild(dlJson);
-  actions.appendChild(sendBtn);
   card.appendChild(actions);
   return card;
 }
 
 function showResultCards(taskId, results, fmt) {
-  // Track most recent generation for Rework auto-load
+  // Store per-tab result so Rework can auto-load from the active tab
   if (results.length > 0) {
-    _lastGenResult = {
+    _tabAudio[_createTab] = {
       audioPath: results[0].audio_url,
-      lyrics: results[0].lyrics || lyricsText.value,
+      lyrics: results[0].lyrics || (_createTab === 'my-lyrics' ? lyricsText.value : ''),
     };
   }
 
@@ -1427,6 +1424,10 @@ generateBtn.addEventListener('click', async () => {
           document.getElementById('waveform-result-actions').classList.remove('hidden');
         } else {
           showResultCards(taskId, data.results, payload.audio_format);
+          // AI Lyrics tab — populate read-only lyrics display with what AceStep generated
+          if (_createTab === 'ai-lyrics' && data.results[0] && data.results[0].lyrics) {
+            aiLyricsDisplay.value = data.results[0].lyrics;
+          }
         }
       } else if (data.status === 'error') {
         clearInterval(_pollInterval);
