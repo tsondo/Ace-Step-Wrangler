@@ -711,6 +711,12 @@ html, body {
   font-size: 12px;
 }
 
+.music-load-status {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .instrumental-note {
   margin: 0;
   padding: 14px 0;

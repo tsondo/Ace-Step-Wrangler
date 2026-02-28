@@ -643,6 +643,88 @@ document.getElementById('load-file-btn').addEventListener('click', () => {
   input.click();
 });
 
+// Load Music — audio file + optional companion JSON
+document.getElementById('load-music-btn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.wav,.flac,.mp3,.json';
+  input.multiple = true;
+  input.addEventListener('change', () => handleMusicLoad(Array.from(input.files)));
+  input.click();
+});
+
+const _musicStatusEl = document.getElementById('my-lyrics-music-status');
+
+async function handleMusicLoad(files) {
+  const audioFile = files.find(f => /\.(wav|flac|mp3)$/i.test(f.name));
+  const jsonFile  = files.find(f => /\.json$/i.test(f.name));
+  if (!audioFile) return;
+
+  _musicStatusEl.textContent = `Uploading ${audioFile.name}…`;
+  _musicStatusEl.classList.remove('hidden');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', audioFile);
+    const res = await fetch('/upload-audio', { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+    const { path } = await res.json();
+
+    let lyrics = '';
+    if (jsonFile) {
+      try {
+        const meta = JSON.parse(await jsonFile.text());
+        const params = meta.params || meta;
+        lyrics = params.lyrics || '';
+        applyJsonParams(params);
+      } catch (_) {
+        _musicStatusEl.textContent += ' — JSON parse error';
+      }
+    }
+
+    _tabAudio['my-lyrics'] = { audioPath: path, lyrics };
+    _musicStatusEl.textContent = `Loaded: ${audioFile.name}${jsonFile ? ' + settings' : ''}`;
+    updateGenerateState();
+  } catch (err) {
+    _musicStatusEl.textContent = `Error: ${err.message}`;
+  }
+}
+
+function applyJsonParams(params) {
+  if (!params) return;
+
+  if (params.lyrics) {
+    lyricsText.value = params.lyrics;
+    updateLyricsCount();
+  }
+
+  const styleTextEl = document.getElementById('style-text');
+  if (params.style && styleTextEl) styleTextEl.value = params.style;
+
+  const bpmEl = document.getElementById('bpm');
+  if (params.bpm != null && bpmEl) bpmEl.value = params.bpm;
+
+  const durEl = document.getElementById('duration');
+  if (params.duration != null && durEl) {
+    durEl.value = Math.round(params.duration);
+    updateSlider(durEl);
+  }
+
+  const timeSigEl = document.getElementById('time-sig');
+  if (params.time_signature && timeSigEl) timeSigEl.value = params.time_signature;
+
+  if (params.key) {
+    const parts = params.key.trim().split(/\s+/);
+    const rootEl = document.getElementById('key-root');
+    const modeEl = document.getElementById('key-mode');
+    if (rootEl && parts[0]) rootEl.value = parts[0];
+    if (modeEl && parts[1]) modeEl.value = parts[1];
+  }
+
+  const langEl = document.getElementById('lyrics-language');
+  if (params.vocal_language && langEl) langEl.value = params.vocal_language;
+}
+
 // Drag-and-drop onto lyrics panel
 lyricsPanel.addEventListener('dragenter', (e) => {
   e.preventDefault();
