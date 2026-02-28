@@ -50,7 +50,7 @@ uv sync
 ## Usage
 
 ```bash
-uv run python run.py
+uv run wrangler
 ```
 
 This starts both servers:
