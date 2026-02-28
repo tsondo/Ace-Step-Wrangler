@@ -27,11 +27,11 @@ The interface is a three-column layout with a persistent strip across the bottom
 | Column | Contents |
 |---|---|
 | Left | **Style** (Create mode) or **Rework** controls |
-| Centre | **Lyrics** — three tabs: My Lyrics, AI Lyrics, Instrumental; result cards appear below each tab's content after generation |
+| Centre | **Create / Rework** toggle at the top, then **My Lyrics / AI Lyrics / Instrumental** sub-tabs; result cards appear below each tab's content after generation |
 | Right | **Controls** — duration, quality, generate button |
-| Bottom | **Now Playing** bar (Create mode) or **Rework** waveform timeline |
+| Bottom | **Now Playing** bar — always visible; waveform timeline appears above it in Rework mode |
 
-Switch between **Create** and **Rework** mode using the tab buttons in the header.
+Switch between **Create** and **Rework** mode using the toggle at the top of the centre Lyrics panel, directly above the My Lyrics / AI Lyrics / Instrumental tabs.
 
 ---
 
@@ -49,7 +49,7 @@ Build a style description by combining tags and free text. The assembled prompt 
 
 ### Lyrics Panel (centre column)
 
-The panel header has three tabs: **My Lyrics**, **AI Lyrics**, and **Instrumental**. Each tab independently remembers its last generated song — you can have a different result in each and rework any of them.
+At the top of the panel, the **Create / Rework** toggle selects the overall mode. Directly below it, three sub-tabs — **My Lyrics**, **AI Lyrics**, and **Instrumental** — select what kind of content to generate. Each tab independently remembers its last generated song — you can have a different result in each and rework any of them.
 
 **My Lyrics** (default)
 
@@ -122,7 +122,7 @@ Once loaded, the filename, duration, and an audio player appear. The output pane
 
 ### Approach
 
-**Reimagine** — generates a new creative take on the **entire song**. The waveform selection has no effect here; any region you drew is ignored. Use the **Reimagine strength** slider to control how closely the result resembles the original.
+**Reimagine** — generates a new creative take on the **entire song**. Region selection is disabled in this mode — dragging the waveform and clicking section labels have no effect. Use the **Reimagine strength** slider to control how closely the result resembles the original.
 
 | Reimagine strength | Effect |
 |---|---|
