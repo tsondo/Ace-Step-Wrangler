@@ -163,10 +163,11 @@ function switchMode(mode) {
   createPanel.classList.toggle('hidden', mode !== 'create');
   reworkPanel.classList.toggle('hidden', mode !== 'rework');
 
-  // Waveform: clear when switching to create; rework waveform loads via upload/sendToRework
+  // Waveform: clear when switching to create; preserve cards if they exist
   if (mode === 'create') {
     clearWaveform();
-    setOutputState('idle');
+    const hasCards = document.getElementById('output-cards').children.length > 0;
+    setOutputState(hasCards ? 'cards' : 'idle');
   }
 
   updateControlsForMode(mode);
@@ -1317,7 +1318,8 @@ function createResultCard(taskId, index, result, total, fmt) {
     '<button class="player-btn player-play"   type="button" title="Play">▶</button>' +
     '<button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>' +
     '<div class="player-scrubber"><div class="player-scrubber-fill"></div></div>' +
-    '<span class="player-time">0:00 / 0:00</span>';
+    '<span class="player-time">0:00 / 0:00</span>' +
+    `<a class="player-btn player-save" title="Save audio" href="/download/${taskId}/${index}/audio" download="acestep-${taskId.slice(0, 8)}-${index + 1}.${fmt}">⬇</a>`;
   card.appendChild(player);
   initAudioPlayer(audio, player);
 
@@ -1417,10 +1419,14 @@ generateBtn.addEventListener('click', async () => {
           const fmt = payload.audio_format || 'mp3';
           const dlAudio = document.getElementById('wf-download-audio');
           const dlJson  = document.getElementById('wf-download-json');
+          const dlFile  = `acestep-${taskId.slice(0, 8)}-rework.${fmt}`;
           dlAudio.href     = `/download/${taskId}/0/audio`;
-          dlAudio.download = `acestep-${taskId.slice(0, 8)}-rework.${fmt}`;
+          dlAudio.download = dlFile;
           dlJson.href      = `/download/${taskId}/0/json`;
           dlJson.download  = `acestep-${taskId.slice(0, 8)}-rework.json`;
+          const wfSaveBtn = document.getElementById('wf-save-btn');
+          wfSaveBtn.href     = `/download/${taskId}/0/audio`;
+          wfSaveBtn.download = dlFile;
           document.getElementById('waveform-result-actions').classList.remove('hidden');
         } else {
           showResultCards(taskId, data.results, payload.audio_format);

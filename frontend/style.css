@@ -755,6 +755,13 @@ html, body {
   cursor: not-allowed;
 }
 
+a.player-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .player-scrubber {
   flex: 1;
   height: 4px;
