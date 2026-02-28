@@ -110,26 +110,29 @@ html, body {
 }
 
 /* ============================================================
-   Mode Selector (header)
+   Mode Selector (Create / Rework — lives in the lyrics panel header)
    ============================================================ */
 .mode-selector {
   display: flex;
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius) var(--radius) 0 0;
+  border-bottom: none;
   overflow: hidden;
 }
 
 .mode-btn {
+  flex: 1;
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 5px 14px;
+  padding: 7px 0;
   font-size: 13px;
   font-weight: 600;
   font-family: var(--font-ui);
   letter-spacing: 0.04em;
+  text-align: center;
   transition: color 0.15s, background 0.15s;
 }
 
@@ -283,6 +286,13 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.lyrics-panel-header {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
 }
 
 .panel-header .panel-title {
@@ -660,9 +670,12 @@ html, body {
 .create-tabs {
   display: flex;
   gap: 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .create-tab {
+  flex: 1;
+  text-align: center;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;

@@ -16,10 +16,6 @@
       <span class="logo-icon">♪</span>
       <span class="logo-text">ACE-Step <span class="logo-accent">Wrangler</span></span>
     </div>
-    <div class="mode-selector" role="tablist" aria-label="Task mode">
-      <button class="mode-btn active" data-mode="create" role="tab" aria-selected="true">Create</button>
-      <button class="mode-btn" data-mode="rework" role="tab" aria-selected="false">Rework</button>
-    </div>
     <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
   </header>
 
@@ -224,8 +220,11 @@
 
     <!-- Center: Lyrics -->
     <section class="panel" id="lyrics-panel">
-      <div class="panel-header">
-        <h2 class="panel-title">Lyrics</h2>
+      <div class="panel-header lyrics-panel-header">
+        <div class="mode-selector" role="tablist" aria-label="Task mode">
+          <button class="mode-btn active" data-mode="create" role="tab" aria-selected="true">Create</button>
+          <button class="mode-btn" data-mode="rework" role="tab" aria-selected="false">Rework</button>
+        </div>
         <div class="create-tabs" role="tablist">
           <button class="create-tab active" data-tab="my-lyrics" role="tab" aria-selected="true">My Lyrics</button>
           <button class="create-tab" data-tab="ai-lyrics" role="tab" aria-selected="false">AI Lyrics</button>
