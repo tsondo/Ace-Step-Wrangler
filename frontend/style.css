@@ -30,8 +30,8 @@
 
   /* Text */
   --text-primary:    #e4e4e7;
-  --text-secondary:  #8b8b9e;
-  --text-muted:      #44445a;
+  --text-secondary:  #a0a0b8;
+  --text-muted:      #6b6b84;
 
   /* Danger */
   --danger:          #f87171;
@@ -58,7 +58,7 @@ html, body {
   background: var(--bg);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   overflow: hidden;
 }
@@ -126,7 +126,7 @@ html, body {
   color: var(--text-muted);
   cursor: pointer;
   padding: 5px 14px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   font-family: var(--font-ui);
   letter-spacing: 0.04em;
@@ -167,14 +167,14 @@ html, body {
 
 /* Duration lock note (shown in rework mode) */
 .duration-lock-note {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.4;
 }
 
 /* Fix & Blend tip */
 .repaint-tip {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
   line-height: 1.4;
@@ -212,7 +212,7 @@ html, body {
   cursor: pointer;
   padding: 4px 10px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--font-ui);
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
@@ -272,7 +272,7 @@ html, body {
 }
 
 .panel-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -297,7 +297,7 @@ html, body {
 }
 
 .panel-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   line-height: 1.3;
 }
@@ -312,7 +312,7 @@ html, body {
 }
 
 .tag-group-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -332,7 +332,7 @@ html, body {
   cursor: pointer;
   padding: 4px 11px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--font-ui);
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   user-select: none;
@@ -356,7 +356,7 @@ html, body {
 }
 
 .tags-count {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -371,7 +371,7 @@ html, body {
 }
 
 .style-preview-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -379,7 +379,7 @@ html, body {
 }
 
 .style-preview-text {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-primary);
   line-height: 1.5;
   word-break: break-word;
@@ -439,7 +439,7 @@ html, body {
   cursor: pointer;
   padding: 2px 7px;
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -478,7 +478,7 @@ html, body {
 }
 
 .field-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -493,7 +493,7 @@ html, body {
   border-radius: var(--radius);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.65;
   padding: 10px 12px;
   resize: none;
@@ -527,13 +527,13 @@ html, body {
 }
 
 .lyrics-count {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-muted);
 }
 
 .lyrics-warning {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--danger);
 }
 
@@ -571,7 +571,7 @@ html, body {
 }
 
 .upload-label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -588,7 +588,7 @@ html, body {
 }
 
 .upload-filename {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -597,7 +597,7 @@ html, body {
 }
 
 .upload-duration {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text-muted);
 }
@@ -622,7 +622,7 @@ html, body {
   cursor: pointer;
   text-align: left;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   transition: border-color 0.15s, background 0.15s, color 0.15s;
@@ -669,7 +669,7 @@ html, body {
   color: var(--text-muted);
   cursor: pointer;
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-family: var(--font-ui);
   letter-spacing: 0.04em;
@@ -716,19 +716,19 @@ html, body {
   padding-left: 6px;
   padding-right: 18px;
   background-position: right 4px center;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .music-load-status {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
 .instrumental-note {
   margin: 0;
   padding: 14px 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   text-align: center;
   flex: 1;
@@ -774,7 +774,7 @@ html, body {
   cursor: pointer;
   padding: 3px 7px;
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-ui);
   line-height: 1.4;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
@@ -823,7 +823,7 @@ a.player-save {
 }
 
 .player-time {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -846,7 +846,7 @@ a.player-save {
 }
 
 .control-value {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--accent);
   min-width: 44px;
@@ -922,7 +922,7 @@ a.player-save {
 .slider-bounds {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   letter-spacing: 0.02em;
 }
@@ -935,7 +935,7 @@ a.player-save {
   border-radius: var(--radius);
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   padding: 6px 10px;
   outline: none;
   transition: border-color 0.15s;
@@ -946,7 +946,7 @@ a.player-save {
 .number-input:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .batch-note {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.4;
 }
@@ -959,7 +959,7 @@ a.player-save {
   border-radius: var(--radius);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 14px;
   padding: 6px 28px 6px 10px;
   outline: none;
   cursor: pointer;
@@ -984,7 +984,7 @@ a.player-save {
   border: none;
   border-radius: var(--radius);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.06em;
   cursor: pointer;
@@ -1006,7 +1006,7 @@ a.player-save {
 }
 
 .generate-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--danger);
   min-height: 0;
   line-height: 1.4;
@@ -1029,7 +1029,7 @@ a.player-save {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1083,7 +1083,7 @@ details[open] > .advanced-toggle {
 }
 
 .output-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1103,7 +1103,7 @@ details[open] > .advanced-toggle {
 }
 
 .now-playing-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
@@ -1146,14 +1146,14 @@ details[open] > .advanced-toggle {
 }
 
 .output-generating-label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
 .generating-timer {
   font-family: var(--font-mono);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .result-card {
@@ -1169,7 +1169,7 @@ details[open] > .advanced-toggle {
 }
 
 .card-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1187,7 +1187,7 @@ details[open] > .advanced-toggle {
 
 .card-lyrics {
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--text-secondary);
   white-space: pre-wrap;
@@ -1245,7 +1245,7 @@ details[open] > .advanced-toggle {
   gap: 8px;
   background: var(--surface-raised);
   z-index: 5;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -1264,7 +1264,7 @@ details[open] > .advanced-toggle {
   top: 3px;
   background: rgba(245, 158, 11, 0.15);
   color: var(--accent);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 1px 5px;
@@ -1325,7 +1325,7 @@ details[open] > .advanced-toggle {
 .wf-time-label {
   position: absolute;
   bottom: 2px;
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-ui);
   color: var(--accent-bright);
   pointer-events: none;
@@ -1381,7 +1381,7 @@ details[open] > .advanced-toggle {
 }
 
 .wf-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -1391,11 +1391,11 @@ details[open] > .advanced-toggle {
 .wf-time-input {
   width: 72px;
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .waveform-selection-info {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   white-space: nowrap;
