@@ -17,6 +17,7 @@ import re
 import shutil
 import tempfile
 import uuid
+import mimetypes
 import uvicorn
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +25,7 @@ from typing import Optional
 from urllib.parse import urlparse, parse_qs
 
 from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -462,7 +463,13 @@ async def status(task_id: str):
 
 @app.get("/audio")
 async def audio_proxy(path: str):
-    """Transparent audio proxy (no Content-Disposition) — used by <audio> elements."""
+    """Serve audio for <audio> elements. Uses FileResponse for local files (Range support)."""
+    resolved = _resolve_audio_path(path)
+    fp = Path(resolved)
+    if fp.is_file():
+        ct = mimetypes.guess_type(str(fp))[0] or "audio/mpeg"
+        return FileResponse(str(fp), media_type=ct)
+    # Fallback: proxy from AceStep server
     try:
         data, content_type = await get_audio_bytes(path)
     except Exception as exc:
