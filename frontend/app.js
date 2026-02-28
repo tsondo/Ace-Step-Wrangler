@@ -34,14 +34,21 @@ function initAudioPlayer(audioEl, playerEl) {
     timeEl.textContent = _fmtTime(cur) + ' / ' + _fmtTime(dur);
   }
 
-  function syncStopBtn() {
-    stopBtn.disabled = audioEl.paused;
+  function syncButtons() {
+    const paused = audioEl.paused;
+    stopBtn.disabled = paused;
+    playBtn.textContent = paused ? '\u25B6' : '\u23F8';
+    playBtn.title = paused ? 'Play' : 'Pause';
   }
 
-  // Play — start from current position, stop all other players
+  // Play/Pause toggle
   playBtn.addEventListener('click', () => {
-    _stopOthers(audioEl);
-    audioEl.play();
+    if (audioEl.paused) {
+      _stopOthers(audioEl);
+      audioEl.play();
+    } else {
+      audioEl.pause();
+    }
   });
 
   // Stop — pause and save position (next Play resumes from here)
@@ -70,15 +77,15 @@ function initAudioPlayer(audioEl, playerEl) {
   audioEl.addEventListener('ended', () => {
     audioEl.currentTime = 0;
     updateProgress();
-    syncStopBtn();
+    syncButtons();
   });
 
-  audioEl.addEventListener('play',        syncStopBtn);
-  audioEl.addEventListener('pause',       syncStopBtn);
+  audioEl.addEventListener('play',        syncButtons);
+  audioEl.addEventListener('pause',       syncButtons);
   audioEl.addEventListener('timeupdate',  updateProgress);
   audioEl.addEventListener('loadedmetadata', updateProgress);
 
-  syncStopBtn();
+  syncButtons();
   updateProgress();
 }
 
@@ -1001,6 +1008,9 @@ function setWaveformRegion(start, end) {
   updateWaveformVisuals();
 }
 
+const wfTimeStart = document.getElementById('wf-time-start');
+const wfTimeEnd   = document.getElementById('wf-time-end');
+
 function updateWaveformVisuals() {
   const start = Number(wfRegionStart.value) || 0;
   const end = Number(wfRegionEnd.value) || 0;
@@ -1012,6 +1022,10 @@ function updateWaveformVisuals() {
     waveformSelection.style.width = widthPct + '%';
     waveformSelection.classList.remove('hidden');
 
+    // In-waveform time labels at selection edges
+    wfTimeStart.textContent = formatTimecode(start);
+    wfTimeEnd.textContent = formatTimecode(end);
+
     // Selection info text
     const durSecs = end - start;
     const sectionNames = _waveformSections
@@ -1021,6 +1035,8 @@ function updateWaveformVisuals() {
     wfSelectionInfo.textContent = secLabel + formatTimecode(start) + ' \u2013 ' + formatTimecode(end) + ' (' + durSecs.toFixed(1) + 's)';
   } else {
     waveformSelection.classList.add('hidden');
+    wfTimeStart.textContent = '';
+    wfTimeEnd.textContent = '';
     wfSelectionInfo.textContent = '';
   }
 

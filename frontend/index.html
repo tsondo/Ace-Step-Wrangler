@@ -495,6 +495,8 @@
         <div class="waveform-selection hidden" id="waveform-selection">
           <div class="waveform-handle waveform-handle-left"></div>
           <div class="waveform-handle waveform-handle-right"></div>
+          <span class="wf-time-label wf-time-start" id="wf-time-start"></span>
+          <span class="wf-time-label wf-time-end" id="wf-time-end"></span>
         </div>
         <div class="waveform-playhead" id="waveform-playhead"></div>
       </div>
@@ -506,7 +508,7 @@
         <span class="player-time">0:00 / 0:00</span>
         <a class="player-btn player-save" id="wf-save-btn" title="Save audio">⬇</a>
       </div>
-      <div class="waveform-controls">
+      <div class="waveform-controls hidden">
         <div class="waveform-time-inputs">
           <label class="wf-label">Start</label>
           <input type="number" id="wf-region-start" class="number-input wf-time-input" step="0.1" min="0" value="0">

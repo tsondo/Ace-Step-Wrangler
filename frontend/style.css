@@ -1283,6 +1283,27 @@ details[open] > .advanced-toggle {
   right: -5px;
 }
 
+/* Selection time labels — inside the waveform, at selection edges */
+.wf-time-label {
+  position: absolute;
+  bottom: 2px;
+  font-size: 10px;
+  font-family: var(--font-ui);
+  color: var(--accent-bright);
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+  text-shadow: 0 0 3px var(--bg), 0 0 6px var(--bg);
+}
+
+.wf-time-start {
+  left: 2px;
+}
+
+.wf-time-end {
+  right: 2px;
+}
+
 /* Playhead */
 .waveform-playhead {
   position: absolute;
