@@ -22,6 +22,8 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 - **Advanced panel** — raw AceStep parameters (guidance scale, inference steps, scheduler, seed, batch size, audio format) still accessible for power users
 - **Dark DAW aesthetic** — feels at home next to your other music tools
 
+See the [User Guide](docs/USER_GUIDE.md) for full documentation.
+
 ## Requirements
 
 - Python 3.11 or 3.12
