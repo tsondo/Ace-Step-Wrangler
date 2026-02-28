@@ -290,7 +290,7 @@ function updateControlsForMode(mode) {
     if (mode === 'create') {
       genBtn.textContent = '▶ Generate';
     } else {
-      genBtn.textContent = _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Repaint';
+      genBtn.textContent = _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Fix & Blend';
     }
   }
 
@@ -1090,6 +1090,7 @@ function renderSections(sections) {
     label.style.left = (sec.start / _waveformDuration * 100) + '%';
     label.dataset.index = i;
     label.addEventListener('click', (e) => {
+      if (_reworkApproach === 'cover') return;
       if (e.shiftKey && _waveformSections.length > 0) {
         // Shift+click: extend selection
         const curStart = Number(wfRegionStart.value) || 0;
@@ -1173,6 +1174,9 @@ let _wfMouseDownX = 0;
 let _wfHandleDrag = null;   // 'left' | 'right' | null
 
 waveformContainer.addEventListener('mousedown', (e) => {
+  // In Reimagine mode, no region selection — entire song is processed
+  if (_reworkApproach === 'cover') return;
+
   // Handle edge-drag
   const target = e.target;
   if (target.classList.contains('waveform-handle-left')) {
@@ -1472,7 +1476,7 @@ function setOutputState(state) {
 
 function getGenerateLabel() {
   if (_currentMode === 'rework') {
-    return _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Repaint';
+    return _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Fix & Blend';
   }
   return '▶ Generate';
 }
