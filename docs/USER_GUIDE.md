@@ -21,7 +21,7 @@ The interface is a three-column layout with an output panel across the bottom.
 | Column | Contents |
 |---|---|
 | Left | **Style** (Create mode) or **Rework** controls |
-| Centre | **Lyrics** — write, leave blank for AI-generated lyrics, or switch to Instrumental |
+| Centre | **Lyrics** — three tabs: My Lyrics, AI Lyrics, Instrumental |
 | Right | **Controls** — duration, quality, generate button |
 | Bottom | **Output** — generated audio, waveform editor |
 
@@ -43,35 +43,40 @@ Build a style description by combining tags and free text. The assembled prompt 
 
 ### Lyrics Panel (centre column)
 
-The panel header has two mode buttons:
+The panel header has three tabs: **My Lyrics**, **AI Lyrics**, and **Instrumental**. Each tab independently remembers its last generated song — you can have a different result in each and rework any of them.
 
-**With Lyrics** (default)
+**My Lyrics** (default)
 
-The textarea is active. You have two options:
+Write or paste your own lyrics. Use `[Section]` headers on their own line to mark song structure:
 
-- **Write lyrics** — type or paste directly. Use `[Section]` headers on their own line to mark song structure:
+```
+[Verse 1]
+Lines go here
 
-  ```
-  [Verse 1]
-  Lines go here
+[Chorus]
+Lines go here
+```
 
-  [Chorus]
-  Lines go here
-  ```
-
-  You can also drag and drop a `.txt` or `.lrc` file onto the panel, or use **Load file**.
-
-- **Leave blank** — AceStep's language model will generate lyrics from your style settings (tags, key, BPM, custom description). The small language selector in the header controls the vocal language. A note in the placeholder text explains that when AI writes the lyrics, duration, BPM, and key may be adjusted to fit the generated content.
+Actions in the toolbar:
+- **Language selector** (EN / ZH / JA / …) — tells AceStep the vocal language
+- **Load file** — load lyrics from a `.txt` or `.lrc` file (you can also drag and drop onto the panel)
+- **Clear** — empty the textarea
+- **Load music** — load an existing audio file (WAV/FLAC/MP3) and optionally a companion JSON. If the JSON is included, lyrics, style, BPM, duration, key, and other settings are restored from it. The audio is stored so switching to Rework auto-loads it.
 
 A character count and a lyrics-too-long warning appear as you type. If the lyrics are likely too long for the chosen duration, adjust the Duration slider before generating.
 
+**AI Lyrics**
+
+Let AceStep's language model write the lyrics for you. The tab has two fields:
+
+- **Song description** — describe the mood, topic, or style of the song you want (e.g. "upbeat summer anthem about road trips"). This is combined with your Style panel settings and sent to the model.
+- **Generated lyrics** — a read-only display that fills in after generation. You can select and copy the text to paste into My Lyrics for editing.
+
+The language selector controls which language the AI generates vocals in.
+
 **Instrumental**
 
-The textarea hides. AceStep generates a purely instrumental track from your style settings — no lyrics are generated or expected.
-
-#### Language selector
-
-The **EN / ZH / JA / …** dropdown (visible in With Lyrics mode) tells AceStep which language to use for the vocals when it is generating lyrics. It has no effect when you supply your own lyrics — the model follows whatever language you write.
+AceStep generates a purely instrumental track from your style settings — no lyrics are generated or expected.
 
 ### Controls Panel (right column)
 
@@ -87,7 +92,7 @@ The **EN / ZH / JA / …** dropdown (visible in With Lyrics mode) tells AceStep 
 
 While generating, an elapsed timer and a **Cancel** button are shown.
 
-On completion, one card per result appears. Each card has a custom audio player, download links for the audio file and a JSON metadata file, and a **Send to Rework** button that loads the result directly into Rework mode.
+On completion, one card per result appears. Each card has a custom audio player (with a save button for quick download), and download links for the audio file and a JSON metadata file. The result is automatically stored in the active tab — switching to Rework loads it.
 
 ---
 
@@ -98,8 +103,8 @@ Rework takes an existing audio file and transforms part or all of it.
 ### Loading Audio
 
 - **Drag and drop** an audio file onto the upload zone, or click **Browse**
-- Or use **Send to Rework** on any result card after generating — no re-upload needed
-- Or click the **Rework** tab immediately after a generation — it auto-loads the most recent result
+- Or simply click the **Rework** tab — it auto-loads the last result from whichever lyrics tab (My Lyrics / AI Lyrics / Instrumental) is currently active
+- Or use **Load music** on the My Lyrics tab to load an existing audio file for reworking
 
 Once loaded, the filename, duration, and an audio player appear. The output panel shows a **waveform timeline** of the audio.
 
@@ -118,7 +123,8 @@ Set the region:
 - Click and drag on the **waveform** to select a range (highlighted in amber)
 - Drag the left/right handles to adjust an existing selection
 - Click a **section label** (if lyrics were provided) to snap to that section; Shift-click to extend the selection
-- Or type start/end times directly in the **Start** / **End** number inputs below the waveform
+- Start/end timecodes are displayed right on the waveform at the selection edges
+- Or type start/end times directly in the region inputs in the Rework panel
 
 ### Style Direction
 
@@ -140,14 +146,15 @@ The output panel stays on the waveform view with the reworked audio loaded. You 
 
 ## Playback Controls
 
-Every audio player in the app uses the same transport controls. The behaviour is intentionally DAW-style rather than standard media-player style.
+Every audio player in the app uses the same transport controls.
 
 | Control | Label | Behaviour |
 |---|---|---|
-| **Rewind** | ⟪ | Jumps to position 0. If the audio is playing, it keeps playing from the top. If stopped, it just repositions without starting playback. |
-| **Play** | ▶ | Starts playback from the last saved position. Always labelled Play — it does not toggle to Pause. |
+| **Rewind** | ⟪ | Jumps to position 0. If the audio is playing, it keeps playing from the top. If paused, it just repositions without starting playback. |
+| **Play / Pause** | ▶ / ⏸ | Toggles between play and pause. Shows ▶ when paused, ⏸ when playing. Resumes from the current position. |
 | **Stop** | ⏹ | Pauses and saves the current position. Next Play resumes from there. Greyed out when nothing is playing. |
 | **Scrubber** | ▬▬▬ | Click anywhere on the bar to seek to that position and immediately start playback. |
+| **Save** | ⬇ | Downloads the audio file directly from the player bar. |
 
 Additional behaviours:
 
@@ -199,8 +206,10 @@ When the batch size is locked, an inline note explains why.
 
 - **Section headers in lyrics matter.** `[Verse]`, `[Chorus]`, `[Bridge]` etc. help the model structure the arrangement correctly and enable the Auto Duration estimate.
 - **Auto Duration** works best when BPM is set and the lyrics have section headers.
-- **Leave the lyrics blank** when you want the AI to write them. Your style panel settings (tags, key, BPM) feed directly into what the LM generates — set those first for better results.
+- **Use AI Lyrics** when you want the AI to write them. Describe the song you want and your style panel settings (tags, key, BPM) feed directly into what the LM generates — set those first for better results. Copy the generated lyrics to My Lyrics if you want to edit them.
 - **Instrumental mode** is the fastest path to background music or loop generation — no lyrics needed, just set the style and hit Generate.
-- **Send to Rework** after generating is the fastest path to iterating on a song — the audio is already on the server, no upload needed. The Rework tab also auto-loads the last result if nothing is uploaded yet.
+- **Each tab remembers its last song.** You can have a different result in My Lyrics, AI Lyrics, and Instrumental — switching to Rework auto-loads whichever tab is active.
+- **Load music** to rework existing tracks — load a WAV/FLAC/MP3 with its companion JSON to restore all the original settings, then switch to Rework.
 - **Fix & Blend on small regions** works better than trying to repaint large portions of a song. For a big change, use Reimagine instead.
+- **Save button (⬇)** on every player bar lets you quickly download audio at any point — useful in Rework for comparing versions.
 - **Seed** is your best friend for reproducibility. Once you have a result you like, note the seed from the downloaded JSON before running variations.
