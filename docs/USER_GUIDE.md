@@ -227,3 +227,21 @@ When the batch size is locked, an inline note explains why.
 - **Now Playing bar** lets you control playback without scrolling or switching tabs — start a song in AI Lyrics, move to My Lyrics to edit, and the bottom bar keeps playing and lets you pause or rewind.
 - **Save button (⬇)** on every player bar (including Now Playing) lets you quickly download audio at any point.
 - **Seed** is your best friend for reproducibility. Once you have a result you like, note the seed from the downloaded JSON before running variations.
+
+---
+
+## Updating ACE-Step
+
+ACE-Step 1.5 is bundled as a git submodule. To pull the latest upstream version:
+
+```bash
+git submodule update --remote vendor/ACE-Step-1.5
+git add vendor/ACE-Step-1.5
+git commit -m "Update ACE-Step submodule to latest upstream"
+```
+
+This fetches the newest commit from the ACE-Step repo and pins it in your project.
+
+Note: `git pull --recurse-submodules` does **not** advance the submodule — it only syncs to whatever commit is already pinned. Use the commands above to actually update.
+
+**Caution:** Upstream updates may introduce new dependencies or breaking API changes. Test locally before committing the updated submodule — run `uv sync` to pick up any new requirements, then launch with `uv run wrangler` and verify generation still works.
