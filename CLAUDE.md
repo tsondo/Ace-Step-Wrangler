@@ -98,6 +98,10 @@ Check `docs/PROJECT_PLAN.md` build order. Update this line when a stage is compl
 
 **Current stage: Complete — all 9 stages shipped**
 
+## Shared Model Location
+
+Set `MODEL_LOCATION` in `.env` (or the environment) to share model checkpoints across installs. When set, `run.py` symlinks `vendor/ACE-Step-1.5/checkpoints` → `$MODEL_LOCATION` at startup, so ACE-Step finds its models transparently. If the variable is unset, checkpoints live in the default vendor location as before.
+
 ## GPU Selection
 
 `run.py` manages device isolation between the two servers:

@@ -13,6 +13,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "fastapi>=0.133.1",
     "httpx>=0.28.1",
+    "python-dotenv>=1.0",
     "uvicorn>=0.41.0",
     # ACE-Step and all its GPU/ML dependencies — resolved via [tool.uv.sources]
     "ace-step",

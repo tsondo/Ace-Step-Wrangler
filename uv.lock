@@ -154,6 +154,7 @@ dependencies = [
     { name = "ace-step" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "python-dotenv" },
     { name = "uvicorn" },
 ]
 
@@ -162,6 +163,7 @@ requires-dist = [
     { name = "ace-step", editable = "vendor/ACE-Step-1.5" },
     { name = "fastapi", specifier = ">=0.133.1" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "python-dotenv", specifier = ">=1.0" },
     { name = "uvicorn", specifier = ">=0.41.0" },
 ]
 

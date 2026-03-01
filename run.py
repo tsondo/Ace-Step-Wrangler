@@ -28,6 +28,46 @@ _ACESTEP_PASSTHROUGH_VARS = [
 ]
 
 _HERE = Path(__file__).resolve().parent
+_CHECKPOINTS = _HERE / "vendor" / "ACE-Step-1.5" / "checkpoints"
+
+
+def _ensure_model_symlink() -> str | None:
+    """If MODEL_LOCATION is set, symlink vendor checkpoints dir to it.
+
+    Returns the resolved MODEL_LOCATION or None.
+    """
+    model_loc = os.environ.get("MODEL_LOCATION")
+    if not model_loc:
+        return None
+
+    target = Path(model_loc)
+    if not target.is_dir():
+        print(f"[run] WARNING: MODEL_LOCATION={model_loc} is not a directory, ignoring")
+        return None
+
+    # Already a correct symlink — nothing to do
+    if _CHECKPOINTS.is_symlink():
+        if _CHECKPOINTS.resolve() == target.resolve():
+            return str(target)
+        # Wrong symlink target — fix it
+        _CHECKPOINTS.unlink()
+        _CHECKPOINTS.symlink_to(target)
+        print(f"[run] Updated checkpoints symlink → {target}")
+        return str(target)
+
+    # Real directory with files — don't clobber, tell the user
+    if _CHECKPOINTS.is_dir() and any(_CHECKPOINTS.iterdir()):
+        print(f"[run] WARNING: {_CHECKPOINTS} is a non-empty directory.")
+        print(f"  Move its contents to {target} and remove it, then restart.")
+        print(f"  Example:  mv {_CHECKPOINTS}/* {target}/ && rmdir {_CHECKPOINTS}")
+        return None
+
+    # Empty dir or doesn't exist — safe to create symlink
+    if _CHECKPOINTS.is_dir():
+        _CHECKPOINTS.rmdir()
+    _CHECKPOINTS.symlink_to(target)
+    print(f"[run] Created checkpoints symlink → {target}")
+    return str(target)
 
 
 def main() -> None:
@@ -56,6 +96,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # --- Load .env from project root (won't override existing env vars) -----
+    _env_file = _HERE / ".env"
+    if _env_file.is_file():
+        from dotenv import load_dotenv
+        load_dotenv(_env_file, override=False)
+
+    # --- Shared model location (symlink checkpoints → MODEL_LOCATION) ------
+    model_location = _ensure_model_symlink()
+
     # --- GPU selection: --gpu flag > ACESTEP_GPU env > auto -----------------
     gpu = args.gpu or os.environ.get("ACESTEP_GPU")
 
@@ -79,6 +128,8 @@ def main() -> None:
     print("  ACE-Step Wrangler")
     print("=" * 60)
     print(f"  GPU:           {gpu_display}")
+    if model_location:
+        print(f"  Models:        {model_location}")
     print(f"  AceStep API:   http://localhost:{args.acestep_port}")
     print(f"  Wrangler UI:   http://localhost:{args.port}")
     if active_overrides:
