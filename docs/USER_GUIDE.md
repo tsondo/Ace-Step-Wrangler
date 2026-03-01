@@ -10,11 +10,14 @@ ACE-Step Wrangler is a DAW-style web UI for [AceStep 1.5](https://github.com/ace
 uv run wrangler
 ```
 
-To use a specific GPU:
+On multi-GPU systems, Wrangler auto-selects the GPU with the most free VRAM. To override:
 
 ```bash
-uv run wrangler --gpu 1
+uv run wrangler --gpu 1          # use GPU 1
+ACESTEP_GPU=1 uv run wrangler    # equivalent via env var
 ```
+
+Priority: `--gpu` flag > `ACESTEP_GPU` env > auto-select > CUDA default. The startup banner shows which GPU was chosen and how much VRAM is free.
 
 Open **http://localhost:7860** in your browser. AceStep must finish loading its models before the first generation — the first run after startup may take a minute.
 

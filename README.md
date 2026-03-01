@@ -70,15 +70,32 @@ Ctrl+C shuts down both servers gracefully.
 
 ACE-Step is a single-GPU model — it does not do multi-GPU inference, but `CUDA_VISIBLE_DEVICES` controls which GPU it uses.
 
+On multi-GPU systems, Wrangler **auto-selects the GPU with the most free VRAM** when no explicit choice is made. The startup banner shows which GPU was selected, how it was chosen, and current VRAM:
+
+```
+============================================================
+  ACE-Step Wrangler
+============================================================
+  GPU:           0 — NVIDIA GeForce RTX 3090 Ti (22.1 / 24.0 GB free)  [auto-selected (most free VRAM)]
+  Models:        /data/models
+  AceStep API:   http://localhost:8001
+  Wrangler UI:   http://localhost:7860
+============================================================
+```
+
+To override auto-selection:
+
 ```bash
 # Use a specific GPU (e.g. GPU 1)
 uv run wrangler --gpu 1
 
-# Equivalent using environment variable
+# Or set in .env / environment
 ACESTEP_GPU=1 uv run wrangler
 ```
 
-The `--gpu` flag takes priority over `ACESTEP_GPU`. If neither is set, AceStep uses its default auto-detection.
+Priority: `--gpu` flag > `ACESTEP_GPU` env var > auto-select (most free VRAM) > CUDA default.
+
+If free VRAM on the selected GPU is below 14 GB, the banner warns and suggests using a smaller LM or offloading the VAE to CPU.
 
 The Wrangler UI server never sees `CUDA_VISIBLE_DEVICES` — it has no GPU requirements.
 
