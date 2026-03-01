@@ -30,6 +30,76 @@ _ACESTEP_PASSTHROUGH_VARS = [
 _HERE = Path(__file__).resolve().parent
 _CHECKPOINTS = _HERE / "vendor" / "ACE-Step-1.5" / "checkpoints"
 
+_LOW_VRAM_THRESHOLD_MB = 14_000  # ~14 GB
+
+
+def _auto_select_gpu() -> str | None:
+    """Pick the GPU with the most free VRAM via nvidia-smi.
+
+    Returns the GPU index as a string, or None if nvidia-smi is unavailable.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=index,name,memory.free,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+    best_idx: str | None = None
+    best_free: float = -1
+    for line in result.stdout.strip().splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) < 4:
+            continue
+        idx, _name, free, _total = parts[0], parts[1], parts[2], parts[3]
+        try:
+            free_mb = float(free)
+        except ValueError:
+            continue
+        if free_mb > best_free:
+            best_free = free_mb
+            best_idx = idx
+
+    return best_idx
+
+
+def _get_gpu_info(index: str) -> tuple[str, int, int] | None:
+    """Return (name, free_mb, total_mb) for a specific GPU index."""
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "-i", index,
+                "--query-gpu=name,memory.free,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+    line = result.stdout.strip()
+    parts = [p.strip() for p in line.split(",")]
+    if len(parts) < 3:
+        return None
+    try:
+        return parts[0], int(float(parts[1])), int(float(parts[2]))
+    except ValueError:
+        return None
+
 
 def _ensure_model_symlink() -> str | None:
     """If MODEL_LOCATION is set, symlink vendor checkpoints dir to it.
@@ -105,8 +175,19 @@ def main() -> None:
     # --- Shared model location (symlink checkpoints → MODEL_LOCATION) ------
     model_location = _ensure_model_symlink()
 
-    # --- GPU selection: --gpu flag > ACESTEP_GPU env > auto -----------------
-    gpu = args.gpu or os.environ.get("ACESTEP_GPU")
+    # --- GPU selection: --gpu flag > ACESTEP_GPU env > auto-select > default -
+    gpu_source = None
+    gpu = args.gpu
+    if gpu:
+        gpu_source = "--gpu flag"
+    else:
+        gpu = os.environ.get("ACESTEP_GPU")
+        if gpu:
+            gpu_source = "ACESTEP_GPU env"
+        else:
+            gpu = _auto_select_gpu()
+            if gpu:
+                gpu_source = "auto-selected (most free VRAM)"
 
     # --- Build environment for AceStep subprocess ---------------------------
     acestep_env = os.environ.copy()
@@ -118,7 +199,18 @@ def main() -> None:
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)
 
     # --- Startup banner -----------------------------------------------------
-    gpu_display = gpu if gpu else "auto"
+    gpu_info = _get_gpu_info(gpu) if gpu else None
+
+    if gpu and gpu_info:
+        name, free_mb, total_mb = gpu_info
+        gpu_display = (
+            f"{gpu} — {name} ({free_mb / 1024:.1f} / {total_mb / 1024:.1f} GB free)"
+        )
+    elif gpu:
+        gpu_display = gpu
+    else:
+        gpu_display = "CUDA default"
+
     active_overrides = {
         k: os.environ[k] for k in _ACESTEP_PASSTHROUGH_VARS if k in os.environ
     }
@@ -127,7 +219,13 @@ def main() -> None:
     print("=" * 60)
     print("  ACE-Step Wrangler")
     print("=" * 60)
-    print(f"  GPU:           {gpu_display}")
+    if gpu_source:
+        print(f"  GPU:           {gpu_display}  [{gpu_source}]")
+    else:
+        print(f"  GPU:           {gpu_display}")
+    if gpu_info and gpu_info[1] < _LOW_VRAM_THRESHOLD_MB:
+        print(f"  ⚠ Low free VRAM — consider ACESTEP_LM_MODEL_PATH=acestep-5Hz-lm-0.6B")
+        print(f"    or ACESTEP_VAE_ON_CPU=true")
     if model_location:
         print(f"  Models:        {model_location}")
     print(f"  AceStep API:   http://localhost:{args.acestep_port}")
