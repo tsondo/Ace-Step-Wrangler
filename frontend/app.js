@@ -774,98 +774,24 @@ document.getElementById('load-music-btn').addEventListener('click', () => {
   input.click();
 });
 
-const _loadedMusicCard = document.getElementById('loaded-music-card');
-let _loadedMusicWf = null;
-
-function clearLoadedMusic() {
-  if (_loadedMusicWf) { _loadedMusicWf.destroy(); _loadedMusicWf = null; }
-  _loadedMusicCard.innerHTML = '';
-  _loadedMusicCard.classList.add('hidden');
-  _tabAudio['my-lyrics'] = null;
-  updateGenerateState();
-}
-
-function showLoadedMusicCard(audioPath, filename) {
-  // Clean up previous
-  if (_loadedMusicWf) { _loadedMusicWf.destroy(); _loadedMusicWf = null; }
-  _loadedMusicCard.innerHTML = '';
-
-  // Header: filename + close button
-  var header = document.createElement('div');
-  header.className = 'loaded-music-header';
-  var nameEl = document.createElement('span');
-  nameEl.className = 'loaded-music-name';
-  nameEl.textContent = filename;
-  var closeBtn = document.createElement('button');
-  closeBtn.className = 'loaded-music-close';
-  closeBtn.type = 'button';
-  closeBtn.title = 'Remove loaded music';
-  closeBtn.textContent = '\u2715';
-  closeBtn.addEventListener('click', clearLoadedMusic);
-  header.appendChild(nameEl);
-  header.appendChild(closeBtn);
-  _loadedMusicCard.appendChild(header);
-
-  // Hidden audio element
-  var audioEl = document.createElement('audio');
-  var audioUrl = '/audio?path=' + encodeURIComponent(audioPath);
-  audioEl.src = audioUrl;
-  audioEl.style.display = 'none';
-  _loadedMusicCard.appendChild(audioEl);
-
-  // Waveform
-  var wfContainer = document.createElement('div');
-  wfContainer.className = 'card-wf-container';
-  var wfCanvas = document.createElement('canvas');
-  wfCanvas.className = 'card-wf-canvas';
-  wfContainer.appendChild(wfCanvas);
-  _loadedMusicCard.appendChild(wfContainer);
-
-  // Transport
-  var player = document.createElement('div');
-  player.className = 'audio-player';
-  player.innerHTML =
-    '<button class="player-btn player-rewind" type="button" title="Rewind to start">\u27EA</button>' +
-    '<button class="player-btn player-play"   type="button" title="Play">\u25B6</button>' +
-    '<button class="player-btn player-stop"   type="button" title="Stop" disabled>\u23F9</button>' +
-    '<span class="player-time">0:00 / 0:00</span>';
-  _loadedMusicCard.appendChild(player);
-  initAudioPlayer(audioEl, player, 'Loaded: ' + filename);
-
-  // Card waveform
-  _loadedMusicWf = createCardWaveform(wfContainer, wfCanvas, audioEl, []);
-  _loadedMusicCard.classList.remove('hidden');
-  requestAnimationFrame(function() { _loadedMusicWf.render(audioUrl); });
-}
-
+// Load Music — audio file + optional companion JSON, loaded into Rework
 async function handleMusicLoad(files) {
   const audioFile = files.find(f => /\.(wav|flac|mp3)$/i.test(f.name));
   const jsonFile  = files.find(f => /\.json$/i.test(f.name));
   if (!audioFile) return;
 
-  try {
-    const formData = new FormData();
-    formData.append('file', audioFile);
-    const res = await fetch('/upload-audio', { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-    const { path } = await res.json();
-
-    let lyrics = '';
-    if (jsonFile) {
-      try {
-        const meta = JSON.parse(await jsonFile.text());
-        const params = meta.params || meta;
-        lyrics = params.lyrics || '';
-        applyJsonParams(params);
-      } catch (_) { /* JSON parse error — ignore */ }
-    }
-
-    _tabAudio['my-lyrics'] = { audioPath: path, lyrics };
-    showLoadedMusicCard(path, audioFile.name + (jsonFile ? ' + settings' : ''));
-    updateGenerateState();
-  } catch (err) {
-    console.error('Music load error:', err);
+  // Apply companion JSON params if present (lyrics, BPM, key, etc.)
+  if (jsonFile) {
+    try {
+      const meta = JSON.parse(await jsonFile.text());
+      const params = meta.params || meta;
+      applyJsonParams(params);
+    } catch (_) { /* JSON parse error — ignore */ }
   }
+
+  // Switch to Rework mode and use existing audio upload flow
+  switchMode('rework');
+  handleAudioUpload(audioFile);
 }
 
 function applyJsonParams(params) {
@@ -1359,15 +1285,12 @@ const debouncedWaveformResize = debounce(() => {
     resizeCanvas();
     drawWaveform();
   }
-  // Resize card waveforms in result cards + loaded music
+  // Resize card waveforms in result cards
   document.querySelectorAll('.result-card').forEach(function(card) {
     if (card._waveform && card._waveform._state && card._waveform._state.data) {
       card._waveform.resize();
     }
   });
-  if (_loadedMusicWf && _loadedMusicWf._state && _loadedMusicWf._state.data) {
-    _loadedMusicWf.resize();
-  }
 }, 200);
 window.addEventListener('resize', debouncedWaveformResize);
 
