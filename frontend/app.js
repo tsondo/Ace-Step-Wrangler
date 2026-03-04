@@ -124,7 +124,7 @@ function initAudioPlayer(audioEl, playerEl, label) {
   function updateProgress() {
     const cur = audioEl.currentTime || 0;
     const dur = isFinite(audioEl.duration) ? audioEl.duration : 0;
-    fill.style.width = dur ? ((cur / dur) * 100) + '%' : '0%';
+    if (fill) fill.style.width = dur ? ((cur / dur) * 100) + '%' : '0%';
     timeEl.textContent = _fmtTime(cur) + ' / ' + _fmtTime(dur);
   }
 
@@ -157,7 +157,7 @@ function initAudioPlayer(audioEl, playerEl, label) {
   });
 
   // Scrubber click — seek to position AND start playback immediately
-  scrubber.addEventListener('click', (e) => {
+  if (scrubber) scrubber.addEventListener('click', (e) => {
     const dur = audioEl.duration;
     if (!dur || !isFinite(dur)) return;
     const rect = scrubber.getBoundingClientRect();
@@ -1302,8 +1302,200 @@ const debouncedWaveformResize = debounce(() => {
     resizeCanvas();
     drawWaveform();
   }
+  // Resize card waveforms in result cards
+  document.querySelectorAll('.result-card').forEach(function(card) {
+    if (card._waveform && card._waveform._state && card._waveform._state.data) {
+      card._waveform.resize();
+    }
+  });
 }, 200);
 window.addEventListener('resize', debouncedWaveformResize);
+
+// ===== Card Waveform — per-result-card waveform with section labels =====
+
+function createCardWaveform(containerEl, canvasEl, audioEl, sections) {
+  const ctx = canvasEl.getContext('2d');
+  const playhead = document.createElement('div');
+  playhead.className = 'card-wf-playhead';
+  containerEl.appendChild(playhead);
+
+  const sectionsEl = document.createElement('div');
+  sectionsEl.className = 'card-wf-sections';
+  containerEl.appendChild(sectionsEl);
+
+  const state = {
+    data: null,
+    duration: 0,
+    sections: sections || [],
+    animFrame: null,
+  };
+
+  function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = containerEl.getBoundingClientRect();
+    canvasEl.width = rect.width * dpr;
+    canvasEl.height = rect.height * dpr;
+    canvasEl.style.width = rect.width + 'px';
+    canvasEl.style.height = rect.height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawPeaks() {
+    if (!state.data) return;
+    const w = containerEl.getBoundingClientRect().width;
+    const h = containerEl.getBoundingClientRect().height;
+    const barCount = state.data.length;
+    if (barCount === 0) return;
+
+    const barWidth = w / barCount;
+    const mutedColor = getComputedColor('--text-muted');
+
+    ctx.clearRect(0, 0, w, h);
+    const midY = h / 2;
+    const maxBarH = h * 0.85;
+
+    for (let i = 0; i < barCount; i++) {
+      const x = i * barWidth;
+      const barH = Math.max(1, state.data[i] * maxBarH);
+      ctx.fillStyle = mutedColor;
+      ctx.fillRect(x, midY - barH / 2, Math.max(1, barWidth - 0.5), barH);
+    }
+  }
+
+  function renderSectionLabels() {
+    while (sectionsEl.firstChild) sectionsEl.removeChild(sectionsEl.firstChild);
+    if (!state.sections.length || !state.duration) return;
+
+    state.sections.forEach(function(sec) {
+      // Tick at section boundary
+      if (sec.start > 0) {
+        var tick = document.createElement('div');
+        tick.className = 'card-wf-section-tick';
+        tick.style.left = (sec.start / state.duration * 100) + '%';
+        sectionsEl.appendChild(tick);
+      }
+
+      // Label pill
+      var lbl = document.createElement('div');
+      lbl.className = 'card-wf-section-label';
+      lbl.textContent = sec.name;
+      lbl.style.left = (sec.start / state.duration * 100) + '%';
+      lbl.addEventListener('click', function(e) {
+        e.stopPropagation();
+        audioEl.currentTime = sec.start;
+        _stopOthers(audioEl);
+        audioEl.play();
+      });
+      sectionsEl.appendChild(lbl);
+    });
+  }
+
+  // Click-to-seek on the waveform body
+  containerEl.addEventListener('click', function(e) {
+    if (e.target.classList.contains('card-wf-section-label')) return;
+    var dur = isFinite(audioEl.duration) ? audioEl.duration
+            : (state.duration > 0 ? state.duration : 0);
+    if (dur <= 0) return;
+    var rect = containerEl.getBoundingClientRect();
+    var x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    audioEl.currentTime = (x / rect.width) * dur;
+    _stopOthers(audioEl);
+    audioEl.play();
+  });
+
+  // Playhead tracking
+  function startTracking() {
+    stopTracking();
+    playhead.classList.add('active');
+    (function tick() {
+      if (audioEl.paused && !audioEl.seeking) {
+        playhead.classList.remove('active');
+        return;
+      }
+      var dur = state.duration || audioEl.duration || 0;
+      if (dur > 0) {
+        playhead.style.left = (audioEl.currentTime / dur * 100) + '%';
+      }
+      state.animFrame = requestAnimationFrame(tick);
+    })();
+  }
+
+  function stopTracking() {
+    if (state.animFrame) {
+      cancelAnimationFrame(state.animFrame);
+      state.animFrame = null;
+    }
+    playhead.classList.remove('active');
+  }
+
+  audioEl.addEventListener('play', startTracking);
+  audioEl.addEventListener('pause', stopTracking);
+  audioEl.addEventListener('ended', stopTracking);
+
+  // Render — fetch, decode, downsample, draw
+  async function render(audioUrl) {
+    try {
+      var resp = await fetch(audioUrl);
+      if (!resp.ok) return;
+      var arrayBuf = await resp.arrayBuffer();
+
+      var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+      audioCtx.close();
+
+      state.duration = audioBuf.duration;
+
+      // Mono mixdown
+      var channels = audioBuf.numberOfChannels;
+      var length = audioBuf.length;
+      var mono = new Float32Array(length);
+      for (var ch = 0; ch < channels; ch++) {
+        var chData = audioBuf.getChannelData(ch);
+        for (var s = 0; s < length; s++) {
+          mono[s] += chData[s] / channels;
+        }
+      }
+
+      // Downsample to peaks
+      resizeCanvas();
+      var barCount = Math.floor(canvasEl.width / (2 * (window.devicePixelRatio || 1)));
+      if (barCount < 1) barCount = 1;
+      var samplesPerBar = Math.floor(length / barCount);
+      state.data = new Float32Array(barCount);
+      for (var i = 0; i < barCount; i++) {
+        var peak = 0;
+        var offset = i * samplesPerBar;
+        for (var j = 0; j < samplesPerBar; j++) {
+          var abs = Math.abs(mono[offset + j] || 0);
+          if (abs > peak) peak = abs;
+        }
+        state.data[i] = peak;
+      }
+
+      drawPeaks();
+      renderSectionLabels();
+    } catch (err) {
+      console.error('Card waveform decode error:', err);
+    }
+  }
+
+  function resize() {
+    resizeCanvas();
+    drawPeaks();
+    renderSectionLabels();
+  }
+
+  function destroy() {
+    stopTracking();
+    audioEl.removeEventListener('play', startTracking);
+    audioEl.removeEventListener('pause', stopTracking);
+    audioEl.removeEventListener('ended', stopTracking);
+  }
+
+  return { data: state.data, duration: state.duration, sections: state.sections,
+           animFrame: state.animFrame, render: render, resize: resize,
+           drawPeaks: drawPeaks, destroy: destroy, _state: state };
+}
 
 // --- Integration: load waveform when audio loads in rework mode ---
 
@@ -1514,7 +1706,7 @@ document.getElementById('cancel-btn').addEventListener('click', () => {
 const _TAB_LABELS = { 'my-lyrics': 'My Lyrics', 'ai-lyrics': 'AI Lyrics', 'instrumental': 'Instrumental' };
 const _TAB_RESULT_IDS = { 'my-lyrics': 'tab-my-lyrics-results', 'ai-lyrics': 'tab-ai-lyrics-results', 'instrumental': 'tab-instrumental-results' };
 
-function createResultCard(taskId, index, result, total, fmt, label) {
+function createResultCard(taskId, index, result, total, fmt, label, sections) {
   const card = document.createElement('div');
   card.className = 'result-card';
 
@@ -1529,17 +1721,31 @@ function createResultCard(taskId, index, result, total, fmt, label) {
   audio.src = '/audio?path=' + encodeURIComponent(result.audio_url);
   card.appendChild(audio);
 
+  // Card waveform
+  const wfContainer = document.createElement('div');
+  wfContainer.className = 'card-wf-container';
+  const wfCanvas = document.createElement('canvas');
+  wfCanvas.className = 'card-wf-canvas';
+  wfContainer.appendChild(wfCanvas);
+  card.appendChild(wfContainer);
+
   const player = document.createElement('div');
   player.className = 'audio-player';
   player.innerHTML =
     '<button class="player-btn player-rewind" type="button" title="Rewind to start">⟪</button>' +
     '<button class="player-btn player-play"   type="button" title="Play">▶</button>' +
     '<button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>' +
-    '<div class="player-scrubber"><div class="player-scrubber-fill"></div></div>' +
     '<span class="player-time">0:00 / 0:00</span>' +
     `<a class="player-btn player-save" title="Save audio" href="/download/${taskId}/${index}/audio" download="acestep-${taskId.slice(0, 8)}-${index + 1}.${fmt}">⬇</a>`;
   card.appendChild(player);
   initAudioPlayer(audio, player, label);
+
+  // Initialize card waveform after layout
+  const wf = createCardWaveform(wfContainer, wfCanvas, audio, sections || []);
+  card._waveform = wf;
+  requestAnimationFrame(function() {
+    wf.render(audio.src);
+  });
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
@@ -1562,7 +1768,7 @@ function createResultCard(taskId, index, result, total, fmt, label) {
   return card;
 }
 
-function showResultCards(taskId, results, fmt) {
+async function showResultCards(taskId, results, fmt) {
   // Store per-tab result so Rework can auto-load from the active tab
   if (results.length > 0) {
     _tabAudio[_createTab] = {
@@ -1571,12 +1777,46 @@ function showResultCards(taskId, results, fmt) {
     };
   }
 
+  // Fetch section estimates (shared across batch — same lyrics/duration/BPM)
+  var sections = [];
+  var lyricsForSections = '';
+  if (_createTab === 'my-lyrics') lyricsForSections = lyricsText.value;
+  else if (_createTab === 'ai-lyrics' && results[0] && results[0].lyrics) lyricsForSections = results[0].lyrics;
+
+  if (lyricsForSections && lyricsForSections.trim()) {
+    try {
+      var bpmVal = document.getElementById('bpm').value.trim();
+      var timeSig = document.getElementById('time-sig').value;
+      var dur = Number(document.getElementById('duration').value) || 30;
+      var secRes = await fetch('/estimate-sections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lyrics: lyricsForSections,
+          duration: dur,
+          bpm: bpmVal ? parseInt(bpmVal, 10) : null,
+          time_signature: timeSig,
+        }),
+      });
+      if (secRes.ok) {
+        var secData = await secRes.json();
+        sections = secData.sections || [];
+      }
+    } catch (_) { /* sections are optional */ }
+  }
+
   const label = _TAB_LABELS[_createTab] || 'Result';
   const containerId = _TAB_RESULT_IDS[_createTab];
   const container = document.getElementById(containerId);
+
+  // Clean up existing card waveforms before replacing
+  container.querySelectorAll('.result-card').forEach(function(oldCard) {
+    if (oldCard._waveform) oldCard._waveform.destroy();
+  });
+
   container.innerHTML = '';
   results.forEach((result, i) => {
-    container.appendChild(createResultCard(taskId, i, result, results.length, fmt, label));
+    container.appendChild(createResultCard(taskId, i, result, results.length, fmt, label, sections));
   });
   container.classList.remove('hidden');
   setOutputState('now-playing');
@@ -1656,7 +1896,7 @@ generateBtn.addEventListener('click', async () => {
           wfSaveBtn.download = dlFile;
           document.getElementById('waveform-result-actions').classList.remove('hidden');
         } else {
-          showResultCards(taskId, data.results, payload.audio_format);
+          await showResultCards(taskId, data.results, payload.audio_format);
           // AI Lyrics tab — populate read-only lyrics display with what AceStep generated
           if (_createTab === 'ai-lyrics' && data.results[0] && data.results[0].lyrics) {
             aiLyricsDisplay.value = data.results[0].lyrics;

@@ -1207,6 +1207,90 @@ details[open] > .advanced-toggle {
 }
 
 /* ============================================================
+   Card Waveform (result cards)
+   ============================================================ */
+.card-wf-container {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.card-wf-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.card-wf-sections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.card-wf-section-label {
+  position: absolute;
+  top: 2px;
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.15s;
+  z-index: 3;
+}
+
+.card-wf-section-label:hover {
+  background: rgba(245, 158, 11, 0.3);
+}
+
+.card-wf-section-tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--border);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.card-wf-playhead {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--accent-bright);
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.card-wf-playhead.active {
+  opacity: 1;
+}
+
+/* Card player — time fills space left by removed scrubber */
+.result-card .player-time {
+  flex: 1;
+  text-align: right;
+}
+
+/* ============================================================
    Waveform Timeline
    ============================================================ */
 
