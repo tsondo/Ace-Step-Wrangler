@@ -9,7 +9,7 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 - **Three lyrics modes** — **My Lyrics** (write/paste/load), **AI Lyrics** (describe a song and let AceStep write the words), and **Instrumental** (no vocals)
 - **Per-tab results** — each lyrics tab keeps its own generated audio independently; switch tabs without losing your results
 - **Now Playing bar** — a persistent transport strip at the bottom shows what is playing and which tab it came from; works across all three tabs and Rework mode
-- **Friendly controls** — sliders like "Strictly follow lyrics" and "Creativity" instead of raw model parameters
+- **Friendly controls** — sliders like "Lyrical influence" and "Creativity" instead of raw model parameters
 - **Genre + mood tag picker** — click presets or type your own style description
 - **Song parameters** — set key (e.g. A minor), BPM, and time signature; appended to the AceStep prompt automatically
 - **Auto duration** — estimates song length from your lyrics and tempo using AceStep's LM planner, with a heuristic fallback
@@ -17,12 +17,10 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 - **Smart warnings** — get notified if your song duration is too short for your lyrics before you generate
 - **Rework mode** — reimagine a full song or fix and blend a selected region using the waveform editor; auto-loads from whichever lyrics tab is active
 - **DAW-style audio transport** — Play/Pause toggle, Stop, Rewind, scrubber, and save button on every player
-- **Waveform selection labels** — start/end timecodes displayed right on the waveform at selection edges
-- **Elapsed-time counter** — shows how long generation has been running so you know it hasn't stalled
 - **Advanced panel** — raw AceStep parameters (guidance scale, inference steps, scheduler, seed, batch size, audio format) still accessible for power users
 - **Dark DAW aesthetic** — feels at home next to your other music tools
 
-See the [User Guide](docs/USER_GUIDE.md) for full documentation.
+See the [User Guide](docs/USER_GUIDE.md) for full documentation, or the [Lyrics Guide](docs/LYRICS_GUIDE.md) for tips on writing lyrics that work well with ACE-Step.
 
 ## Requirements
 
@@ -146,33 +144,22 @@ ACE-Step-Wrangler/
 │   └── app.js
 └── docs/
     ├── PROJECT_PLAN.md       # Original design spec and build plan
-    └── USER_GUIDE.md         # Current user-facing documentation
+    ├── USER_GUIDE.md         # Current user-facing documentation
+    └── LYRICS_GUIDE.md       # Tips for writing lyrics that work with ACE-Step
 ```
 
 ## Compatibility
 
 - **Python:** 3.11–3.12
-- **CUDA:** up to 13 (via ACE-Step's PyTorch pins)
-- **PyTorch:** up to 2.10 (pinned by ACE-Step per platform)
+- **CUDA:** 12.8 (x86_64 / Windows), 13.0 (aarch64 Linux)
+- **PyTorch:** 2.10 (Linux / macOS), 2.7 (Windows)
 - **Platforms:** Linux x86_64, Linux aarch64, macOS Apple Silicon, Windows
 
 Wrangler itself has no GPU dependencies — GPU/platform support comes entirely from ACE-Step.
 
 ## Status
 
-Complete — all 9 build stages shipped and end-to-end tested. The full generation loop works: style + song parameters → AceStep → audio playback, download, and JSON metadata export.
-
-| Stage | Description | Status |
-|---|---|---|
-| 1 | Static HTML/CSS shell | Done |
-| 2 | Lyrics panel (file load, count) | Done |
-| 3 | Style panel (tags, mood, preview) | Done |
-| 4 | Controls column (sliders, validation) | Done |
-| 5 | FastAPI backend + AceStep wiring | Done |
-| 6 | Progress + output panel | Done |
-| 7 | Warnings system | Done |
-| 8 | Advanced panel | Done |
-| 9 | Polish pass | Done |
+Complete — all build stages shipped and end-to-end tested. The full generation loop works: style + song parameters → AceStep → audio playback, download, and JSON metadata export.
 
 ## License
 

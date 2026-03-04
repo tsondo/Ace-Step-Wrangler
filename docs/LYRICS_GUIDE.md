@@ -1,246 +1,115 @@
-# LYRICS_GUIDE.md
-Guidelines for Writing Lyrics That Ace Step Can Follow Reliably
+# Lyrics Guide for ACE-Step
 
-Ace Step’s vocal engine is melody‑first, not text‑first. It tries to sing naturally, which means it may merge lines, skip lines, reorder lines, or reinterpret words unless the lyrics are written in a way that minimizes ambiguity. This guide explains how to structure lyrics so Ace Step is most likely to sing them exactly as written.
+ACE-Step is a melody-first singing model. It prioritizes musical phrasing and expressive delivery over literal text reproduction. It may skip, merge, or reorder lines to serve the music. You can reduce this by structuring lyrics clearly, but you cannot eliminate it — ACE-Step is not a text-to-speech engine.
 
----
-
-## 1. Write One Complete Idea Per Line
-Ace Step treats each line as a musical phrase. If a line feels incomplete or too short, the model may merge it with the next line. If two lines feel like one idea, it may drop the boundary.
-
-**Good:**
-My voice grew stronger when I started creating  
-A new spark rose inside me with steady warmth  
-
-**Avoid:**
-My voice grew stronger  
-When I started creating  
-
-Short lines invite merging.
+Note: The "Lyrical influence" slider controls how much your lyrics shape the mood and feel of the generated music. It does not affect how accurately ACE-Step sings the words.
 
 ---
 
-## 2. Avoid Rhymes and Near‑Rhymes
-Rhymes cause the model to smooth lines together or reorder them to create a more “musical” pattern.
+## Structure
 
-**Avoid:**
-fear / near  
-me / see  
-light / night  
+**Use section tags.** Tags tell ACE-Step how to shape energy and dynamics over time.
 
-**Prefer:**
-fear / forward  
-me / create  
-light / motion  
+```
+[Intro]
 
-Distinct vowel shapes reduce merging.
+[Verse 1]
+Walking down the empty road
+Counting every step I take
 
----
+[Chorus]
+We are the ones who stayed behind
+Standing where the rivers meet
 
-## 3. Make Each Line Structurally Different
-If two lines begin the same way, Ace Step may treat them as duplicates and skip one.
+[Verse 2]
+Morning comes without a sound
+Nothing left but open sky
 
-**Avoid:**
-I walked through the day with a quiet mind  
-I walked through the night with a quiet heart  
+[Bridge]
+If the world forgets our name
+We will carve it in the stone
 
-**Prefer:**
-I walked through the day with a quiet mind  
-The night brought a stillness that felt familiar  
+[Chorus]
+We are the ones who stayed behind
+Standing where the rivers meet
 
-Different openings = safer alignment.
+[Outro]
+```
 
----
+Numbered verses (`[Verse 1]`, `[Verse 2]`) work fine. Tags like `[Pre-Chorus]`, `[Bridge]`, `[Instrumental]`, `[Guitar Solo]`, `[Fade Out]` are all recognized.
 
-## 4. Avoid Punctuation Entirely
-Punctuation encourages the model to reinterpret phrasing.
+You can add hints to tags for finer control: `[Chorus - anthemic]`, `[Verse - whispered]`. Keep hints short — put detailed style descriptions in the caption instead.
 
-**Avoid:**
-I felt a spark, rising inside me  
-I felt a spark rising inside me.  
-
-**Prefer:**
-I felt a spark rising inside me  
-
-Clean text = stable alignment.
+**Leave a blank line between sections.** This reinforces boundaries.
 
 ---
 
-## 5. Avoid Contractions
-Contractions create unstable phoneme clusters.
+## Line Length
 
-**Avoid:**
-I’m  
-don’t  
-can’t  
-you’re  
+Aim for **6-10 syllables per line**. This matches natural sung phrasing and gives ACE-Step the best chance of aligning syllables to beats. Keep syllable counts roughly consistent within a section (within 1-2 syllables).
 
-**Prefer:**
-I am  
-do not  
-cannot  
-you are  
-
-This reduces slurring and dropped syllables.
+Lines that are too short may get merged with the next line. Lines that are too long may get truncated or rushed.
 
 ---
 
-## 6. Use Phonetic Spellings for Unstable Words
-Some words are consistently mispronounced or stylized. Spell them phonetically.
+## Line Independence
 
-**Examples:**
-AI → Ay Eye  
-alive → a live  
-electric → e lek trik  
-higher → hi er  
+Each line should feel like a complete phrase. If a line reads like the continuation of the previous one, ACE-Step may merge them.
 
-This forces clear articulation.
+Vary how lines begin — if two lines start with the same words, the model may treat one as a duplicate and skip it.
 
 ---
 
-## 7. Keep Lines Long Enough to Feel “Singable”
-Lines that are too short get merged. Lines that are too long get truncated.
+## Formatting
 
-**Target length:**  
-10–14 syllables per line is the most stable range.
+**UPPERCASE** signals emphasis or shouting: `WE ARE THE CHAMPIONS` vs `walking through the streets`.
 
-This gives the model enough material to treat each line as a complete phrase.
+**Parentheses** mark background vocals or echoes: `We rise together (together)`.
 
----
-
-## 8. Avoid Semantic Continuations Across Lines
-If line B feels like the natural continuation of line A, the model may merge them.
-
-**Avoid:**
-I opened the door to a new way of thinking  
-And then I stepped inside to explore the space  
-
-**Prefer:**
-I opened the door to a new way of thinking  
-A calm steady light filled the room around me  
-
-Distinct ideas = distinct lines.
+**Avoid forced or inconsistent rhyme schemes.** Natural rhymes are fine, but forcing rhymes or switching patterns mid-section can cause the model to reorder or smooth lines unpredictably.
 
 ---
 
-## 9. Use Clear Section Headers
-Ace Step respects section boundaries more than CFG values.
+## Vocabulary
 
-Use:
-[Verse]  
-[Chorus]  
-[Pre Chorus]  
-[Bridge]  
-[Outro]  
+Use varied language across sections. When the same emotionally loaded words (rise, light, dream, fire) appear in multiple sections, ACE-Step is more likely to drift or shuffle lines between them.
 
-Do not include bar counts or numbers in the header. The model may sing them.
+Give each section its own distinct emotional territory.
 
 ---
 
-## 10. Avoid Repeated Words at the Start of Lines
-Repeated openings cause deduplication.
+## Phonetic Spellings
 
-**Avoid:**
-Now I rise  
-Now I see  
-Now I feel  
+If a word is consistently mispronounced, try spelling it phonetically:
+- AI → Ay Eye
+- higher → hi er
 
-**Prefer:**
-Now I rise  
-A new sense of motion fills my mind  
-The world feels open in a new way  
-
-Variety prevents skipping.
+This is experimental — results vary.
 
 ---
 
-## 11. Keep Style Conditioning Simple
-The more style detail you give, the more freedom the model takes.
+## Caption Matters More Than You Think
 
-For maximum fidelity, use:
-Clean pop vocal  
-No melisma  
-No ad libs  
-Sing lines exactly as written  
+The caption (style description) is the single most important input affecting the generated music. Be specific about genre, instruments, mood, and production style. Vague captions give the model too much freedom; detailed captions anchor it.
 
-Instrumentation can be described separately.
+See the upstream [Songwriting Guide](../vendor/ACE-Step-1.5/.claude/skills/acestep-songwriting/SKILL.md) for caption-writing principles.
 
 ---
 
-## 12. Use Moderate CFG and Moderate Inference Steps
-High CFG causes skipping and reordering.  
-Low CFG causes improvisation.
+## Expect Some Drift
 
-**Recommended:**
-lyrics_cfg: 6–8  
-inference_steps: 20–30  
-
-Higher steps polish pronunciation but do not improve obedience.
+Even with perfect formatting, ACE-Step will always prioritize musical expression over literal reproduction. Literal fidelity can be improved but never guaranteed. Generate in batches (2-4 variations) and pick the best result — this is faster than trying to engineer one perfect output.
 
 ---
 
-## 13. Avoid Internal Rhythmic Patterns
-If lines share rhythm or cadence, the model may reorder them to create a “better” musical flow.
+## Quick Checklist
 
-Vary:
-- stress patterns  
-- vowel shapes  
-- line length slightly  
-- semantic domains  
-
-This prevents smoothing.
-
----
-
-## 14. Keep Each Line Semantically Self‑Contained
-Ace Step tries to “fix” lines that feel incomplete.
-
-**Avoid:**
-I reached for the light  
-that rose inside me  
-
-**Prefer:**
-I reached for the light rising inside me  
-
-One line = one idea.
-
----
-
-## 15. Test Small Sections Before Writing a Full Song
-Ace Step’s alignment behavior is predictable.  
-Test:
-- a verse  
-- a chorus  
-- a bridge  
-
-Then adjust your writing style before committing to a full lyric sheet.
-
----
-
-## 16. Expect Some Drift
-Even with perfect formatting, Ace Step is not a text‑to‑speech engine. It is a singing model. It will always prioritize:
-- melodic phrasing  
-- vowel smoothing  
-- expressive delivery  
-
-Literal fidelity can be maximized, not guaranteed.
-
----
-
-## Summary Checklist
-- One complete idea per line  
-- No rhymes  
-- No punctuation  
-- No contractions  
-- Distinct line openings  
-- 10–14 syllables per line  
-- Phonetic spellings for unstable words  
-- Clear section headers  
-- Moderate CFG  
-- Moderate inference steps  
-- Avoid semantic continuations  
-- Avoid repeated rhythmic patterns  
-- Keep style conditioning simple  
-
-Following these guidelines will give Ace Step the highest chance of singing your lyrics exactly as written while still allowing expressive, musical performance.
-
+- Use section tags (`[Verse]`, `[Chorus]`, `[Bridge]`, etc.)
+- Blank line between sections
+- 6-10 syllables per line
+- Each line is a complete thought
+- Vary line openings
+- Vary vocabulary across sections
+- UPPERCASE for emphasis, (parentheses) for backing vocals
+- Detailed, specific caption
+- Generate in batches and pick the best

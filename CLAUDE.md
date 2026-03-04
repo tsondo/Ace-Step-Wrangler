@@ -58,7 +58,7 @@ These friendly UI controls map to AceStep parameters:
 | UI Label | AceStep Param | Notes |
 |---|---|---|
 | Duration | `audio_duration` | Warn if lyrics likely won't fit |
-| Strictly follow lyrics | `guidance_scale` (lyric) | |
+| Lyrical influence | `guidance_scale` (lyric) | Controls how much lyrics shape mood/feel, not word-for-word fidelity |
 | Creativity | `guidance_scale` (audio) / temperature | |
 | Polished / Raw | `num_inference_steps` | |
 | Seed | `seed` | Advanced panel only |

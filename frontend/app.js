@@ -226,7 +226,7 @@ function updateSlider(slider) {
       break;
     }
     case 'lyric-adherence':
-      valueEl.textContent = ['Loose', 'Med', 'Strict'][val];
+      valueEl.textContent = ['Little', 'Some', 'Strong'][val];
       break;
     case 'creativity':
       valueEl.textContent = `${val}%`;
