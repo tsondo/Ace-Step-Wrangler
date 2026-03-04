@@ -21,7 +21,7 @@ import mimetypes
 import uvicorn
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
 
 from fastapi import FastAPI, HTTPException, UploadFile
@@ -111,11 +111,15 @@ class GenerateRequest(BaseModel):
     vocal_language: str           = "en"
 
     # Rework mode
-    task_type:             str             = "text2music"  # text2music | cover | repaint
+    task_type:             str             = "text2music"  # text2music | cover | repaint | extract | lego | complete
     src_audio_path:        Optional[str]   = None
     audio_cover_strength:  Optional[float] = None          # 0.0–1.0 for cover
     repainting_start:      Optional[float] = None          # seconds, for repaint
     repainting_end:        Optional[float] = None          # seconds, for repaint
+
+    # Analyze mode (extract / lego / complete)
+    track_name:    Optional[str]       = None   # single track for extract/lego
+    track_classes: Optional[List[str]] = None   # multiple tracks for complete
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -177,8 +181,8 @@ def _build_payload(req: GenerateRequest) -> dict:
     if model_name:
         payload["model"] = model_name
 
-    # Rework params
-    if req.task_type in ("cover", "repaint"):
+    # Rework / Analyze params
+    if req.task_type in ("cover", "repaint", "extract", "lego", "complete"):
         payload["task_type"] = req.task_type
         if req.src_audio_path:
             payload["src_audio_path"] = req.src_audio_path
@@ -189,6 +193,10 @@ def _build_payload(req: GenerateRequest) -> dict:
                 payload["repainting_start"] = req.repainting_start
             if req.repainting_end is not None:
                 payload["repainting_end"] = req.repainting_end
+        if req.track_name:
+            payload["track_name"] = req.track_name
+        if req.track_classes:
+            payload["track_classes"] = req.track_classes
 
     return payload
 

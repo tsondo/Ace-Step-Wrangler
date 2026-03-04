@@ -217,6 +217,88 @@
         </div>
       </div>
 
+      <!-- Analyze mode panel -->
+      <div id="analyze-panel" class="mode-panel hidden">
+        <h2 class="panel-title">Analyze</h2>
+
+        <!-- Audio upload zone -->
+        <div class="audio-upload-zone" id="analyze-upload-zone">
+          <div class="upload-prompt" id="analyze-upload-prompt">
+            <span class="upload-icon">♫</span>
+            <span class="upload-label">Drop audio here or</span>
+            <button class="ghost-btn" id="analyze-browse-btn" type="button">Browse</button>
+          </div>
+          <div class="upload-loaded hidden" id="analyze-upload-loaded">
+            <div class="upload-file-info">
+              <span class="upload-filename" id="analyze-upload-filename"></span>
+              <span class="upload-duration" id="analyze-upload-duration"></span>
+            </div>
+            <audio id="analyze-audio-preview"></audio>
+            <div class="audio-player" id="analyze-audio-player">
+              <button class="player-btn player-rewind" type="button" title="Rewind to start">⟪</button>
+              <button class="player-btn player-play"   type="button" title="Play">▶</button>
+              <button class="player-btn player-stop"   type="button" title="Stop" disabled>⏹</button>
+              <div class="player-scrubber">
+                <div class="player-scrubber-fill"></div>
+              </div>
+              <span class="player-time">0:00 / 0:00</span>
+            </div>
+            <button class="ghost-btn" id="analyze-remove-btn" type="button">Remove</button>
+          </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Sub-mode selector -->
+        <span class="tag-group-label">Operation</span>
+        <div class="approach-grid">
+          <button class="approach-btn active" data-analyze="extract">Extract (isolate a stem)</button>
+          <button class="approach-btn" data-analyze="lego">Lego (replace a track)</button>
+          <button class="approach-btn" data-analyze="complete">Complete (fill missing tracks)</button>
+        </div>
+
+        <!-- Track name dropdown (Extract / Lego) -->
+        <div class="control-group" id="analyze-track-group">
+          <label class="field-label" for="analyze-track">Track</label>
+          <select id="analyze-track" class="select-input">
+            <option value="vocals">Vocals</option>
+            <option value="backing_vocals">Backing Vocals</option>
+            <option value="drums">Drums</option>
+            <option value="bass">Bass</option>
+            <option value="guitar">Guitar</option>
+            <option value="keyboard">Keyboard</option>
+            <option value="strings">Strings</option>
+            <option value="brass">Brass</option>
+            <option value="woodwinds">Woodwinds</option>
+            <option value="synth">Synth</option>
+            <option value="percussion">Percussion</option>
+            <option value="fx">FX</option>
+          </select>
+        </div>
+
+        <!-- Track classes multi-select (Complete) -->
+        <div class="control-group hidden" id="analyze-tracks-multi">
+          <label class="field-label">Tracks to fill</label>
+          <div class="track-classes-grid">
+            <button class="tag track-class-tag" data-track="vocals">Vocals</button>
+            <button class="tag track-class-tag" data-track="backing_vocals">Backing Vocals</button>
+            <button class="tag track-class-tag" data-track="drums">Drums</button>
+            <button class="tag track-class-tag" data-track="bass">Bass</button>
+            <button class="tag track-class-tag" data-track="guitar">Guitar</button>
+            <button class="tag track-class-tag" data-track="keyboard">Keyboard</button>
+            <button class="tag track-class-tag" data-track="strings">Strings</button>
+            <button class="tag track-class-tag" data-track="brass">Brass</button>
+            <button class="tag track-class-tag" data-track="woodwinds">Woodwinds</button>
+            <button class="tag track-class-tag" data-track="synth">Synth</button>
+            <button class="tag track-class-tag" data-track="percussion">Percussion</button>
+            <button class="tag track-class-tag" data-track="fx">FX</button>
+          </div>
+        </div>
+
+        <p class="panel-hint analyze-track-hint" id="analyze-track-hint">Isolates the selected stem from the mix</p>
+        <p class="panel-hint analyze-note">Requires base generation model</p>
+      </div>
+
     </section>
 
     <!-- Center: Lyrics -->
@@ -225,6 +307,7 @@
         <div class="mode-selector" role="tablist" aria-label="Task mode">
           <button class="mode-btn active" data-mode="create" role="tab" aria-selected="true">Create</button>
           <button class="mode-btn" data-mode="rework" role="tab" aria-selected="false">Rework</button>
+          <button class="mode-btn" data-mode="analyze" role="tab" aria-selected="false">Analyze</button>
         </div>
         <div class="create-tabs" role="tablist">
           <button class="create-tab active" data-tab="my-lyrics" role="tab" aria-selected="true">My Lyrics</button>
@@ -311,6 +394,33 @@
       <div id="tab-instrumental" class="create-tab-content hidden">
         <p class="instrumental-note">No lyrics — AceStep will generate an instrumental track from your style settings.</p>
         <div class="tab-result-area hidden" id="tab-instrumental-results"></div>
+      </div>
+
+      <!-- Tab: Analyze (shown when Analyze mode is active) -->
+      <div id="tab-analyze" class="create-tab-content hidden">
+        <div class="field-group">
+          <label class="field-label" for="analyze-description">Description</label>
+          <textarea id="analyze-description" class="text-input"
+            placeholder="Describe the result you want…" rows="3"></textarea>
+        </div>
+
+        <!-- Source waveform (dimmed) -->
+        <div class="analyze-wf-section hidden" id="analyze-wf-source-section">
+          <span class="analyze-wf-label">Source</span>
+          <div class="analyze-wf-container" id="analyze-wf-source">
+            <canvas class="analyze-wf-canvas" id="analyze-wf-source-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Result waveform (diff-colored) -->
+        <div class="analyze-wf-section hidden" id="analyze-wf-result-section">
+          <span class="analyze-wf-label">Result</span>
+          <div class="analyze-wf-container" id="analyze-wf-result">
+            <canvas class="analyze-wf-canvas" id="analyze-wf-result-canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="tab-result-area hidden" id="tab-analyze-results"></div>
       </div>
     </section>
 

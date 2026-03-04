@@ -255,10 +255,12 @@ document.getElementById('duration').addEventListener('input', checkLyricsWarning
 // ===== Mode selector (Create / Rework) =====
 
 let _currentMode = 'create';
+let _savedGenModel = null;   // stashed gen-model value when analyze locks it to base
 
-const modeBtns     = document.querySelectorAll('.mode-btn');
-const createPanel  = document.getElementById('create-panel');
-const reworkPanel  = document.getElementById('rework-panel');
+const modeBtns      = document.querySelectorAll('.mode-btn');
+const createPanel   = document.getElementById('create-panel');
+const reworkPanel   = document.getElementById('rework-panel');
+const analyzePanel  = document.getElementById('analyze-panel');
 
 function switchMode(mode) {
   // Block mode switch during active generation
@@ -273,11 +275,41 @@ function switchMode(mode) {
   });
   createPanel.classList.toggle('hidden', mode !== 'create');
   reworkPanel.classList.toggle('hidden', mode !== 'rework');
+  analyzePanel.classList.toggle('hidden', mode !== 'analyze');
 
-  // Waveform: clear when switching to create
-  if (mode === 'create') {
+  // Show/hide create tabs — only visible in create and rework modes
+  document.querySelector('.create-tabs').classList.toggle('hidden', mode === 'analyze');
+
+  // Center column: hide all create tab content when in analyze mode
+  if (mode === 'analyze') {
+    document.getElementById('tab-my-lyrics').classList.add('hidden');
+    document.getElementById('tab-ai-lyrics').classList.add('hidden');
+    document.getElementById('tab-instrumental').classList.add('hidden');
+    document.getElementById('tab-analyze').classList.remove('hidden');
+  } else {
+    document.getElementById('tab-analyze').classList.add('hidden');
+    // Restore the active create tab
+    switchCreateTab(_createTab);
+  }
+
+  // Waveform: clear when switching to create or analyze
+  if (mode === 'create' || mode === 'analyze') {
     clearWaveform();
     setOutputState('now-playing');
+  }
+
+  // Lock gen-model to base in Analyze mode; restore on exit
+  const genModelEl = document.getElementById('gen-model');
+  if (mode === 'analyze') {
+    if (_savedGenModel === null) _savedGenModel = genModelEl.value;
+    genModelEl.value = 'base';
+    genModelEl.disabled = true;
+    updateBatchLimit();
+  } else if (_savedGenModel !== null) {
+    genModelEl.value = _savedGenModel;
+    genModelEl.disabled = false;
+    _savedGenModel = null;
+    updateBatchLimit();
   }
 
   updateControlsForMode(mode);
@@ -289,6 +321,9 @@ function updateControlsForMode(mode) {
   if (genBtn && !genBtn.disabled) {
     if (mode === 'create') {
       genBtn.textContent = '▶ Generate';
+    } else if (mode === 'analyze') {
+      const labels = { extract: '▶ Extract', lego: '▶ Replace Track', complete: '▶ Complete' };
+      genBtn.textContent = labels[_analyzeMode] || '▶ Analyze';
     } else {
       genBtn.textContent = _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Fix & Blend';
     }
@@ -335,6 +370,305 @@ modeBtns.forEach(btn =>
     }
   })
 );
+
+// ===== Analyze mode — state & sub-mode switching =====
+
+let _analyzeMode = 'extract';       // 'extract' | 'lego' | 'complete'
+let _analyzeAudioPath = null;
+let _analyzeAudioDuration = null;
+
+const analyzeAudioPreview   = document.getElementById('analyze-audio-preview');
+const analyzeUploadZone     = document.getElementById('analyze-upload-zone');
+const analyzeUploadPrompt   = document.getElementById('analyze-upload-prompt');
+const analyzeUploadLoaded   = document.getElementById('analyze-upload-loaded');
+
+// Init audio player for analyze preview
+initAudioPlayer(analyzeAudioPreview, document.getElementById('analyze-audio-player'), 'Analyze');
+
+const _VOCAL_TRACKS = new Set(['vocals', 'backing_vocals']);
+
+function updateAnalyzeTrackHint() {
+  const hint = document.getElementById('analyze-track-hint');
+  if (_analyzeMode === 'extract') {
+    hint.textContent = 'Isolates the selected stem from the mix';
+  } else if (_analyzeMode === 'lego') {
+    const track = document.getElementById('analyze-track').value;
+    hint.textContent = _VOCAL_TRACKS.has(track)
+      ? 'Generates AI vocal elements to replace this track — melodic, not sung lyrics'
+      : 'Generates a new version of this track to fit the mix';
+  } else {
+    const selected = getSelectedTrackClasses();
+    const hasVocal = selected.some(t => _VOCAL_TRACKS.has(t));
+    hint.textContent = hasVocal
+      ? 'Vocal tracks produce AI-generated melodic elements, not sung lyrics'
+      : selected.length > 0
+        ? 'Generates the selected tracks to fill out the arrangement'
+        : 'Select tracks to add to the mix';
+  }
+}
+
+function switchAnalyzeMode(mode) {
+  _analyzeMode = mode;
+  document.querySelectorAll('[data-analyze]').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.analyze === mode)
+  );
+
+  // Extract & Lego: single track dropdown; Complete: multi-select tags
+  document.getElementById('analyze-track-group').classList.toggle('hidden', mode === 'complete');
+  document.getElementById('analyze-tracks-multi').classList.toggle('hidden', mode !== 'complete');
+
+  updateAnalyzeTrackHint();
+  updateControlsForMode(_currentMode);
+  updateGenerateState();
+}
+
+document.querySelectorAll('[data-analyze]').forEach(btn =>
+  btn.addEventListener('click', () => switchAnalyzeMode(btn.dataset.analyze))
+);
+
+// Track class tag toggles (Complete mode multi-select)
+document.querySelectorAll('.track-class-tag').forEach(tag => {
+  tag.addEventListener('click', () => {
+    tag.classList.toggle('active');
+    updateAnalyzeTrackHint();
+    updateGenerateState();
+  });
+});
+
+// Track dropdown change → update hint (vocal vs instrument context)
+document.getElementById('analyze-track').addEventListener('change', updateAnalyzeTrackHint);
+
+function getSelectedTrackClasses() {
+  return [...document.querySelectorAll('.track-class-tag.active')].map(t => t.dataset.track);
+}
+
+// --- Analyze waveform displays ---
+
+let _analyzeSourcePeaks = null;  // Float32Array of source audio peaks
+
+/**
+ * Decode an audio URL into a Float32Array of peak amplitudes.
+ * @param {string} audioUrl
+ * @param {number} barCount  Number of bars to downsample to
+ * @returns {Promise<Float32Array>}
+ */
+async function decodeAudioPeaks(audioUrl, barCount) {
+  const resp = await fetch(audioUrl);
+  if (!resp.ok) throw new Error(resp.statusText);
+  const arrayBuf = await resp.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+  audioCtx.close();
+
+  const channels = audioBuf.numberOfChannels;
+  const length = audioBuf.length;
+  const mono = new Float32Array(length);
+  for (let ch = 0; ch < channels; ch++) {
+    const data = audioBuf.getChannelData(ch);
+    for (let i = 0; i < length; i++) mono[i] += data[i] / channels;
+  }
+
+  if (barCount < 1) barCount = 1;
+  const samplesPerBar = Math.floor(length / barCount);
+  const peaks = new Float32Array(barCount);
+  for (let i = 0; i < barCount; i++) {
+    let peak = 0;
+    const offset = i * samplesPerBar;
+    for (let j = 0; j < samplesPerBar; j++) {
+      const abs = Math.abs(mono[offset + j] || 0);
+      if (abs > peak) peak = abs;
+    }
+    peaks[i] = peak;
+  }
+  return peaks;
+}
+
+function drawAnalyzeWaveform(canvasEl, containerEl, peaks, colorFn) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = containerEl.getBoundingClientRect();
+  canvasEl.width = rect.width * dpr;
+  canvasEl.height = rect.height * dpr;
+  canvasEl.style.width = rect.width + 'px';
+  canvasEl.style.height = rect.height + 'px';
+  const ctx = canvasEl.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = rect.width;
+  const h = rect.height;
+  const barCount = peaks.length;
+  if (barCount === 0) return;
+
+  const barWidth = w / barCount;
+  const midY = h / 2;
+  const maxBarH = h * 0.85;
+
+  ctx.clearRect(0, 0, w, h);
+  for (let i = 0; i < barCount; i++) {
+    const x = i * barWidth;
+    const barH = Math.max(1, peaks[i] * maxBarH);
+    ctx.fillStyle = colorFn(i);
+    ctx.fillRect(x, midY - barH / 2, Math.max(1, barWidth - 0.5), barH);
+  }
+}
+
+async function renderAnalyzeSourceWaveform(audioUrl) {
+  const section = document.getElementById('analyze-wf-source-section');
+  const container = document.getElementById('analyze-wf-source');
+  const canvas = document.getElementById('analyze-wf-source-canvas');
+  section.classList.remove('hidden');
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+  const barCount = Math.max(1, Math.floor((rect.width * dpr) / (2 * dpr)));
+
+  try {
+    _analyzeSourcePeaks = await decodeAudioPeaks(audioUrl, barCount);
+    const mutedColor = getComputedColor('--text-muted');
+    drawAnalyzeWaveform(canvas, container, _analyzeSourcePeaks, () => mutedColor);
+  } catch (err) {
+    console.error('Analyze source waveform error:', err);
+  }
+}
+
+async function renderAnalyzeResultWaveform(resultAudioUrl) {
+  const section = document.getElementById('analyze-wf-result-section');
+  const container = document.getElementById('analyze-wf-result');
+  const canvas = document.getElementById('analyze-wf-result-canvas');
+  section.classList.remove('hidden');
+
+  const barCount = _analyzeSourcePeaks ? _analyzeSourcePeaks.length : 200;
+
+  try {
+    const resultPeaks = await decodeAudioPeaks(resultAudioUrl, barCount);
+
+    // Compute per-bar difference and normalize
+    const diffs = new Float32Array(barCount);
+    let maxDiff = 0;
+    for (let i = 0; i < barCount; i++) {
+      const srcPeak = _analyzeSourcePeaks ? (_analyzeSourcePeaks[i] || 0) : 0;
+      diffs[i] = Math.abs(resultPeaks[i] - srcPeak);
+      if (diffs[i] > maxDiff) maxDiff = diffs[i];
+    }
+
+    // Parse muted and accent colors for interpolation
+    const mutedHex = getComputedColor('--text-muted');
+    const accentHex = getComputedColor('--accent');
+    const mRgb = hexToRgb(mutedHex);
+    const aRgb = hexToRgb(accentHex);
+
+    drawAnalyzeWaveform(canvas, container, resultPeaks, (i) => {
+      if (maxDiff === 0) return mutedHex;
+      const t = diffs[i] / maxDiff;
+      // Ease the transition so only strong diffs shift noticeably
+      const e = t * t;
+      const r = Math.round(mRgb[0] + (aRgb[0] - mRgb[0]) * e);
+      const g = Math.round(mRgb[1] + (aRgb[1] - mRgb[1]) * e);
+      const b = Math.round(mRgb[2] + (aRgb[2] - mRgb[2]) * e);
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    });
+  } catch (err) {
+    console.error('Analyze result waveform error:', err);
+  }
+}
+
+function hexToRgb(hex) {
+  // Handle both #rrggbb and named/rgb() colors
+  if (hex.startsWith('#')) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  // Fallback: parse rgb(r, g, b)
+  const m = hex.match(/(\d+)/g);
+  return m ? [+m[0], +m[1], +m[2]] : [107, 107, 132];
+}
+
+function clearAnalyzeWaveforms() {
+  _analyzeSourcePeaks = null;
+  document.getElementById('analyze-wf-source-section').classList.add('hidden');
+  document.getElementById('analyze-wf-result-section').classList.add('hidden');
+}
+
+// --- Analyze audio upload ---
+
+function handleAnalyzeAudioUpload(file) {
+  if (!file || !file.type.startsWith('audio/')) {
+    const hint = document.getElementById('generate-hint');
+    if (hint) hint.textContent = 'Only audio files are supported.';
+    return;
+  }
+
+  const objUrl = URL.createObjectURL(file);
+  analyzeAudioPreview.src = objUrl;
+  analyzeAudioPreview.onloadedmetadata = () => {
+    _analyzeAudioDuration = analyzeAudioPreview.duration;
+    document.getElementById('analyze-upload-duration').textContent =
+      formatDuration(analyzeAudioPreview.duration);
+  };
+
+  document.getElementById('analyze-upload-filename').textContent = file.name;
+  analyzeUploadPrompt.classList.add('hidden');
+  analyzeUploadLoaded.classList.remove('hidden');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  fetch('/upload-audio', { method: 'POST', body: formData })
+    .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+    .then(data => {
+      _analyzeAudioPath = data.path;
+      updateGenerateState();
+      renderAnalyzeSourceWaveform('/audio?path=' + encodeURIComponent(data.path));
+    })
+    .catch(err => {
+      removeAnalyzeAudio();
+      const hint = document.getElementById('generate-hint');
+      if (hint) hint.textContent = 'Upload failed: ' + err.message;
+    });
+}
+
+function removeAnalyzeAudio() {
+  _analyzeAudioPath = null;
+  _analyzeAudioDuration = null;
+  analyzeAudioPreview.src = '';
+  document.getElementById('analyze-upload-filename').textContent = '';
+  document.getElementById('analyze-upload-duration').textContent = '';
+  analyzeUploadPrompt.classList.remove('hidden');
+  analyzeUploadLoaded.classList.add('hidden');
+  clearAnalyzeWaveforms();
+  updateGenerateState();
+}
+
+document.getElementById('analyze-browse-btn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'audio/*';
+  input.addEventListener('change', () => {
+    if (input.files[0]) handleAnalyzeAudioUpload(input.files[0]);
+  });
+  input.click();
+});
+
+document.getElementById('analyze-remove-btn').addEventListener('click', removeAnalyzeAudio);
+
+// Drag-and-drop on analyze upload zone
+analyzeUploadZone.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  analyzeUploadZone.classList.add('drag-over');
+});
+analyzeUploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+analyzeUploadZone.addEventListener('dragleave', (e) => {
+  if (!analyzeUploadZone.contains(e.relatedTarget)) {
+    analyzeUploadZone.classList.remove('drag-over');
+  }
+});
+analyzeUploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  analyzeUploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleAnalyzeAudioUpload(file);
+});
 
 // ===== Rework panel — audio upload, approach selector =====
 
@@ -448,8 +782,8 @@ audioUploadZone.addEventListener('drop', (e) => {
   if (file) handleAudioUpload(file);
 });
 
-// Approach selector
-const approachBtns       = document.querySelectorAll('.approach-btn');
+// Approach selector (scoped to rework panel — analyze has its own buttons)
+const approachBtns       = document.querySelectorAll('#rework-panel .approach-btn');
 const coverStrengthGroup = document.getElementById('cover-strength-group');
 const regionInputs       = document.getElementById('region-inputs');
 
@@ -520,7 +854,7 @@ const styleText    = document.getElementById('style-text');
 
 /** Returns the combined style prompt (tags + custom text) for the AceStep `style` field. */
 function getStylePrompt() {
-  const tags   = [...document.querySelectorAll('.tag.active')].map(t => t.textContent.trim()).join(', ');
+  const tags   = [...document.querySelectorAll('.tag.active:not(.track-class-tag)')].map(t => t.textContent.trim()).join(', ');
   const custom = styleText.value.trim();
   if (tags && custom) return `${tags} — ${custom}`;
   return tags || custom;
@@ -544,7 +878,7 @@ function getSongParamsSummary() {
 }
 
 function updateStyleState() {
-  const selected = document.querySelectorAll('.tag.active');
+  const selected = document.querySelectorAll('.tag.active:not(.track-class-tag)');
   const n = selected.length;
 
   // Tag count badge
@@ -572,7 +906,7 @@ function updateStyleState() {
   }
 }
 
-document.querySelectorAll('.tag').forEach(tag => {
+document.querySelectorAll('.tag:not(.track-class-tag)').forEach(tag => {
   tag.addEventListener('click', () => {
     tag.classList.toggle('active');
     updateStyleState();
@@ -580,7 +914,7 @@ document.querySelectorAll('.tag').forEach(tag => {
 });
 
 document.getElementById('clear-tags-btn').addEventListener('click', () => {
-  document.querySelectorAll('.tag.active').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tag.active:not(.track-class-tag)').forEach(t => t.classList.remove('active'));
   updateStyleState();
 });
 
@@ -1291,6 +1625,13 @@ const debouncedWaveformResize = debounce(() => {
       card._waveform.resize();
     }
   });
+  // Resize analyze source waveform
+  if (_analyzeSourcePeaks) {
+    const srcContainer = document.getElementById('analyze-wf-source');
+    const srcCanvas = document.getElementById('analyze-wf-source-canvas');
+    const mutedColor = getComputedColor('--text-muted');
+    drawAnalyzeWaveform(srcCanvas, srcContainer, _analyzeSourcePeaks, () => mutedColor);
+  }
 }, 200);
 window.addEventListener('resize', debouncedWaveformResize);
 
@@ -1537,6 +1878,9 @@ const generateBtn  = document.getElementById('generate-btn');
 const generateHint = document.getElementById('generate-hint');
 
 function hasContent() {
+  if (_currentMode === 'analyze') {
+    return !!_analyzeAudioPath;
+  }
   if (_currentMode === 'rework') {
     return !!_uploadedAudioPath;
   }
@@ -1555,7 +1899,7 @@ function updateGenerateState() {
     generateHint.textContent = '';
   } else {
     generateBtn.classList.remove('ready');
-    if (_currentMode === 'rework') {
+    if (_currentMode === 'rework' || _currentMode === 'analyze') {
       generateHint.textContent = 'Upload audio to get started.';
     }
   }
@@ -1627,7 +1971,24 @@ function buildReworkPayload() {
   return payload;
 }
 
+function buildAnalyzePayload() {
+  const payload = {
+    ...buildSharedPayload(),
+    task_type: _analyzeMode,
+    src_audio_path: _analyzeAudioPath,
+    style: document.getElementById('analyze-description').value.trim(),
+  };
+  if (_analyzeMode === 'extract' || _analyzeMode === 'lego') {
+    payload.track_name = document.getElementById('analyze-track').value;
+  }
+  if (_analyzeMode === 'complete') {
+    payload.track_classes = getSelectedTrackClasses();
+  }
+  return payload;
+}
+
 function buildPayload() {
+  if (_currentMode === 'analyze') return buildAnalyzePayload();
   return _currentMode === 'rework' ? buildReworkPayload() : buildCreatePayload();
 }
 
@@ -1650,6 +2011,10 @@ function setOutputState(state) {
 }
 
 function getGenerateLabel() {
+  if (_currentMode === 'analyze') {
+    const labels = { extract: '▶ Extract', lego: '▶ Replace Track', complete: '▶ Complete' };
+    return labels[_analyzeMode] || '▶ Analyze';
+  }
   if (_currentMode === 'rework') {
     return _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Fix & Blend';
   }
@@ -1686,12 +2051,40 @@ document.getElementById('cancel-btn').addEventListener('click', () => {
   setOutputState('now-playing');
 });
 
-const _TAB_LABELS = { 'my-lyrics': 'My Lyrics', 'ai-lyrics': 'AI Lyrics', 'instrumental': 'Instrumental' };
-const _TAB_RESULT_IDS = { 'my-lyrics': 'tab-my-lyrics-results', 'ai-lyrics': 'tab-ai-lyrics-results', 'instrumental': 'tab-instrumental-results' };
+const _TAB_LABELS = { 'my-lyrics': 'My Lyrics', 'ai-lyrics': 'AI Lyrics', 'instrumental': 'Instrumental', 'analyze': 'Analyze' };
+const _TAB_RESULT_IDS = { 'my-lyrics': 'tab-my-lyrics-results', 'ai-lyrics': 'tab-ai-lyrics-results', 'instrumental': 'tab-instrumental-results', 'analyze': 'tab-analyze-results' };
 
 function createResultCard(taskId, index, result, total, fmt, label, sections) {
   const card = document.createElement('div');
   card.className = 'result-card';
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'card-close-btn';
+  closeBtn.type = 'button';
+  closeBtn.title = 'Dismiss';
+  closeBtn.textContent = '\u00d7';
+  closeBtn.addEventListener('click', () => {
+    if (card._waveform) card._waveform.destroy();
+    // Stop audio if playing
+    const audioEl = card.querySelector('audio');
+    if (audioEl) {
+      if (!audioEl.paused) audioEl.pause();
+      _playerRegistry.delete(audioEl);
+      if (_nowPlayingAudio === audioEl) {
+        _nowPlayingAudio = null;
+        _syncNowPlayingButtons();
+        _npLabelEl.textContent = '\u2014';
+      }
+    }
+    const container = card.parentElement;
+    card.remove();
+    // Hide the result area if no cards remain
+    if (container && !container.querySelector('.result-card')) {
+      container.classList.add('hidden');
+    }
+  });
+  card.appendChild(closeBtn);
 
   if (total > 1) {
     const label = document.createElement('div');
@@ -1809,15 +2202,45 @@ async function showResultCards(taskId, results, fmt) {
   setTimeout(() => container.classList.remove('results-ready'), 1200);
 }
 
+async function showAnalyzeResults(taskId, results, fmt) {
+  const container = document.getElementById('tab-analyze-results');
+
+  // Clean up existing card waveforms
+  container.querySelectorAll('.result-card').forEach(function(oldCard) {
+    if (oldCard._waveform) oldCard._waveform.destroy();
+  });
+
+  container.innerHTML = '';
+  results.forEach((result, i) => {
+    // No section labels for analyze results (no lyrics to estimate from)
+    container.appendChild(createResultCard(taskId, i, result, results.length, fmt, 'Analyze', []));
+  });
+  container.classList.remove('hidden');
+  setOutputState('now-playing');
+
+  // Render diff waveform for the first result
+  if (results.length > 0 && results[0].audio_url) {
+    renderAnalyzeResultWaveform('/audio?path=' + encodeURIComponent(results[0].audio_url));
+  }
+
+  container.classList.add('results-ready');
+  setTimeout(() => container.classList.remove('results-ready'), 1200);
+}
+
 generateBtn.addEventListener('click', async () => {
   if (!hasContent()) {
-    generateHint.textContent = _currentMode === 'rework'
+    generateHint.textContent = (_currentMode === 'rework' || _currentMode === 'analyze')
       ? 'Upload audio to get started.'
       : 'Add some lyrics or a style description first.';
     return;
   }
   if (!validateRegion()) return;
   generateHint.textContent = '';
+
+  // Hide stale result waveform when starting a new analyze generation
+  if (_currentMode === 'analyze') {
+    document.getElementById('analyze-wf-result-section').classList.add('hidden');
+  }
 
   const payload = buildPayload();
   setGenerating(true);
@@ -1851,7 +2274,10 @@ generateBtn.addEventListener('click', async () => {
       if (data.status === 'done') {
         clearInterval(_pollInterval);
         setGenerating(false);
-        if (_currentMode === 'rework') {
+        if (_currentMode === 'analyze') {
+          // Show result cards in the analyze result area
+          await showAnalyzeResults(taskId, data.results, payload.audio_format);
+        } else if (_currentMode === 'rework') {
           // Stay in waveform view — load the result as the new source audio
           const result = data.results[0];
           _uploadedAudioPath = result.audio_url;
@@ -1964,7 +2390,7 @@ styleText.addEventListener('input', () => {
   updateGenerateState();
 });
 
-document.querySelectorAll('.tag').forEach(tag =>
+document.querySelectorAll('.tag:not(.track-class-tag)').forEach(tag =>
   tag.addEventListener('click', updateGenerateState)
 );
 document.getElementById('clear-tags-btn').addEventListener('click', updateGenerateState);
