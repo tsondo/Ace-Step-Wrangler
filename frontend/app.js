@@ -329,14 +329,16 @@ function updateControlsForMode(mode) {
     }
   }
 
-  // Lock duration to source audio length in rework mode
+  // Lock duration to source audio length in rework/analyze modes
   const durationEl = document.getElementById('duration');
+  const autoDurBtn = document.getElementById('auto-duration-btn');
   let lockNote = document.getElementById('duration-lock-note');
   if (mode === 'rework' && _uploadedAudioDuration) {
     const dur = Math.max(10, Math.min(600, Math.round(_uploadedAudioDuration / 5) * 5));
     durationEl.value = dur;
     updateSlider(durationEl);
     durationEl.disabled = true;
+    autoDurBtn.disabled = true;
     if (!lockNote) {
       lockNote = document.createElement('p');
       lockNote.id = 'duration-lock-note';
@@ -345,8 +347,20 @@ function updateControlsForMode(mode) {
     }
     lockNote.textContent = 'Locked to source audio length';
     lockNote.classList.remove('hidden');
+  } else if (mode === 'analyze') {
+    durationEl.disabled = true;
+    autoDurBtn.disabled = true;
+    if (!lockNote) {
+      lockNote = document.createElement('p');
+      lockNote.id = 'duration-lock-note';
+      lockNote.className = 'duration-lock-note';
+      durationEl.parentElement.appendChild(lockNote);
+    }
+    lockNote.textContent = 'Determined by source audio';
+    lockNote.classList.remove('hidden');
   } else {
     if (mode === 'create') durationEl.disabled = _autoOn;
+    autoDurBtn.disabled = false;
     if (lockNote) lockNote.classList.add('hidden');
   }
 }
