@@ -732,10 +732,51 @@ html, body {
   font-size: 13px;
 }
 
-.music-load-status {
-  margin: 0;
+/* Loaded music card — shown inside My Lyrics tab when audio is loaded */
+.loaded-music-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.loaded-music-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.loaded-music-name {
   font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.loaded-music-close {
+  background: none;
+  border: none;
   color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.loaded-music-close:hover {
+  color: var(--danger);
+  background: var(--danger-dim);
 }
 
 .instrumental-note {
