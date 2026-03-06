@@ -346,6 +346,25 @@ def _resolve_audio_path(path: str) -> str:
     return path
 
 
+# Directories from which the /audio endpoint is permitted to serve files.
+# Audio originates from two places: the system temp dir (AceStep output,
+# user uploads) and the vendor tree (AceStep's own .cache directory).
+_VENDOR_DIR = (Path(__file__).parent.parent / "vendor").resolve()
+_ALLOWED_AUDIO_DIRS = [
+    Path(tempfile.gettempdir()).resolve(),
+    _VENDOR_DIR,
+]
+
+
+def _is_safe_audio_path(path: str) -> bool:
+    """Return True only if path resolves inside an allowed audio directory."""
+    try:
+        real = Path(_resolve_audio_path(path)).resolve()
+    except Exception:
+        return False
+    return any(real == d or d in real.parents for d in _ALLOWED_AUDIO_DIRS)
+
+
 def _ensure_in_tmp(path: str) -> str:
     """Copy a file to the system temp dir if it isn't already there.
 
@@ -472,6 +491,8 @@ async def status(task_id: str):
 @app.get("/audio")
 async def audio_proxy(path: str):
     """Serve audio for <audio> elements. Uses FileResponse for local files (Range support)."""
+    if not _is_safe_audio_path(path):
+        raise HTTPException(status_code=403, detail="Access denied")
     resolved = _resolve_audio_path(path)
     fp = Path(resolved)
     if fp.is_file():
