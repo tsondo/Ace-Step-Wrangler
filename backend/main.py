@@ -807,18 +807,19 @@ async def train_clear():
 @app.get("/train/pipeline-state")
 async def train_pipeline_state():
     """Report what training data exists on disk (survives restarts)."""
-    audio_files = []
-    if _TRAIN_AUDIO_DIR.is_dir():
-        audio_files = [f.name for f in _TRAIN_AUDIO_DIR.iterdir()
-                       if f.is_file() and f.suffix.lower() in ('.wav', '.mp3', '.flac', '.ogg', '.m4a')]
-    tensor_files = []
-    if _TRAIN_TENSOR_DIR.is_dir():
-        tensor_files = [f.name for f in _TRAIN_TENSOR_DIR.iterdir() if f.suffix == '.pt']
+    audio_files = sorted(
+        f.name for f in _TRAIN_AUDIO_DIR.iterdir()
+        if f.is_file() and f.suffix.lower() in ('.wav', '.mp3', '.flac', '.ogg', '.m4a')
+    ) if _TRAIN_AUDIO_DIR.is_dir() else []
+    tensor_count = sum(
+        1 for f in _TRAIN_TENSOR_DIR.iterdir() if f.suffix == '.pt'
+    ) if _TRAIN_TENSOR_DIR.is_dir() else 0
     return {
         "audio_count": len(audio_files),
-        "tensor_count": len(tensor_files),
+        "audio_files": audio_files,
+        "tensor_count": tensor_count,
         "has_audio": len(audio_files) > 0,
-        "has_tensors": len(tensor_files) > 0,
+        "has_tensors": tensor_count > 0,
     }
 
 

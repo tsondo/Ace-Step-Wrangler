@@ -1522,15 +1522,28 @@ async function _recoverPipelineState() {
     const r = await fetch('/train/pipeline-state');
     if (!r.ok) return;
     const state = await r.json();
+
+    // Show file list + clear button when audio exists on disk
+    if (state.has_audio) {
+      _trainFileCountEl.textContent = state.audio_count;
+      _trainFileListEl.classList.remove('hidden');
+      // Populate minimal file entries so clear works
+      if (_trainFiles.length === 0 && state.audio_files) {
+        state.audio_files.forEach(name => _trainFiles.push({ filename: name }));
+        _updateTrainFileList();
+      }
+    }
+
     if (state.has_tensors) {
       _trainPreprocessed = true;
+      _trainScanned = true;
       _trainStartBtn.disabled = false;
       _trainPreprocessBtn.disabled = false;
+      _trainScanBtn.disabled = false;
       _setPipelineStatus(state.tensor_count + ' preprocessed tensors ready', 'ok');
     } else if (state.has_audio) {
-      _trainScanned = false;
-      _trainPreprocessBtn.disabled = true;
-      _setPipelineStatus(state.audio_count + ' audio file(s) uploaded — scan to continue', '');
+      _trainScanBtn.disabled = false;
+      _setPipelineStatus(state.audio_count + ' audio file(s) uploaded — scan & preprocess to continue', '');
     }
   } catch { /* ignore */ }
 }
