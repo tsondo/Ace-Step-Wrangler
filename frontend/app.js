@@ -305,6 +305,7 @@ function switchMode(mode) {
     document.getElementById('tab-analyze').classList.add('hidden');
     document.getElementById('tab-train').classList.remove('hidden');
     _startTrainStatusPoll();
+    _waitForAceStep();
   } else {
     document.getElementById('tab-analyze').classList.add('hidden');
     document.getElementById('tab-train').classList.add('hidden');
@@ -319,7 +320,10 @@ function switchMode(mode) {
   }
 
   // Stop polling when leaving train mode
-  if (mode !== 'train') _stopTrainStatusPoll();
+  if (mode !== 'train') {
+    _stopTrainStatusPoll();
+    if (_healthPollTimer) { clearInterval(_healthPollTimer); _healthPollTimer = null; }
+  }
 
   // Lock gen-model to base in Analyze mode; restore on exit
   const genModelEl = document.getElementById('gen-model');
@@ -1431,11 +1435,51 @@ _loraScaleSlider.addEventListener('input', () => {
 _refreshLoraBrowser();
 _refreshLoraStatus();
 
+// ===== AceStep readiness check =====
+
+let _aceStepReady = false;
+let _healthPollTimer = null;
+
+async function _checkAceStepHealth() {
+  try {
+    const r = await fetch('/api/health');
+    if (r.ok) {
+      _aceStepReady = true;
+      if (_healthPollTimer) { clearInterval(_healthPollTimer); _healthPollTimer = null; }
+      _onAceStepReady();
+      return true;
+    }
+  } catch { /* not ready yet */ }
+  _aceStepReady = false;
+  return false;
+}
+
+function _waitForAceStep() {
+  if (_aceStepReady) { _onAceStepReady(); return; }
+  _setPipelineStatus('Waiting for AceStep to start...', '');
+  _trainScanBtn.disabled = true;
+  _trainPreprocessBtn.disabled = true;
+  _trainStartBtn.disabled = true;
+  if (_healthPollTimer) clearInterval(_healthPollTimer);
+  _checkAceStepHealth();
+  _healthPollTimer = setInterval(_checkAceStepHealth, 3000);
+}
+
+function _onAceStepReady() {
+  if (_trainPipelineStatus.textContent === 'Waiting for AceStep to start...') {
+    _setPipelineStatus('AceStep ready', 'ok');
+  }
+  _trainScanBtn.disabled = _trainFiles.length === 0;
+  _trainPreprocessBtn.disabled = !_trainScanned;
+  _trainStartBtn.disabled = !_trainPreprocessed;
+}
+
 // ===== Training Tab =====
 
 let _trainPollTimer = null;
 let _trainFiles = [];
 let _trainPreprocessed = false;
+let _trainScanned = false;
 
 const _trainFileInput    = document.getElementById('train-file-input');
 const _trainUploadZone   = document.getElementById('train-upload-zone');
@@ -1540,6 +1584,7 @@ _trainUploadZone.addEventListener('drop', async e => {
 _trainClearBtn.addEventListener('click', () => {
   _trainFiles = [];
   _updateTrainFileList();
+  _trainScanned = false;
   _trainPreprocessed = false;
   _trainStartBtn.disabled = true;
   _trainPreprocessBtn.disabled = true;
@@ -1555,6 +1600,7 @@ _trainScanBtn.addEventListener('click', async () => {
     const data = await r.json();
     if (r.ok) {
       _setPipelineStatus('Dataset loaded', 'ok');
+      _trainScanned = true;
       _trainPreprocessBtn.disabled = false;
     } else {
       _setPipelineStatus(data.detail || 'Scan failed', 'error');

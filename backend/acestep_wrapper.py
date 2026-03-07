@@ -221,12 +221,12 @@ async def dataset_load(dataset_path: str) -> dict:
         return r.json()
 
 
-async def dataset_preprocess_async(tensor_dir: str) -> dict:
+async def dataset_preprocess_async(output_dir: str) -> dict:
     """Start async preprocessing of loaded dataset."""
     async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:
         r = await client.post(
             f"{ACESTEP_BASE_URL}/v1/dataset/preprocess_async",
-            json={"tensor_dir": tensor_dir},
+            json={"output_dir": output_dir},
         )
         r.raise_for_status()
         return r.json()
