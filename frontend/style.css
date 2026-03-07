@@ -1001,6 +1001,14 @@ a.player-save {
 .number-input::placeholder { color: var(--text-muted); }
 .number-input:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.seed-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.seed-row .seed-input { flex: 1; min-width: 0; }
+.seed-btn { font-size: 11px; padding: 4px 8px; white-space: nowrap; }
+
 .batch-note {
   font-size: 12px;
   color: var(--text-secondary);

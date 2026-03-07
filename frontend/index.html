@@ -649,7 +649,11 @@
           <!-- Raw generation params -->
           <div class="control-group">
             <label class="field-label" for="seed">Seed</label>
-            <input type="number" id="seed" class="number-input" placeholder="Random" min="0" max="2147483647" autocomplete="off">
+            <div class="seed-row">
+              <input type="number" id="seed" class="number-input seed-input" placeholder="Random" min="0" max="2147483647" autocomplete="off">
+              <button class="ghost-btn seed-btn" id="seed-last-btn" type="button" title="Use last seed" disabled>Last</button>
+              <button class="ghost-btn seed-btn" id="seed-random-btn" type="button" title="Set to random">Random</button>
+            </div>
           </div>
 
           <div class="control-group">

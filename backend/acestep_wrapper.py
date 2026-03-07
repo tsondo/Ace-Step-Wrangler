@@ -71,6 +71,7 @@ async def query_result(task_id: str) -> dict:
                 "meta": item.get("metas"),
                 "prompt": item.get("prompt", ""),
                 "lyrics": item.get("lyrics", ""),
+                "seed_value": item.get("seed_value", ""),
             }
             for item in items
         ],

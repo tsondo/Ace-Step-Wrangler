@@ -1269,6 +1269,35 @@ function updateBatchLimit() {
 
 updateBatchLimit();
 
+// ===== Seed — Last / Random buttons =====
+let _lastSeed = null;
+const _seedInput     = document.getElementById('seed');
+const _seedLastBtn   = document.getElementById('seed-last-btn');
+const _seedRandomBtn = document.getElementById('seed-random-btn');
+
+_seedLastBtn.addEventListener('click', () => {
+  if (_lastSeed != null) {
+    _seedInput.value = _lastSeed;
+  }
+});
+_seedRandomBtn.addEventListener('click', () => {
+  _seedInput.value = '';
+});
+
+function _captureLastSeed(results) {
+  if (!results || !results.length) return;
+  const sv = results[0].seed_value;
+  if (sv != null && sv !== '') {
+    // seed_value can be comma-separated for batch>1; take first
+    const first = String(sv).split(',')[0].trim();
+    if (first && !isNaN(first)) {
+      _lastSeed = first;
+      _seedLastBtn.disabled = false;
+      _seedLastBtn.title = 'Use last seed: ' + first;
+    }
+  }
+}
+
 // ===== Advanced panel — friendly ↔ raw slider sync =====
 // Friendly sliders (quality, lyric-adherence) drive preset values on the raw
 // advanced sliders. The user can then fine-tune the raw sliders independently.
@@ -3529,6 +3558,8 @@ generateBtn.addEventListener('click', async () => {
             aiLyricsDisplay.value = data.results[0].lyrics;
           }
         }
+        // Capture the actual seed used for Last Seed button
+        _captureLastSeed(data.results);
         // Re-check LoRA state — generation may have dropped it
         if (_loraWasLoaded) {
           await _refreshLoraStatus();
@@ -3603,6 +3634,8 @@ function _gatherProject() {
     // Rework
     reworkApproach: _reworkApproach || 'cover',
     reworkDirection: document.getElementById('rework-direction').value,
+    // Last used seed (for recall)
+    lastSeed: _lastSeed,
   };
 }
 
@@ -3669,6 +3702,13 @@ function _applyProject(proj) {
 
   // Rework
   if (proj.reworkDirection != null) document.getElementById('rework-direction').value = proj.reworkDirection;
+
+  // Last seed recall
+  if (proj.lastSeed != null) {
+    _lastSeed = proj.lastSeed;
+    _seedLastBtn.disabled = false;
+    _seedLastBtn.title = 'Use last seed: ' + proj.lastSeed;
+  }
 
   // Sync all derived UI state
   updateBatchLimit();
