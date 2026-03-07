@@ -1604,7 +1604,9 @@ _trainFileInput.addEventListener('change', async () => {
     if (r.ok) {
       _trainFiles.push(...(data.files || []));
       _updateTrainFileList();
-      _setPipelineStatus(data.uploaded + ' file(s) uploaded', 'ok');
+      let msg = data.uploaded + ' file(s) uploaded';
+      if (data.skipped) msg += ', ' + data.skipped + ' duplicate(s) skipped';
+      _setPipelineStatus(msg, 'ok');
       _trainPreprocessed = false;
     } else {
       _setPipelineStatus(data.detail || 'Upload failed', 'error');
@@ -1632,7 +1634,9 @@ _trainUploadZone.addEventListener('drop', async e => {
     if (r.ok) {
       _trainFiles.push(...(data.files || []));
       _updateTrainFileList();
-      _setPipelineStatus(data.uploaded + ' file(s) uploaded', 'ok');
+      let msg = data.uploaded + ' file(s) uploaded';
+      if (data.skipped) msg += ', ' + data.skipped + ' duplicate(s) skipped';
+      _setPipelineStatus(msg, 'ok');
       _trainPreprocessed = false;
     } else {
       _setPipelineStatus(data.detail || 'Upload failed', 'error');
@@ -1642,14 +1646,20 @@ _trainUploadZone.addEventListener('drop', async e => {
   }
 });
 
-_trainClearBtn.addEventListener('click', () => {
+_trainClearBtn.addEventListener('click', async () => {
   _trainFiles = [];
   _updateTrainFileList();
   _trainScanned = false;
   _trainPreprocessed = false;
   _trainStartBtn.disabled = true;
   _trainPreprocessBtn.disabled = true;
-  _setPipelineStatus('', '');
+  _setPipelineStatus('Clearing...', '');
+  try {
+    await fetch('/train/clear', { method: 'POST' });
+    _setPipelineStatus('Cleared', '');
+  } catch {
+    _setPipelineStatus('', '');
+  }
 });
 
 // Scan & Load

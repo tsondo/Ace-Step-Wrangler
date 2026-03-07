@@ -775,24 +775,33 @@ async def train_upload(files: List[UploadFile]):
     """Accept multiple audio files for training dataset."""
     _TRAIN_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     saved = []
+    skipped = 0
     for file in files:
         if not file.content_type or not file.content_type.startswith("audio/"):
             continue
         fname = file.filename or "audio.wav"
-        # Sanitise filename
         safe_name = Path(fname).name
         dest = _TRAIN_AUDIO_DIR / safe_name
-        # Avoid overwrites
         if dest.exists():
-            stem, suffix = dest.stem, dest.suffix
-            counter = 1
-            while dest.exists():
-                dest = _TRAIN_AUDIO_DIR / f"{stem}_{counter}{suffix}"
-                counter += 1
+            skipped += 1
+            continue
         with open(dest, "wb") as f:
             shutil.copyfileobj(file.file, f)
         saved.append({"filename": safe_name, "path": str(dest)})
-    return {"uploaded": len(saved), "files": saved, "audio_dir": str(_TRAIN_AUDIO_DIR)}
+    return {"uploaded": len(saved), "skipped": skipped, "files": saved, "audio_dir": str(_TRAIN_AUDIO_DIR)}
+
+
+@app.post("/train/clear")
+async def train_clear():
+    """Delete all uploaded audio and preprocessed tensor files."""
+    removed = {"audio": 0, "tensors": 0}
+    for d, key in [(_TRAIN_AUDIO_DIR, "audio"), (_TRAIN_TENSOR_DIR, "tensors")]:
+        if d.is_dir():
+            for f in d.iterdir():
+                if f.is_file():
+                    f.unlink()
+                    removed[key] += 1
+    return {"removed": removed}
 
 
 @app.get("/train/pipeline-state")
