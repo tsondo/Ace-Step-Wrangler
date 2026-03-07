@@ -3460,6 +3460,7 @@ generateBtn.addEventListener('click', async () => {
   }
 
   const payload = buildPayload();
+  const _loraWasLoaded = _loraStatusEl.classList.contains('loaded');
   setGenerating(true);
 
   let taskId;
@@ -3528,11 +3529,19 @@ generateBtn.addEventListener('click', async () => {
             aiLyricsDisplay.value = data.results[0].lyrics;
           }
         }
+        // Re-check LoRA state — generation may have dropped it
+        if (_loraWasLoaded) {
+          await _refreshLoraStatus();
+          if (!_loraStatusEl.classList.contains('loaded')) {
+            generateHint.textContent = 'Style adapter was unloaded during generation. Reload it before the next run.';
+          }
+        }
       } else if (data.status === 'error') {
         clearInterval(_pollInterval);
         setGenerating(false);
         setOutputState('now-playing');
         generateHint.textContent = 'Generation failed. Check AceStep logs.';
+        if (_loraWasLoaded) _refreshLoraStatus();
       }
       // 'processing' → keep polling
     } catch (err) {
