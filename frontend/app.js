@@ -2009,8 +2009,13 @@ _trainClearBtn.addEventListener('click', async () => {
 _trainScanBtn.addEventListener('click', async () => {
   _trainScanBtn.disabled = true;
   _setPipelineStatus('Scanning...', '');
+  const stemsMode = document.getElementById('train-stems-mode').checked;
   try {
-    const r = await fetch('/train/scan', { method: 'POST' });
+    const r = await fetch('/train/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stems_mode: stemsMode }),
+    });
     const data = await r.json();
     if (r.ok) {
       _trainScanned = true;

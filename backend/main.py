@@ -831,14 +831,23 @@ async def train_pipeline_state():
     }
 
 
+class TrainScanRequest(BaseModel):
+    stems_mode: bool = False
+
+
 @app.post("/train/scan")
-async def train_scan():
+async def train_scan(req: TrainScanRequest = TrainScanRequest()):
     """Scan the training audio directory and load files into AceStep's dataset."""
     audio_dir = str(_TRAIN_AUDIO_DIR)
     if not _TRAIN_AUDIO_DIR.is_dir():
         raise HTTPException(status_code=400, detail="No audio files uploaded yet")
     try:
-        scan_result = await dataset_scan(audio_dir)
+        payload = {"audio_dir": audio_dir}
+        if req.stems_mode:
+            payload["custom_tag"] = "a cappella vocal stem, no instruments"
+            payload["tag_position"] = "append"
+            payload["all_instrumental"] = False
+        scan_result = await dataset_scan(payload)
         return {"scan": scan_result}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")

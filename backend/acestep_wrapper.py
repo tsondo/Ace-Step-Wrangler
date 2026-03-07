@@ -199,12 +199,18 @@ async def lora_status() -> dict:
 _TIMEOUT_TRAIN = httpx.Timeout(300.0)  # preprocessing/training start can block
 
 
-async def dataset_scan(audio_dir: str) -> dict:
-    """Scan a directory for audio files."""
+async def dataset_scan(payload: dict | str) -> dict:
+    """Scan a directory for audio files.
+
+    Accepts either a string (audio_dir) or a full payload dict with
+    optional custom_tag, tag_position, all_instrumental fields.
+    """
+    if isinstance(payload, str):
+        payload = {"audio_dir": payload}
     async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
         r = await client.post(
             f"{ACESTEP_BASE_URL}/v1/dataset/scan",
-            json={"audio_dir": audio_dir},
+            json=payload,
         )
         r.raise_for_status()
         return r.json()
