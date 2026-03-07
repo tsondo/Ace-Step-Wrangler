@@ -199,6 +199,10 @@ def main() -> None:
     # This avoids CUBLAS_STATUS_INVALID_VALUE errors caused by version mismatch.
     acestep_env.pop("LD_LIBRARY_PATH", None)
 
+    # Enable Tensor Core acceleration for matmul — trades negligible precision
+    # for meaningful speed gains on Ampere+ GPUs (3090, 4080, 5090, etc.).
+    acestep_env.setdefault("TORCH_FLOAT32_MATMUL_PRECISION", "medium")
+
     # --- Build environment for Wrangler (no GPU needed) ---------------------
     wrangler_env = os.environ.copy()
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)
