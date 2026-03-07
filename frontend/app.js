@@ -1472,6 +1472,60 @@ function _onAceStepReady() {
   _trainScanBtn.disabled = _trainFiles.length === 0;
   _trainPreprocessBtn.disabled = !_trainScanned;
   _trainStartBtn.disabled = !_trainPreprocessed;
+  _recoverPreprocessState();
+}
+
+async function _recoverPreprocessState() {
+  try {
+    const r = await fetch('/train/preprocess/status');
+    if (!r.ok) return;
+    const raw = await r.json();
+    const info = raw.data || raw;
+    if (!info || info.status === 'idle') return;
+
+    if (info.status === 'running') {
+      // Resume polling an in-progress preprocess
+      _trainPreprocessBtn.disabled = true;
+      _setPipelineStatus('Preprocessing', '');
+      _startPreprocessAnim();
+      const pollRecover = async () => {
+        try {
+          const sr = await fetch('/train/preprocess/status');
+          const sd = await sr.json();
+          const d = sd.data || sd;
+          if (d.status === 'completed' || d.status === 'done') {
+            _stopPreprocessAnim();
+            _setPipelineStatus('Preprocessing complete', 'ok');
+            _trainPreprocessed = true;
+            _trainStartBtn.disabled = false;
+            _trainPreprocessBtn.disabled = false;
+            return;
+          } else if (d.status === 'failed' || d.status === 'error') {
+            _stopPreprocessAnim();
+            _setPipelineStatus(d.error || 'Preprocessing failed', 'error');
+            _trainPreprocessBtn.disabled = false;
+            return;
+          }
+          if (d.current && d.total && d.total > 0) {
+            const pct = Math.round((d.current / d.total) * 100);
+            _setPipelineStatus('Preprocessing ' + d.current + '/' + d.total + ' (' + pct + '%)', '');
+          }
+          setTimeout(pollRecover, 2000);
+        } catch {
+          _stopPreprocessAnim();
+        }
+      };
+      setTimeout(pollRecover, 2000);
+    } else if (info.status === 'completed' || info.status === 'done') {
+      _trainPreprocessed = true;
+      _trainStartBtn.disabled = false;
+      _trainPreprocessBtn.disabled = false;
+      _setPipelineStatus('Preprocessing complete', 'ok');
+    } else if (info.status === 'failed' || info.status === 'error') {
+      _setPipelineStatus(info.error || 'Preprocessing failed', 'error');
+      _trainPreprocessBtn.disabled = false;
+    }
+  } catch { /* ignore — not critical */ }
 }
 
 // ===== Training Tab =====
