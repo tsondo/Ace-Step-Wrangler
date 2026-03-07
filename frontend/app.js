@@ -2335,6 +2335,8 @@ async function _pollTrainStatus() {
         // Training completed
         _trainStatusLabel.textContent = 'Complete';
         _trainEpochInfo.textContent = '';
+        _trainProgressFill.style.width = '100%';
+        _trainProgressText.textContent = '100%';
         _trainCompleteActions.classList.remove('hidden');
         _stopTrainStatusPoll();
       } else {
