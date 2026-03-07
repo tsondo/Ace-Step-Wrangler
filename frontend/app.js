@@ -2276,6 +2276,96 @@ _trainStopBtn.addEventListener('click', async () => {
   _trainStopBtn.disabled = false;
 });
 
+// ===== Loss Chart =====
+
+const _lossChartWrap = document.getElementById('train-loss-chart-wrap');
+const _lossCanvas = document.getElementById('train-loss-chart');
+
+function _drawLossChart(history) {
+  if (!history || history.length < 2) {
+    _lossChartWrap.classList.add('hidden');
+    return;
+  }
+  _lossChartWrap.classList.remove('hidden');
+
+  const canvas = _lossCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = rect.height;
+
+  // Margins
+  const ml = 48, mr = 12, mt = 12, mb = 24;
+  const pw = W - ml - mr;
+  const ph = H - mt - mb;
+
+  // Data range
+  const losses = history.map(h => h.loss);
+  const steps = history.map(h => h.step);
+  const minLoss = Math.min(...losses);
+  const maxLoss = Math.max(...losses);
+  const minStep = steps[0];
+  const maxStep = steps[steps.length - 1];
+  const lossRange = maxLoss - minLoss || 0.1;
+  const stepRange = maxStep - minStep || 1;
+
+  // Pad Y range 5% top and bottom
+  const yMin = minLoss - lossRange * 0.05;
+  const yMax = maxLoss + lossRange * 0.05;
+  const yRange = yMax - yMin;
+
+  const toX = s => ml + ((s - minStep) / stepRange) * pw;
+  const toY = l => mt + (1 - (l - yMin) / yRange) * ph;
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid lines + Y labels
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '10px system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const val = yMin + (yRange * i) / yTicks;
+    const y = toY(val);
+    ctx.beginPath();
+    ctx.moveTo(ml, y);
+    ctx.lineTo(W - mr, y);
+    ctx.stroke();
+    ctx.fillText(val.toFixed(3), ml - 4, y + 3);
+  }
+
+  // X axis label
+  ctx.textAlign = 'center';
+  ctx.fillText('Step ' + minStep, ml, H - 2);
+  ctx.fillText('Step ' + maxStep, W - mr, H - 2);
+
+  // Loss line
+  ctx.strokeStyle = '#f0a050';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < history.length; i++) {
+    const x = toX(history[i].step);
+    const y = toY(history[i].loss);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Current value dot
+  const last = history[history.length - 1];
+  ctx.fillStyle = '#f0a050';
+  ctx.beginPath();
+  ctx.arc(toX(last.step), toY(last.loss), 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // Status polling
 function _startTrainStatusPoll() {
   _stopTrainStatusPoll();
@@ -2307,6 +2397,8 @@ async function _pollTrainStatus() {
         _trainLossBarFill.style.width = pct + '%';
       }
 
+      _drawLossChart(d.loss_history);
+
       if (d.config && d.config.epochs && d.current_epoch) {
         const pct = (d.current_epoch / d.config.epochs) * 100;
         _trainProgressFill.style.width = pct + '%';
@@ -2337,6 +2429,7 @@ async function _pollTrainStatus() {
         _trainEpochInfo.textContent = '';
         _trainProgressFill.style.width = '100%';
         _trainProgressText.textContent = '100%';
+        _drawLossChart(d.loss_history);
         _trainCompleteActions.classList.remove('hidden');
         _stopTrainStatusPoll();
       } else {

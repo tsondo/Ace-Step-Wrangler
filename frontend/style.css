@@ -1432,6 +1432,18 @@ details[open] > .advanced-toggle {
   transition: width 0.3s ease;
 }
 
+.train-loss-chart-wrap {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.train-loss-chart-wrap canvas {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+
 .train-progress {
   display: flex;
   align-items: center;
