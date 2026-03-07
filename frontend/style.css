@@ -1231,10 +1231,6 @@ details[open] > .advanced-toggle {
   align-items: center;
 }
 
-.train-dataset-actions {
-  display: flex;
-  gap: 6px;
-}
 
 .train-label-progress {
   display: flex;
@@ -1254,7 +1250,7 @@ details[open] > .advanced-toggle {
 
 .train-sample-row {
   display: grid;
-  grid-template-columns: 2fr 60px 3fr 56px;
+  grid-template-columns: 2fr 60px 1fr;
   gap: 8px;
   align-items: center;
   padding: 5px 8px;
@@ -1303,20 +1299,9 @@ details[open] > .advanced-toggle {
   outline: none;
 }
 
-.train-sample-save {
-  font-size: 0.72rem;
-  padding: 2px 6px;
-  opacity: 0.5;
-}
-
-.train-sample-save.dirty {
-  opacity: 1;
-  color: var(--accent);
-}
-
 .train-sample-header {
   display: grid;
-  grid-template-columns: 2fr 60px 3fr 56px;
+  grid-template-columns: 2fr 60px 1fr;
   gap: 8px;
   padding: 4px 8px;
   font-size: 0.72rem;

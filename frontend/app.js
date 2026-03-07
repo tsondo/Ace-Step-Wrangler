@@ -1497,6 +1497,7 @@ async function _recoverPipelineState() {
               _trainPreprocessed = true;
               _trainStartBtn.disabled = false;
               _trainPreprocessBtn.disabled = false;
+              fetch('/train/save', { method: 'POST' }).catch(() => {});
               return;
             } else if (d.status === 'failed' || d.status === 'error') {
               _stopPreprocessAnim();
@@ -1524,7 +1525,7 @@ async function _recoverPipelineState() {
       const lraw = await lr.json();
       const linfo = lraw.data || lraw;
       if (linfo && linfo.status === 'running') {
-        _trainAutoLabelBtn.disabled = true;
+        _trainLabelBtn.disabled = true;
         _trainLabelProgressEl.classList.remove('hidden');
         _trainLabelProgressText.textContent = 'Resuming...';
         // Try to show samples table
@@ -1582,6 +1583,22 @@ async function _recoverPipelineState() {
       }
     }
 
+    // Reload saved dataset into AceStep memory if available
+    if (state.has_saved_dataset) {
+      try {
+        await fetch('/train/load', { method: 'POST' });
+        _trainScanned = true;
+        _trainScanBtn.disabled = false;
+        _trainLabelBtn.disabled = false;
+        await _fetchSamples();
+        const unlabeled = _trainSamples.filter(s => !s.labeled).length;
+        if (unlabeled === 0 && _trainSamples.length > 0) {
+          _trainLabeled = true;
+          _trainPreprocessBtn.disabled = false;
+        }
+      } catch { /* user can scan manually */ }
+    }
+
     if (state.has_tensors) {
       _trainPreprocessed = true;
       _trainScanned = true;
@@ -1590,28 +1607,12 @@ async function _recoverPipelineState() {
       _trainPreprocessBtn.disabled = false;
       _trainLabelBtn.disabled = false;
       _trainScanBtn.disabled = false;
-      _setPipelineStatus(state.tensor_count + ' preprocessed tensors ready', 'ok');
-      // Try to load samples into table
-      await _fetchSamples();
-    } else if (state.has_saved_dataset) {
-      // Try to reload saved dataset, then show samples
-      _trainScanBtn.disabled = false;
-      try {
-        const lr = await fetch('/train/load', { method: 'POST' });
-        if (lr.ok) {
-          _trainScanned = true;
-          _trainLabelBtn.disabled = false;
-          await _fetchSamples();
-          const unlabeled = _trainSamples.filter(s => !s.labeled).length;
-          if (unlabeled === 0 && _trainSamples.length > 0) {
-            _trainLabeled = true;
-            _trainPreprocessBtn.disabled = false;
-            _setPipelineStatus('Saved dataset loaded — all labeled, preprocess next', 'ok');
-          } else {
-            _setPipelineStatus('Saved dataset loaded — ' + unlabeled + ' need labeling', 'ok');
-          }
-        }
-      } catch { /* ignore, user can scan manually */ }
+      _setPipelineStatus(state.tensor_count + ' preprocessed tensors ready — train or re-preprocess', 'ok');
+    } else if (_trainLabeled) {
+      _setPipelineStatus('Saved dataset loaded — all labeled, preprocess next', 'ok');
+    } else if (_trainScanned) {
+      const unlabeled = _trainSamples.filter(s => !s.labeled).length;
+      _setPipelineStatus('Saved dataset loaded — ' + unlabeled + ' need labeling', 'ok');
     } else if (state.has_audio) {
       _trainScanBtn.disabled = false;
       _setPipelineStatus(state.audio_count + ' audio file(s) uploaded — scan to continue', '');
@@ -1655,8 +1656,6 @@ const _trainProgressText = document.getElementById('train-progress-text');
 const _trainDatasetView     = document.getElementById('train-dataset-view');
 const _trainSampleCountEl   = document.getElementById('train-sample-count');
 const _trainLabeledCountEl  = document.getElementById('train-labeled-count');
-const _trainAutoLabelBtn    = document.getElementById('train-auto-label-btn');
-const _trainSaveDatasetBtn  = document.getElementById('train-save-dataset-btn');
 const _trainLabelProgressEl = document.getElementById('train-label-progress');
 const _trainLabelProgressFill = document.getElementById('train-label-progress-fill');
 const _trainLabelProgressText = document.getElementById('train-label-progress-text');
@@ -1721,7 +1720,7 @@ function _renderSampleTable() {
   // Header row
   const header = document.createElement('div');
   header.className = 'train-sample-header';
-  header.innerHTML = '<span>File</span><span>Dur</span><span>Caption</span><span></span>';
+  header.innerHTML = '<span>File</span><span>Dur</span><span>Caption</span>';
   _trainSamplesTable.appendChild(header);
 
   let labeledCount = 0;
@@ -1746,20 +1745,9 @@ function _renderSampleTable() {
     captionEl.placeholder = 'No label';
     captionEl.rows = 3;
 
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'ghost-btn train-sample-save';
-    saveBtn.textContent = 'Save';
-    saveBtn.type = 'button';
-
-    // Mark dirty on edit
-    captionEl.addEventListener('input', () => {
-      saveBtn.classList.toggle('dirty', captionEl.value !== (sample.caption || ''));
-    });
-
-    // Save individual sample
-    saveBtn.addEventListener('click', async () => {
-      saveBtn.disabled = true;
-      saveBtn.textContent = '...';
+    // Auto-save on blur: PUT the sample then persist the full dataset
+    captionEl.addEventListener('blur', async () => {
+      if (captionEl.value === (sample.caption || '')) return;
       try {
         const r = await fetch('/train/sample/' + idx, {
           method: 'PUT',
@@ -1770,18 +1758,15 @@ function _renderSampleTable() {
           sample.caption = captionEl.value;
           sample.labeled = true;
           row.classList.add('labeled');
-          saveBtn.classList.remove('dirty');
           _updateLabeledCount();
+          fetch('/train/save', { method: 'POST' }).catch(() => {});
         }
       } catch { /* ignore */ }
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save';
     });
 
     row.appendChild(nameEl);
     row.appendChild(durEl);
     row.appendChild(captionEl);
-    row.appendChild(saveBtn);
     _trainSamplesTable.appendChild(row);
   });
 
@@ -1817,7 +1802,6 @@ function _updateSampleInTable(idx, sampleData) {
 }
 
 function _enableLabelBtns() {
-  _trainAutoLabelBtn.disabled = false;
   _trainLabelBtn.disabled = false;
 }
 
@@ -1827,8 +1811,7 @@ document.getElementById('train-label-model').addEventListener('change', function
 });
 
 // Auto-label (async with polling)
-_trainAutoLabelBtn.addEventListener('click', async () => {
-  _trainAutoLabelBtn.disabled = true;
+_trainLabelBtn.addEventListener('click', async () => {
   _trainLabelBtn.disabled = true;
   _trainLabelProgressEl.classList.remove('hidden');
   _trainLabelProgressText.textContent = 'Starting...';
@@ -1909,26 +1892,6 @@ _trainAutoLabelBtn.addEventListener('click', async () => {
     _trainLabelProgressText.textContent = 'Connection error';
     _enableLabelBtns();
   }
-});
-
-// Save dataset
-_trainSaveDatasetBtn.addEventListener('click', async () => {
-  _trainSaveDatasetBtn.disabled = true;
-  _trainSaveDatasetBtn.textContent = 'Saving...';
-  try {
-    const r = await fetch('/train/save', { method: 'POST' });
-    if (r.ok) {
-      _trainSaveDatasetBtn.textContent = 'Saved!';
-    } else {
-      _trainSaveDatasetBtn.textContent = 'Save failed';
-    }
-  } catch {
-    _trainSaveDatasetBtn.textContent = 'Save failed';
-  }
-  setTimeout(() => {
-    _trainSaveDatasetBtn.textContent = 'Save';
-    _trainSaveDatasetBtn.disabled = false;
-  }, 1500);
 });
 
 // File upload
@@ -2043,9 +2006,6 @@ _trainScanBtn.addEventListener('click', async () => {
   }
 });
 
-// Auto-label (pipeline button — delegates to the same async handler as center panel button)
-_trainLabelBtn.addEventListener('click', () => _trainAutoLabelBtn.click());
-
 // Preprocess
 let _preprocessDots = 0;
 let _preprocessAnimTimer = null;
@@ -2089,6 +2049,7 @@ _trainPreprocessBtn.addEventListener('click', async () => {
           _trainPreprocessed = true;
           _trainStartBtn.disabled = false;
           _trainPreprocessBtn.disabled = false;
+          fetch('/train/save', { method: 'POST' }).catch(() => {});
           return;
         } else if (info.status === 'failed' || info.status === 'error') {
           _stopPreprocessAnim();
