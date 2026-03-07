@@ -1508,10 +1508,10 @@ async function _recoverPipelineState() {
               const pct = Math.round((d.current / d.total) * 100);
               _setPipelineStatus('Preprocessing ' + d.current + '/' + d.total + ' (' + pct + '%)', '');
             }
-            setTimeout(pollRecover, 2000);
+            setTimeout(pollRecover, 10000);
           } catch { _stopPreprocessAnim(); }
         };
-        setTimeout(pollRecover, 2000);
+        setTimeout(pollRecover, 10000);
         return; // active task found — don't fall through to disk check
       }
     }
@@ -1559,10 +1559,10 @@ async function _recoverPipelineState() {
               _enableLabelBtns();
               return;
             }
-            setTimeout(pollResumeLabel, 2000);
+            setTimeout(pollResumeLabel, 10000);
           } catch { _enableLabelBtns(); }
         };
-        setTimeout(pollResumeLabel, 2000);
+        setTimeout(pollResumeLabel, 10000);
         return; // active label task — don't fall through
       }
     }
@@ -1891,13 +1891,13 @@ _trainAutoLabelBtn.addEventListener('click', async () => {
           _enableLabelBtns();
           return;
         }
-        setTimeout(pollLabel, 2000);
+        setTimeout(pollLabel, 10000);
       } catch {
         _trainLabelProgressText.textContent = 'Status check failed';
         _enableLabelBtns();
       }
     };
-    setTimeout(pollLabel, 2000);
+    setTimeout(pollLabel, 10000);
   } catch {
     _trainLabelProgressText.textContent = 'Connection error';
     _enableLabelBtns();
@@ -2090,14 +2090,14 @@ _trainPreprocessBtn.addEventListener('click', async () => {
         } else {
           _setPipelineStatus('Preprocessing', '');
         }
-        setTimeout(pollPreprocess, 2000);
+        setTimeout(pollPreprocess, 10000);
       } catch {
         _stopPreprocessAnim();
         _setPipelineStatus('Status check failed', 'error');
         _trainPreprocessBtn.disabled = false;
       }
     };
-    setTimeout(pollPreprocess, 2000);
+    setTimeout(pollPreprocess, 10000);
   } catch {
     _stopPreprocessAnim();
     _setPipelineStatus('Preprocess failed', 'error');
@@ -2168,7 +2168,7 @@ _trainStopBtn.addEventListener('click', async () => {
 function _startTrainStatusPoll() {
   _stopTrainStatusPoll();
   _pollTrainStatus();
-  _trainPollTimer = setInterval(_pollTrainStatus, 2000);
+  _trainPollTimer = setInterval(_pollTrainStatus, 10000);
 }
 
 function _stopTrainStatusPoll() {
