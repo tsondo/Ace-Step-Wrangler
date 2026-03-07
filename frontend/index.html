@@ -568,6 +568,31 @@
             <div class="slider-bounds"><span>1</span><span>15</span></div>
           </div>
 
+          <div class="section-divider"></div>
+
+          <!-- Style Adapter (LoRA) -->
+          <div class="control-group" id="lora-section">
+            <span class="tag-group-label">Style Adapter</span>
+            <div class="lora-status" id="lora-status">No adapter loaded</div>
+
+            <div class="lora-controls">
+              <select id="lora-browser" class="select-input">
+                <option value="">Select adapter&hellip;</option>
+              </select>
+              <button class="ghost-btn" id="lora-load-btn" type="button">Load</button>
+              <button class="ghost-btn hidden" id="lora-unload-btn" type="button">Unload</button>
+            </div>
+
+            <div class="lora-active-controls hidden" id="lora-active-controls">
+              <div class="control-label-row">
+                <label class="field-label" for="lora-scale">Style influence</label>
+                <span class="control-value" id="lora-scale-value">100%</span>
+              </div>
+              <input type="range" id="lora-scale" class="slider" min="0" max="100" value="100" step="5">
+              <div class="slider-bounds"><span>Subtle</span><span>Full</span></div>
+            </div>
+          </div>
+
         </div>
       </details>
     </section>

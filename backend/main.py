@@ -9,6 +9,13 @@ Endpoints:
   GET  /download/{job_id}/{n}/json  Download generation metadata as JSON
   GET  /api/health                  Forward AceStep health check
 
+  POST /lora/load                   Load a LoRA/LoKR adapter
+  POST /lora/unload                 Unload adapter, restore base model
+  POST /lora/toggle                 Enable/disable loaded adapter
+  POST /lora/scale                  Set adapter influence (0.0–1.0)
+  GET  /lora/status                 Current adapter state
+  GET  /lora/browse                 List adapters in loras/ directory
+
 Static frontend is served from /  (catch-all, mounted last).
 """
 
@@ -38,6 +45,11 @@ from acestep_wrapper import (
     get_audio_bytes,
     format_input,
     create_sample,
+    lora_load,
+    lora_unload,
+    lora_toggle,
+    lora_scale,
+    lora_status,
     _LANG_LABELS,
 )
 
@@ -604,6 +616,106 @@ async def upload_audio(file: UploadFile):
 
     _uploads[upload_id] = {"path": str(dest), "filename": file.filename or "audio"}
     return {"upload_id": upload_id, "path": str(dest), "filename": file.filename}
+
+
+# ---------------------------------------------------------------------------
+# LoRA adapter management
+# ---------------------------------------------------------------------------
+
+import os
+
+_LORA_DIR = Path(os.environ.get("LORA_DIR", str(Path(__file__).parent.parent / "loras")))
+
+
+class LoRALoadRequest(BaseModel):
+    lora_path: str
+    adapter_name: Optional[str] = None
+
+
+class LoRAToggleRequest(BaseModel):
+    use_lora: bool
+
+
+class LoRAScaleRequest(BaseModel):
+    scale: float
+    adapter_name: Optional[str] = None
+
+
+@app.post("/lora/load")
+async def lora_load_route(req: LoRALoadRequest):
+    try:
+        result = await lora_load(req.lora_path, req.adapter_name)
+        return result
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text if exc.response else str(exc)
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/lora/unload")
+async def lora_unload_route():
+    try:
+        result = await lora_unload()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/lora/toggle")
+async def lora_toggle_route(req: LoRAToggleRequest):
+    try:
+        result = await lora_toggle(req.use_lora)
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/lora/scale")
+async def lora_scale_route(req: LoRAScaleRequest):
+    try:
+        result = await lora_scale(req.scale, req.adapter_name)
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.get("/lora/status")
+async def lora_status_route():
+    try:
+        result = await lora_status()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.get("/lora/browse")
+async def lora_browse():
+    """List available LoRA/LoKR adapters in the configured loras directory."""
+    adapters = []
+    if not _LORA_DIR.is_dir():
+        return {"adapters": adapters, "lora_dir": str(_LORA_DIR)}
+
+    for entry in sorted(_LORA_DIR.iterdir()):
+        # PEFT LoRA: directory with adapter_config.json
+        if entry.is_dir() and (entry / "adapter_config.json").exists():
+            size_bytes = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
+            adapters.append({
+                "name": entry.name,
+                "path": str(entry),
+                "type": "lora",
+                "size_mb": round(size_bytes / 1_048_576, 1),
+            })
+        # LoKR: single .safetensors file
+        elif entry.is_file() and entry.suffix == ".safetensors":
+            adapters.append({
+                "name": entry.stem,
+                "path": str(entry),
+                "type": "lokr",
+                "size_mb": round(entry.stat().st_size / 1_048_576, 1),
+            })
+
+    return {"adapters": adapters, "lora_dir": str(_LORA_DIR)}
 
 
 # ---------------------------------------------------------------------------

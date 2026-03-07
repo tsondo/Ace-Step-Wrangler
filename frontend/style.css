@@ -1122,6 +1122,40 @@ details[open] > .advanced-toggle {
 }
 
 /* ============================================================
+   Style Adapter (LoRA) — Advanced Panel
+   ============================================================ */
+
+.lora-status {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 4px 0;
+  min-height: 1.4em;
+}
+
+.lora-status.loaded {
+  color: var(--accent);
+}
+
+.lora-status.error {
+  color: var(--warning, #e8a33d);
+}
+
+.lora-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.lora-controls .select-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.lora-active-controls {
+  margin-top: 8px;
+}
+
+/* ============================================================
    Output Panel / Now Playing Bar
    ============================================================ */
 #output-panel {

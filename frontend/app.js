@@ -241,6 +241,9 @@ function updateSlider(slider) {
     case 'guidance-audio':
       valueEl.textContent = Number(val).toFixed(1);
       break;
+    case 'lora-scale':
+      valueEl.textContent = `${val}%`;
+      break;
   }
 }
 
@@ -1280,6 +1283,133 @@ document.getElementById('quality').addEventListener('input', () => {
   infSteps.value = _QUALITY_STEPS_MAP[val];
   updateSlider(infSteps);
 });
+
+// ===== Style Adapter (LoRA) =====
+
+const _loraBrowser     = document.getElementById('lora-browser');
+const _loraLoadBtn     = document.getElementById('lora-load-btn');
+const _loraUnloadBtn   = document.getElementById('lora-unload-btn');
+const _loraStatusEl    = document.getElementById('lora-status');
+const _loraActiveCtrl  = document.getElementById('lora-active-controls');
+const _loraScaleSlider = document.getElementById('lora-scale');
+
+function _setLoraStatus(text, state) {
+  _loraStatusEl.textContent = text;
+  _loraStatusEl.classList.toggle('loaded', state === 'loaded');
+  _loraStatusEl.classList.toggle('error', state === 'error');
+}
+
+function _showLoraLoaded(name) {
+  _setLoraStatus(name + ' loaded', 'loaded');
+  _loraLoadBtn.classList.add('hidden');
+  _loraUnloadBtn.classList.remove('hidden');
+  _loraActiveCtrl.classList.remove('hidden');
+}
+
+function _showLoraUnloaded() {
+  _setLoraStatus('No adapter loaded', '');
+  _loraLoadBtn.classList.remove('hidden');
+  _loraUnloadBtn.classList.add('hidden');
+  _loraActiveCtrl.classList.add('hidden');
+}
+
+async function _refreshLoraBrowser() {
+  try {
+    const r = await fetch('/lora/browse');
+    if (!r.ok) return;
+    const data = await r.json();
+    // Keep the placeholder, replace the rest
+    while (_loraBrowser.options.length > 1) _loraBrowser.remove(1);
+    for (const a of data.adapters) {
+      const opt = document.createElement('option');
+      opt.value = a.path;
+      opt.textContent = a.name + ' (' + a.type + ', ' + a.size_mb + ' MB)';
+      _loraBrowser.appendChild(opt);
+    }
+  } catch { /* ignore — browse is best-effort */ }
+}
+
+async function _refreshLoraStatus() {
+  try {
+    const r = await fetch('/lora/status');
+    if (!r.ok) return;
+    const data = await r.json();
+    const info = data.data || data;
+    if (info.lora_loaded) {
+      _showLoraLoaded(info.adapter_type || 'Adapter');
+      if (typeof info.lora_scale === 'number') {
+        _loraScaleSlider.value = Math.round(info.lora_scale * 100);
+        updateSlider(_loraScaleSlider);
+      }
+    } else {
+      _showLoraUnloaded();
+    }
+  } catch { /* AceStep may not be ready yet */ }
+}
+
+_loraLoadBtn.addEventListener('click', async () => {
+  const path = _loraBrowser.value;
+  if (!path) { _setLoraStatus('Select an adapter first', 'error'); return; }
+  _loraLoadBtn.disabled = true;
+  _setLoraStatus('Loading\u2026', '');
+  try {
+    const r = await fetch('/lora/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lora_path: path }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      const name = _loraBrowser.selectedOptions[0]?.textContent?.split(' (')[0] || 'Adapter';
+      _showLoraLoaded(name);
+    } else {
+      const msg = (data.data && data.data.error) || data.detail || 'Load failed';
+      _setLoraStatus(msg, 'error');
+    }
+  } catch (e) {
+    _setLoraStatus('Connection error', 'error');
+  } finally {
+    _loraLoadBtn.disabled = false;
+  }
+});
+
+_loraUnloadBtn.addEventListener('click', async () => {
+  _loraUnloadBtn.disabled = true;
+  _setLoraStatus('Unloading\u2026', '');
+  try {
+    const r = await fetch('/lora/unload', { method: 'POST' });
+    if (r.ok) {
+      _showLoraUnloaded();
+      _loraScaleSlider.value = 100;
+      updateSlider(_loraScaleSlider);
+    } else {
+      _setLoraStatus('Unload failed', 'error');
+    }
+  } catch {
+    _setLoraStatus('Connection error', 'error');
+  } finally {
+    _loraUnloadBtn.disabled = false;
+  }
+});
+
+const _debouncedLoraScale = debounce(async (val) => {
+  try {
+    await fetch('/lora/scale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scale: val / 100 }),
+    });
+  } catch { /* best-effort */ }
+}, 300);
+
+_loraScaleSlider.addEventListener('input', () => {
+  updateSlider(_loraScaleSlider);
+  _debouncedLoraScale(Number(_loraScaleSlider.value));
+});
+
+// Initialize on load
+_refreshLoraBrowser();
+_refreshLoraStatus();
 
 // ===== Waveform Timeline =====
 

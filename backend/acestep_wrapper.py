@@ -136,6 +136,62 @@ async def format_input(lyrics: str) -> dict:
         return r.json()
 
 
+# ---------------------------------------------------------------------------
+# LoRA adapter management
+# ---------------------------------------------------------------------------
+
+_TIMEOUT_LORA = httpx.Timeout(60.0)  # loading can take a while
+
+
+async def lora_load(lora_path: str, adapter_name: str | None = None) -> dict:
+    """Load a LoRA/LoKR adapter into the active model."""
+    payload: dict = {"lora_path": lora_path}
+    if adapter_name:
+        payload["adapter_name"] = adapter_name
+    async with httpx.AsyncClient(timeout=_TIMEOUT_LORA) as client:
+        r = await client.post(f"{ACESTEP_BASE_URL}/v1/lora/load", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+async def lora_unload() -> dict:
+    """Unload all LoRA adapters and restore the base model."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_LORA) as client:
+        r = await client.post(f"{ACESTEP_BASE_URL}/v1/lora/unload")
+        r.raise_for_status()
+        return r.json()
+
+
+async def lora_toggle(use_lora: bool) -> dict:
+    """Enable or disable the loaded LoRA adapter."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/lora/toggle",
+            json={"use_lora": use_lora},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def lora_scale(scale: float, adapter_name: str | None = None) -> dict:
+    """Set the LoRA influence scale (0.0–1.0)."""
+    payload: dict = {"scale": scale}
+    if adapter_name:
+        payload["adapter_name"] = adapter_name
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.post(f"{ACESTEP_BASE_URL}/v1/lora/scale", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+async def lora_status() -> dict:
+    """Get current LoRA adapter state."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.get(f"{ACESTEP_BASE_URL}/v1/lora/status")
+        r.raise_for_status()
+        return r.json()
+
+
 async def get_audio_bytes(path: str) -> tuple[bytes, str]:
     """
     Download audio and return (bytes, content_type).
