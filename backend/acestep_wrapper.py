@@ -210,12 +210,12 @@ async def dataset_scan(audio_dir: str) -> dict:
         return r.json()
 
 
-async def dataset_load(audio_dir: str) -> dict:
-    """Load audio files from a directory into the dataset."""
+async def dataset_load(dataset_path: str) -> dict:
+    """Load an existing dataset from a JSON file."""
     async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
         r = await client.post(
             f"{ACESTEP_BASE_URL}/v1/dataset/load",
-            json={"audio_dir": audio_dir},
+            json={"dataset_path": dataset_path},
         )
         r.raise_for_status()
         return r.json()

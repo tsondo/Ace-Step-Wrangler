@@ -62,7 +62,6 @@ from acestep_wrapper import (
     lora_scale,
     lora_status,
     dataset_scan,
-    dataset_load,
     dataset_preprocess_async,
     dataset_preprocess_status,
     dataset_samples,
@@ -804,8 +803,7 @@ async def train_scan():
         raise HTTPException(status_code=400, detail="No audio files uploaded yet")
     try:
         scan_result = await dataset_scan(audio_dir)
-        load_result = await dataset_load(audio_dir)
-        return {"scan": scan_result, "load": load_result}
+        return {"scan": scan_result}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
 
