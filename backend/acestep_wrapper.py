@@ -232,6 +232,69 @@ async def dataset_preprocess_async(output_dir: str) -> dict:
         return r.json()
 
 
+async def dataset_auto_label(payload: dict | None = None) -> dict:
+    """Auto-label dataset samples using the LLM (synchronous)."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/auto_label",
+            json=payload or {},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_auto_label_async(payload: dict | None = None) -> dict:
+    """Start async auto-labeling. Returns task_id for polling."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/auto_label_async",
+            json=payload or {},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_auto_label_status() -> dict:
+    """Poll latest auto-label task progress."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.get(f"{ACESTEP_BASE_URL}/v1/dataset/auto_label_status")
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_sample_update(sample_idx: int, payload: dict) -> dict:
+    """Update a single dataset sample's metadata."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.put(
+            f"{ACESTEP_BASE_URL}/v1/dataset/sample/{sample_idx}",
+            json=payload,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_save(save_path: str, dataset_name: str = "my_lora_dataset") -> dict:
+    """Save dataset state to a JSON file for later resumption."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/save",
+            json={"save_path": save_path, "dataset_name": dataset_name},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_load(dataset_path: str) -> dict:
+    """Load a saved dataset JSON file."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/load",
+            json={"dataset_path": dataset_path},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
 async def dataset_preprocess_status(task_id: str | None = None) -> dict:
     """Poll preprocessing progress."""
     if task_id:

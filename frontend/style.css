@@ -1217,6 +1217,115 @@ details[open] > .advanced-toggle {
   color: var(--warning, #e8a33d);
 }
 
+/* Dataset view (center panel, train mode) */
+.train-dataset-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.train-dataset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.train-dataset-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.train-label-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.train-samples-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.train-sample-row {
+  display: grid;
+  grid-template-columns: 2fr 60px 3fr 56px;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.train-sample-row:last-child {
+  border-bottom: none;
+}
+
+.train-sample-row.labeled {
+  border-left: 2px solid var(--accent);
+}
+
+.train-sample-filename {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.train-sample-duration {
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.train-sample-caption {
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  resize: none;
+  min-height: 24px;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.train-sample-caption:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.train-sample-save {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  opacity: 0.5;
+}
+
+.train-sample-save.dirty {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.train-sample-header {
+  display: grid;
+  grid-template-columns: 2fr 60px 3fr 56px;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+
 /* Training monitor (center panel) */
 .train-monitor {
   display: flex;

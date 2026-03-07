@@ -1517,7 +1517,58 @@ async function _recoverPipelineState() {
     }
   } catch { /* AceStep may not have task state */ }
 
-  // 2. Fall back to checking what exists on disk (survives server restart)
+  // 2. Check for in-progress auto-label task
+  try {
+    const lr = await fetch('/train/label/status');
+    if (lr.ok) {
+      const lraw = await lr.json();
+      const linfo = lraw.data || lraw;
+      if (linfo && linfo.status === 'running') {
+        _trainAutoLabelBtn.disabled = true;
+        _trainLabelProgressEl.classList.remove('hidden');
+        _trainLabelProgressText.textContent = 'Resuming...';
+        // Try to show samples table
+        await _fetchSamples();
+        const pollResumeLabel = async () => {
+          try {
+            const sr = await fetch('/train/label/status');
+            const sd = await sr.json();
+            const d = sd.data || sd;
+            if (d.current && d.total && d.total > 0) {
+              const pct = Math.round((d.current / d.total) * 100);
+              _trainLabelProgressFill.style.width = pct + '%';
+              _trainLabelProgressText.textContent = d.current + '/' + d.total + ' (' + pct + '%)';
+            }
+            if (d.last_updated_index != null && d.last_updated_sample) {
+              _updateSampleInTable(d.last_updated_index, d.last_updated_sample);
+            }
+            if (d.status === 'completed') {
+              _trainLabelProgressFill.style.width = '100%';
+              _trainLabelProgressText.textContent = 'Complete';
+              _enableLabelBtns();
+              _trainLabeled = true;
+              _trainPreprocessBtn.disabled = false;
+              _setPipelineStatus('All labeled — preprocess next', 'ok');
+              await _fetchSamples();
+              fetch('/train/save', { method: 'POST' }).catch(() => {});
+              setTimeout(() => _trainLabelProgressEl.classList.add('hidden'), 2000);
+              return;
+            }
+            if (d.status === 'failed') {
+              _trainLabelProgressText.textContent = d.error || 'Failed';
+              _enableLabelBtns();
+              return;
+            }
+            setTimeout(pollResumeLabel, 2000);
+          } catch { _enableLabelBtns(); }
+        };
+        setTimeout(pollResumeLabel, 2000);
+        return; // active label task — don't fall through
+      }
+    }
+  } catch { /* ignore */ }
+
+  // 3. Fall back to checking what exists on disk (survives server restart)
   try {
     const r = await fetch('/train/pipeline-state');
     if (!r.ok) return;
@@ -1537,13 +1588,36 @@ async function _recoverPipelineState() {
     if (state.has_tensors) {
       _trainPreprocessed = true;
       _trainScanned = true;
+      _trainLabeled = true;
       _trainStartBtn.disabled = false;
       _trainPreprocessBtn.disabled = false;
+      _trainLabelBtn.disabled = false;
       _trainScanBtn.disabled = false;
       _setPipelineStatus(state.tensor_count + ' preprocessed tensors ready', 'ok');
+      // Try to load samples into table
+      await _fetchSamples();
+    } else if (state.has_saved_dataset) {
+      // Try to reload saved dataset, then show samples
+      _trainScanBtn.disabled = false;
+      try {
+        const lr = await fetch('/train/load', { method: 'POST' });
+        if (lr.ok) {
+          _trainScanned = true;
+          _trainLabelBtn.disabled = false;
+          await _fetchSamples();
+          const unlabeled = _trainSamples.filter(s => !s.labeled).length;
+          if (unlabeled === 0 && _trainSamples.length > 0) {
+            _trainLabeled = true;
+            _trainPreprocessBtn.disabled = false;
+            _setPipelineStatus('Saved dataset loaded — all labeled, preprocess next', 'ok');
+          } else {
+            _setPipelineStatus('Saved dataset loaded — ' + unlabeled + ' need labeling', 'ok');
+          }
+        }
+      } catch { /* ignore, user can scan manually */ }
     } else if (state.has_audio) {
       _trainScanBtn.disabled = false;
-      _setPipelineStatus(state.audio_count + ' audio file(s) uploaded — scan & preprocess to continue', '');
+      _setPipelineStatus(state.audio_count + ' audio file(s) uploaded — scan to continue', '');
     }
   } catch { /* ignore */ }
 }
@@ -1554,6 +1628,8 @@ let _trainPollTimer = null;
 let _trainFiles = [];
 let _trainPreprocessed = false;
 let _trainScanned = false;
+let _trainLabeled = false;
+let _trainSamples = [];  // sample data from AceStep after scan
 
 const _trainFileInput    = document.getElementById('train-file-input');
 const _trainUploadZone   = document.getElementById('train-upload-zone');
@@ -1563,6 +1639,7 @@ const _trainFilesEl      = document.getElementById('train-files');
 const _trainFileCountEl  = document.getElementById('train-file-count');
 const _trainClearBtn     = document.getElementById('train-clear-files-btn');
 const _trainScanBtn      = document.getElementById('train-scan-btn');
+const _trainLabelBtn     = document.getElementById('train-label-btn');
 const _trainPreprocessBtn = document.getElementById('train-preprocess-btn');
 const _trainPipelineStatus = document.getElementById('train-pipeline-status');
 const _trainStartBtn     = document.getElementById('train-start-btn');
@@ -1576,6 +1653,17 @@ const _trainLossBarFill  = document.getElementById('train-loss-bar-fill');
 const _trainProgress     = document.getElementById('train-progress');
 const _trainProgressFill = document.getElementById('train-progress-fill');
 const _trainProgressText = document.getElementById('train-progress-text');
+
+// Dataset view elements
+const _trainDatasetView     = document.getElementById('train-dataset-view');
+const _trainSampleCountEl   = document.getElementById('train-sample-count');
+const _trainLabeledCountEl  = document.getElementById('train-labeled-count');
+const _trainAutoLabelBtn    = document.getElementById('train-auto-label-btn');
+const _trainSaveDatasetBtn  = document.getElementById('train-save-dataset-btn');
+const _trainLabelProgressEl = document.getElementById('train-label-progress');
+const _trainLabelProgressFill = document.getElementById('train-label-progress-fill');
+const _trainLabelProgressText = document.getElementById('train-label-progress-text');
+const _trainSamplesTable    = document.getElementById('train-samples-table');
 const _trainLog          = document.getElementById('train-log');
 const _trainCompleteActions = document.getElementById('train-complete-actions');
 const _trainExportBtn    = document.getElementById('train-export-btn');
@@ -1602,6 +1690,239 @@ function _updateTrainFileList() {
   _trainFileListEl.classList.toggle('hidden', _trainFiles.length === 0);
   _trainScanBtn.disabled = _trainFiles.length === 0;
 }
+
+// ----- Dataset sample table -----
+
+function _formatSecs(s) {
+  if (!s || s <= 0) return '--';
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return m > 0 ? m + ':' + String(sec).padStart(2, '0') : sec + 's';
+}
+
+async function _fetchSamples() {
+  try {
+    const r = await fetch('/train/samples');
+    if (!r.ok) return;
+    const raw = await r.json();
+    const data = raw.data || raw;
+    _trainSamples = data.samples || [];
+    _renderSampleTable();
+    _trainDatasetView.classList.toggle('hidden', _trainSamples.length === 0);
+  } catch { /* ignore */ }
+}
+
+function _renderSampleTable() {
+  _trainSamplesTable.textContent = '';
+
+  // Header row
+  const header = document.createElement('div');
+  header.className = 'train-sample-header';
+  header.innerHTML = '<span>File</span><span>Dur</span><span>Caption</span><span></span>';
+  _trainSamplesTable.appendChild(header);
+
+  let labeledCount = 0;
+  _trainSamples.forEach((sample, idx) => {
+    if (sample.labeled) labeledCount++;
+    const row = document.createElement('div');
+    row.className = 'train-sample-row' + (sample.labeled ? ' labeled' : '');
+    row.dataset.idx = idx;
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'train-sample-filename';
+    nameEl.textContent = sample.filename || '(unknown)';
+    nameEl.title = sample.filename || '';
+
+    const durEl = document.createElement('span');
+    durEl.className = 'train-sample-duration';
+    durEl.textContent = _formatSecs(sample.duration);
+
+    const captionEl = document.createElement('textarea');
+    captionEl.className = 'train-sample-caption';
+    captionEl.value = sample.caption || '';
+    captionEl.placeholder = 'No label';
+    captionEl.rows = 1;
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'ghost-btn train-sample-save';
+    saveBtn.textContent = 'Save';
+    saveBtn.type = 'button';
+
+    // Mark dirty on edit
+    captionEl.addEventListener('input', () => {
+      saveBtn.classList.toggle('dirty', captionEl.value !== (sample.caption || ''));
+    });
+
+    // Save individual sample
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      saveBtn.textContent = '...';
+      try {
+        const r = await fetch('/train/sample/' + idx, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ caption: captionEl.value }),
+        });
+        if (r.ok) {
+          sample.caption = captionEl.value;
+          sample.labeled = true;
+          row.classList.add('labeled');
+          saveBtn.classList.remove('dirty');
+          _updateLabeledCount();
+        }
+      } catch { /* ignore */ }
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    });
+
+    row.appendChild(nameEl);
+    row.appendChild(durEl);
+    row.appendChild(captionEl);
+    row.appendChild(saveBtn);
+    _trainSamplesTable.appendChild(row);
+  });
+
+  _trainSampleCountEl.textContent = _trainSamples.length;
+  _trainLabeledCountEl.textContent = labeledCount;
+}
+
+function _updateLabeledCount() {
+  const count = _trainSamples.filter(s => s.labeled).length;
+  _trainLabeledCountEl.textContent = count;
+  // Enable preprocess if all labeled
+  if (count === _trainSamples.length && count > 0) {
+    _trainLabeled = true;
+    _trainPreprocessBtn.disabled = false;
+  }
+}
+
+function _updateSampleInTable(idx, sampleData) {
+  if (idx < 0 || idx >= _trainSamples.length) return;
+  Object.assign(_trainSamples[idx], sampleData);
+  // Update the row in the DOM
+  const rows = _trainSamplesTable.querySelectorAll('.train-sample-row');
+  const row = rows[idx];
+  if (!row) return;
+  const captionEl = row.querySelector('.train-sample-caption');
+  if (captionEl && sampleData.caption !== undefined) {
+    captionEl.value = sampleData.caption;
+  }
+  if (sampleData.labeled) {
+    row.classList.add('labeled');
+  }
+  _updateLabeledCount();
+}
+
+function _enableLabelBtns() {
+  _trainAutoLabelBtn.disabled = false;
+  _trainLabelBtn.disabled = false;
+}
+
+// Auto-label (async with polling)
+_trainAutoLabelBtn.addEventListener('click', async () => {
+  _trainAutoLabelBtn.disabled = true;
+  _trainLabelBtn.disabled = true;
+  _trainLabelProgressEl.classList.remove('hidden');
+  _trainLabelProgressText.textContent = 'Starting...';
+  _trainLabelProgressFill.style.width = '0%';
+
+  const labelModel = document.getElementById('train-label-model').value;
+  const body = labelModel ? { lm_model_path: labelModel } : {};
+
+  try {
+    const r = await fetch('/train/label', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const raw = await r.json();
+    const data = raw.data || raw;
+
+    if (!r.ok) {
+      _trainLabelProgressText.textContent = data.detail || 'Failed';
+      _enableLabelBtns();
+      return;
+    }
+
+    if (data.total === 0) {
+      _trainLabelProgressText.textContent = 'All samples already labeled';
+      _trainLabelProgressEl.classList.add('hidden');
+      _enableLabelBtns();
+      _trainLabeled = true;
+      _trainPreprocessBtn.disabled = false;
+      _setPipelineStatus('All labeled — preprocess next', 'ok');
+      return;
+    }
+
+    // Poll auto-label status
+    const pollLabel = async () => {
+      try {
+        const sr = await fetch('/train/label/status');
+        const sraw = await sr.json();
+        const info = sraw.data || sraw;
+
+        if (info.current && info.total && info.total > 0) {
+          const pct = Math.round((info.current / info.total) * 100);
+          _trainLabelProgressFill.style.width = pct + '%';
+          _trainLabelProgressText.textContent = info.current + '/' + info.total + ' (' + pct + '%)';
+        }
+
+        // Update individual sample in table as it gets labeled
+        if (info.last_updated_index != null && info.last_updated_sample) {
+          _updateSampleInTable(info.last_updated_index, info.last_updated_sample);
+        }
+
+        if (info.status === 'completed') {
+          _trainLabelProgressFill.style.width = '100%';
+          _trainLabelProgressText.textContent = 'Complete';
+          _enableLabelBtns();
+          _trainLabeled = true;
+          _trainPreprocessBtn.disabled = false;
+          _setPipelineStatus('All labeled — preprocess next', 'ok');
+          // Refresh full sample list
+          await _fetchSamples();
+          // Auto-save after labeling
+          fetch('/train/save', { method: 'POST' }).catch(() => {});
+          setTimeout(() => _trainLabelProgressEl.classList.add('hidden'), 2000);
+          return;
+        }
+        if (info.status === 'failed') {
+          _trainLabelProgressText.textContent = info.error || 'Failed';
+          _enableLabelBtns();
+          return;
+        }
+        setTimeout(pollLabel, 2000);
+      } catch {
+        _trainLabelProgressText.textContent = 'Status check failed';
+        _enableLabelBtns();
+      }
+    };
+    setTimeout(pollLabel, 2000);
+  } catch {
+    _trainLabelProgressText.textContent = 'Connection error';
+    _enableLabelBtns();
+  }
+});
+
+// Save dataset
+_trainSaveDatasetBtn.addEventListener('click', async () => {
+  _trainSaveDatasetBtn.disabled = true;
+  _trainSaveDatasetBtn.textContent = 'Saving...';
+  try {
+    const r = await fetch('/train/save', { method: 'POST' });
+    if (r.ok) {
+      _trainSaveDatasetBtn.textContent = 'Saved!';
+    } else {
+      _trainSaveDatasetBtn.textContent = 'Save failed';
+    }
+  } catch {
+    _trainSaveDatasetBtn.textContent = 'Save failed';
+  }
+  setTimeout(() => {
+    _trainSaveDatasetBtn.textContent = 'Save';
+    _trainSaveDatasetBtn.disabled = false;
+  }, 1500);
+});
 
 // File upload
 _trainBrowseBtn.addEventListener('click', () => _trainFileInput.click());
@@ -1661,11 +1982,16 @@ _trainUploadZone.addEventListener('drop', async e => {
 
 _trainClearBtn.addEventListener('click', async () => {
   _trainFiles = [];
+  _trainSamples = [];
   _updateTrainFileList();
   _trainScanned = false;
+  _trainLabeled = false;
   _trainPreprocessed = false;
   _trainStartBtn.disabled = true;
   _trainPreprocessBtn.disabled = true;
+  _trainLabelBtn.disabled = true;
+  _trainDatasetView.classList.add('hidden');
+  _trainSamplesTable.textContent = '';
   _setPipelineStatus('Clearing...', '');
   try {
     await fetch('/train/clear', { method: 'POST' });
@@ -1683,9 +2009,18 @@ _trainScanBtn.addEventListener('click', async () => {
     const r = await fetch('/train/scan', { method: 'POST' });
     const data = await r.json();
     if (r.ok) {
-      _setPipelineStatus('Dataset loaded', 'ok');
       _trainScanned = true;
-      _trainPreprocessBtn.disabled = false;
+      _trainLabelBtn.disabled = false;
+      // Fetch and display samples in center panel
+      await _fetchSamples();
+      const unlabeled = _trainSamples.filter(s => !s.labeled).length;
+      if (unlabeled > 0) {
+        _setPipelineStatus(_trainSamples.length + ' samples loaded — ' + unlabeled + ' need labeling', 'ok');
+      } else {
+        _setPipelineStatus(_trainSamples.length + ' samples loaded, all labeled', 'ok');
+        _trainLabeled = true;
+        _trainPreprocessBtn.disabled = false;
+      }
     } else {
       _setPipelineStatus(data.detail || 'Scan failed', 'error');
     }
@@ -1695,6 +2030,9 @@ _trainScanBtn.addEventListener('click', async () => {
     _trainScanBtn.disabled = _trainFiles.length === 0;
   }
 });
+
+// Auto-label (pipeline button — delegates to the same async handler as center panel button)
+_trainLabelBtn.addEventListener('click', () => _trainAutoLabelBtn.click());
 
 // Preprocess
 let _preprocessDots = 0;

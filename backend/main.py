@@ -62,6 +62,12 @@ from acestep_wrapper import (
     lora_scale,
     lora_status,
     dataset_scan,
+    dataset_auto_label,
+    dataset_auto_label_async,
+    dataset_auto_label_status,
+    dataset_sample_update,
+    dataset_save,
+    dataset_load,
     dataset_preprocess_async,
     dataset_preprocess_status,
     dataset_samples,
@@ -814,12 +820,14 @@ async def train_pipeline_state():
     tensor_count = sum(
         1 for f in _TRAIN_TENSOR_DIR.iterdir() if f.suffix == '.pt'
     ) if _TRAIN_TENSOR_DIR.is_dir() else 0
+    has_saved_dataset = (_TRAIN_DIR / "dataset.json").exists()
     return {
         "audio_count": len(audio_files),
         "audio_files": audio_files,
         "tensor_count": tensor_count,
         "has_audio": len(audio_files) > 0,
         "has_tensors": tensor_count > 0,
+        "has_saved_dataset": has_saved_dataset,
     }
 
 
@@ -832,6 +840,91 @@ async def train_scan():
     try:
         scan_result = await dataset_scan(audio_dir)
         return {"scan": scan_result}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+class TrainLabelRequest(BaseModel):
+    lm_model_path: Optional[str] = None
+
+
+@app.post("/train/label")
+async def train_label(req: TrainLabelRequest = TrainLabelRequest()):
+    """Start async auto-labeling of dataset samples."""
+    payload = {"only_unlabeled": True}
+    if req.lm_model_path:
+        payload["lm_model_path"] = req.lm_model_path
+    try:
+        result = await dataset_auto_label_async(payload)
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.get("/train/label/status")
+async def train_label_status():
+    """Poll auto-label progress."""
+    try:
+        result = await dataset_auto_label_status()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+class SampleUpdateRequest(BaseModel):
+    caption: str = ""
+    genre: str = ""
+    lyrics: str = "[Instrumental]"
+    bpm: Optional[int] = None
+    keyscale: str = ""
+    timesignature: str = ""
+    language: str = "unknown"
+    is_instrumental: bool = True
+
+
+@app.put("/train/sample/{sample_idx}")
+async def train_sample_update(sample_idx: int, req: SampleUpdateRequest):
+    """Update a single sample's metadata (caption, genre, lyrics, etc.)."""
+    try:
+        result = await dataset_sample_update(sample_idx, {
+            "sample_idx": sample_idx,
+            "caption": req.caption,
+            "genre": req.genre,
+            "lyrics": req.lyrics,
+            "bpm": req.bpm,
+            "keyscale": req.keyscale,
+            "timesignature": req.timesignature,
+            "language": req.language,
+            "is_instrumental": req.is_instrumental,
+            "labeled": True,
+        })
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+_TRAIN_DATASET_FILE = _TRAIN_DIR / "dataset.json"
+
+
+@app.post("/train/save")
+async def train_save():
+    """Save current dataset state to disk for later resumption."""
+    _TRAIN_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        result = await dataset_save(str(_TRAIN_DATASET_FILE))
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/train/load")
+async def train_load():
+    """Load a previously saved dataset from disk."""
+    if not _TRAIN_DATASET_FILE.exists():
+        raise HTTPException(status_code=404, detail="No saved dataset found")
+    try:
+        result = await dataset_load(str(_TRAIN_DATASET_FILE))
+        return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
 

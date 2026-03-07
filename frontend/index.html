@@ -324,12 +324,13 @@
 
         <!-- Pipeline steps -->
         <div class="train-pipeline">
-          <button class="ghost-btn" id="train-scan-btn" type="button" disabled>1. Scan &amp; Load</button>
-          <button class="ghost-btn" id="train-preprocess-btn" type="button" disabled>2. Preprocess</button>
+          <button class="ghost-btn" id="train-scan-btn" type="button" disabled>1. Scan</button>
+          <button class="ghost-btn" id="train-label-btn" type="button" disabled>2. Auto-label</button>
+          <button class="ghost-btn" id="train-preprocess-btn" type="button" disabled>3. Preprocess</button>
         </div>
         <div class="train-pipeline-status" id="train-pipeline-status"></div>
 
-        <p class="panel-hint">Upload audio samples, then scan and preprocess before training.</p>
+        <p class="panel-hint">Upload audio samples, then scan, label, and preprocess before training.</p>
       </div>
 
     </section>
@@ -459,7 +460,26 @@
 
       <!-- Tab: Train (shown when Train mode is active) -->
       <div id="tab-train" class="create-tab-content hidden">
-        <div class="train-monitor">
+
+        <!-- Dataset samples table (visible after scan) -->
+        <div class="train-dataset-view hidden" id="train-dataset-view">
+          <div class="train-dataset-header">
+            <span class="tag-group-label">Samples (<span id="train-sample-count">0</span>/<span id="train-labeled-count">0</span> labeled)</span>
+            <div class="train-dataset-actions">
+              <button class="ghost-btn" id="train-auto-label-btn" type="button">Auto-label</button>
+              <button class="ghost-btn" id="train-save-dataset-btn" type="button">Save</button>
+            </div>
+          </div>
+          <div class="train-label-progress hidden" id="train-label-progress">
+            <div class="train-progress-bar"><div class="train-progress-fill" id="train-label-progress-fill"></div></div>
+            <span class="train-progress-text" id="train-label-progress-text"></span>
+          </div>
+          <div class="train-samples-table" id="train-samples-table">
+            <!-- rows injected by JS -->
+          </div>
+        </div>
+
+        <div class="train-monitor" id="train-monitor">
           <div class="train-status-header">
             <span class="train-status-label" id="train-status-label">Idle</span>
             <span class="train-epoch-info" id="train-epoch-info"></span>
@@ -699,6 +719,17 @@
         <div class="control-group">
           <label class="field-label" for="train-lr">Learning rate</label>
           <input type="number" id="train-lr" class="number-input" value="0.0001" min="0" max="1" step="0.00001">
+        </div>
+
+        <div class="control-group">
+          <label class="field-label" for="train-label-model">Labeling model</label>
+          <select id="train-label-model" class="select-input">
+            <option value="">Default (startup model)</option>
+            <option value="acestep-5Hz-lm-0.6B">Small (0.6B)</option>
+            <option value="acestep-5Hz-lm-1.7B">Medium (1.7B)</option>
+            <option value="acestep-5Hz-lm-4B">Large (4B) — best captions</option>
+          </select>
+          <p class="batch-note">LLM used for auto-labeling. Larger = better captions but more VRAM.</p>
         </div>
 
         <details class="advanced-panel">
