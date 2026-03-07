@@ -479,6 +479,17 @@
           </div>
         </div>
 
+        <!-- Snapshots -->
+        <div class="train-snapshots" id="train-snapshots">
+          <div class="train-snapshot-save-row">
+            <input type="text" class="text-input" id="train-snapshot-name" placeholder="Snapshot name" maxlength="64">
+            <button class="ghost-btn" id="train-snapshot-save-btn" type="button">Save snapshot</button>
+          </div>
+          <div class="train-snapshot-list hidden" id="train-snapshot-list">
+            <!-- snapshot entries injected by JS -->
+          </div>
+        </div>
+
         <div class="train-monitor" id="train-monitor">
           <div class="train-status-header">
             <span class="train-status-label" id="train-status-label">Idle</span>

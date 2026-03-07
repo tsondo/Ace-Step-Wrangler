@@ -1311,6 +1311,63 @@ details[open] > .advanced-toggle {
   border-bottom: 1px solid var(--border);
 }
 
+/* Snapshots */
+.train-snapshots {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.train-snapshot-save-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.train-snapshot-save-row .text-input {
+  flex: 1;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+}
+
+.train-snapshot-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.train-snapshot-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.train-snapshot-entry .snapshot-name {
+  flex: 1;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.train-snapshot-entry .snapshot-meta {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.train-snapshot-entry .ghost-btn {
+  font-size: 0.72rem;
+  padding: 1px 6px;
+}
+
 /* Training monitor (center panel) */
 .train-monitor {
   display: flex;

@@ -26,6 +26,10 @@ Endpoints:
   POST /train/stop                  Stop current training
   POST /train/export                Export adapter to loras/ directory
   POST /train/reinitialize          Reload model after training
+  GET  /train/snapshots             List saved snapshots
+  POST /train/snapshots/save        Save dataset + tensors as named snapshot
+  POST /train/snapshots/load        Load a named snapshot into working dir
+  DELETE /train/snapshots/{name}    Delete a named snapshot
 
 Static frontend is served from /  (catch-all, mounted last).
 """
@@ -753,6 +757,7 @@ _TRAIN_DIR = Path(os.environ.get("TRAIN_DIR", str(Path(__file__).parent.parent /
 _TRAIN_AUDIO_DIR = _TRAIN_DIR / "audio"
 _TRAIN_TENSOR_DIR = _TRAIN_DIR / "tensors"
 _TRAIN_OUTPUT_DIR = _TRAIN_DIR / "output"
+_TRAIN_SNAPSHOTS_DIR = _TRAIN_DIR / "snapshots"
 
 
 class TrainStartRequest(BaseModel):
@@ -951,6 +956,120 @@ async def train_load():
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Snapshots — named save/load of dataset + tensors
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+_SNAPSHOT_NAME_RE = _re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 _-]{0,62}[a-zA-Z0-9]$|^[a-zA-Z0-9]$")
+
+
+def _safe_snapshot_name(name: str) -> str:
+    """Validate and return a safe snapshot directory name."""
+    name = name.strip()
+    if not name or not _SNAPSHOT_NAME_RE.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail="Snapshot name must be 1-64 alphanumeric characters, spaces, hyphens, or underscores.",
+        )
+    return name
+
+
+class SnapshotRequest(BaseModel):
+    name: str
+
+
+@app.get("/train/snapshots")
+async def train_snapshot_list():
+    """List saved snapshots with metadata."""
+    if not _TRAIN_SNAPSHOTS_DIR.is_dir():
+        return {"snapshots": []}
+    snapshots = []
+    for d in sorted(_TRAIN_SNAPSHOTS_DIR.iterdir()):
+        if not d.is_dir():
+            continue
+        ds_file = d / "dataset.json"
+        tensor_dir = d / "tensors"
+        tensor_count = sum(1 for f in tensor_dir.iterdir() if f.suffix == ".pt") if tensor_dir.is_dir() else 0
+        snapshots.append({
+            "name": d.name,
+            "has_dataset": ds_file.exists(),
+            "tensor_count": tensor_count,
+            "created": datetime.fromtimestamp(d.stat().st_mtime, tz=timezone.utc).isoformat(),
+        })
+    return {"snapshots": snapshots}
+
+
+@app.post("/train/snapshots/save")
+async def train_snapshot_save(req: SnapshotRequest):
+    """Save current dataset + tensors as a named snapshot."""
+    name = _safe_snapshot_name(req.name)
+    snap_dir = _TRAIN_SNAPSHOTS_DIR / name
+    snap_dir.mkdir(parents=True, exist_ok=True)
+
+    copied = {"dataset": False, "tensors": 0}
+
+    # Copy dataset.json
+    if _TRAIN_DATASET_FILE.exists():
+        shutil.copy2(_TRAIN_DATASET_FILE, snap_dir / "dataset.json")
+        copied["dataset"] = True
+
+    # Copy tensors
+    snap_tensors = snap_dir / "tensors"
+    if _TRAIN_TENSOR_DIR.is_dir():
+        if snap_tensors.exists():
+            shutil.rmtree(snap_tensors)
+        shutil.copytree(_TRAIN_TENSOR_DIR, snap_tensors)
+        copied["tensors"] = sum(1 for f in snap_tensors.iterdir() if f.suffix == ".pt")
+
+    return {"name": name, "copied": copied}
+
+
+@app.post("/train/snapshots/load")
+async def train_snapshot_load(req: SnapshotRequest):
+    """Load a named snapshot back into the working directory and AceStep memory."""
+    name = _safe_snapshot_name(req.name)
+    snap_dir = _TRAIN_SNAPSHOTS_DIR / name
+    if not snap_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Snapshot '{name}' not found")
+
+    restored = {"dataset": False, "tensors": 0}
+
+    # Restore dataset.json
+    snap_ds = snap_dir / "dataset.json"
+    if snap_ds.exists():
+        _TRAIN_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(snap_ds, _TRAIN_DATASET_FILE)
+        # Reload into AceStep memory
+        try:
+            await dataset_load(str(_TRAIN_DATASET_FILE))
+        except Exception:
+            pass  # dataset file is on disk even if AceStep load fails
+        restored["dataset"] = True
+
+    # Restore tensors
+    snap_tensors = snap_dir / "tensors"
+    if snap_tensors.is_dir():
+        if _TRAIN_TENSOR_DIR.exists():
+            shutil.rmtree(_TRAIN_TENSOR_DIR)
+        shutil.copytree(snap_tensors, _TRAIN_TENSOR_DIR)
+        restored["tensors"] = sum(1 for f in _TRAIN_TENSOR_DIR.iterdir() if f.suffix == ".pt")
+
+    return {"name": name, "restored": restored}
+
+
+@app.delete("/train/snapshots/{name}")
+async def train_snapshot_delete(name: str):
+    """Delete a named snapshot."""
+    name = _safe_snapshot_name(name)
+    snap_dir = _TRAIN_SNAPSHOTS_DIR / name
+    if not snap_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Snapshot '{name}' not found")
+    shutil.rmtree(snap_dir)
+    return {"deleted": name}
 
 
 @app.post("/train/preprocess")

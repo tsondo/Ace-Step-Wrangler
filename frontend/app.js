@@ -2078,6 +2078,139 @@ _trainPreprocessBtn.addEventListener('click', async () => {
   }
 });
 
+// ===== Snapshots =====
+
+const _snapshotNameInput = document.getElementById('train-snapshot-name');
+const _snapshotSaveBtn   = document.getElementById('train-snapshot-save-btn');
+const _snapshotListEl    = document.getElementById('train-snapshot-list');
+
+async function _loadSnapshotList() {
+  try {
+    const r = await fetch('/train/snapshots');
+    if (!r.ok) return;
+    const data = await r.json();
+    const snaps = data.snapshots || [];
+    if (snaps.length === 0) {
+      _snapshotListEl.classList.add('hidden');
+      return;
+    }
+    _snapshotListEl.textContent = '';
+    _snapshotListEl.classList.remove('hidden');
+    snaps.forEach(snap => {
+      const entry = document.createElement('div');
+      entry.className = 'train-snapshot-entry';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'snapshot-name';
+      nameSpan.textContent = snap.name;
+      nameSpan.title = snap.name;
+
+      const meta = document.createElement('span');
+      meta.className = 'snapshot-meta';
+      const parts = [];
+      if (snap.has_dataset) parts.push('labels');
+      if (snap.tensor_count > 0) parts.push(snap.tensor_count + ' tensors');
+      meta.textContent = parts.join(' + ') || 'empty';
+
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'ghost-btn';
+      loadBtn.textContent = 'Load';
+      loadBtn.addEventListener('click', async () => {
+        loadBtn.disabled = true;
+        loadBtn.textContent = '...';
+        try {
+          const lr = await fetch('/train/snapshots/load', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: snap.name }),
+          });
+          if (lr.ok) {
+            const result = await lr.json();
+            // Update pipeline state
+            if (result.restored.dataset) {
+              _trainScanned = true;
+              _trainLabelBtn.disabled = false;
+              _trainScanBtn.disabled = false;
+              await _fetchSamples();
+              const unlabeled = _trainSamples.filter(s => !s.labeled).length;
+              if (unlabeled === 0 && _trainSamples.length > 0) {
+                _trainLabeled = true;
+                _trainPreprocessBtn.disabled = false;
+              }
+            }
+            if (result.restored.tensors > 0) {
+              _trainPreprocessed = true;
+              _trainStartBtn.disabled = false;
+              _setPipelineStatus('Snapshot "' + snap.name + '" loaded — ' + result.restored.tensors + ' tensors ready', 'ok');
+            } else if (result.restored.dataset) {
+              const unlabeled = _trainSamples.filter(s => !s.labeled).length;
+              if (unlabeled === 0) {
+                _setPipelineStatus('Snapshot "' + snap.name + '" loaded — all labeled, preprocess next', 'ok');
+              } else {
+                _setPipelineStatus('Snapshot "' + snap.name + '" loaded — ' + unlabeled + ' need labeling', 'ok');
+              }
+            }
+          }
+        } catch { /* ignore */ }
+        loadBtn.disabled = false;
+        loadBtn.textContent = 'Load';
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'ghost-btn';
+      delBtn.textContent = 'Del';
+      delBtn.addEventListener('click', async () => {
+        delBtn.disabled = true;
+        try {
+          const dr = await fetch('/train/snapshots/' + encodeURIComponent(snap.name), { method: 'DELETE' });
+          if (dr.ok) {
+            entry.remove();
+            if (_snapshotListEl.children.length === 0) _snapshotListEl.classList.add('hidden');
+          }
+        } catch { /* ignore */ }
+        delBtn.disabled = false;
+      });
+
+      entry.appendChild(nameSpan);
+      entry.appendChild(meta);
+      entry.appendChild(loadBtn);
+      entry.appendChild(delBtn);
+      _snapshotListEl.appendChild(entry);
+    });
+  } catch { /* ignore */ }
+}
+
+_snapshotSaveBtn.addEventListener('click', async () => {
+  const name = _snapshotNameInput.value.trim();
+  if (!name) { _snapshotNameInput.focus(); return; }
+  _snapshotSaveBtn.disabled = true;
+  _snapshotSaveBtn.textContent = 'Saving...';
+  try {
+    const r = await fetch('/train/snapshots/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (r.ok) {
+      _snapshotSaveBtn.textContent = 'Saved!';
+      _snapshotNameInput.value = '';
+      await _loadSnapshotList();
+    } else {
+      const data = await r.json().catch(() => ({}));
+      _snapshotSaveBtn.textContent = data.detail || 'Failed';
+    }
+  } catch {
+    _snapshotSaveBtn.textContent = 'Failed';
+  }
+  setTimeout(() => {
+    _snapshotSaveBtn.textContent = 'Save snapshot';
+    _snapshotSaveBtn.disabled = false;
+  }, 1500);
+});
+
+// Load snapshot list on init
+_loadSnapshotList();
+
 // Start training
 _trainStartBtn.addEventListener('click', async () => {
   _trainStartBtn.disabled = true;
