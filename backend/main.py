@@ -855,6 +855,14 @@ async def train_scan(req: TrainScanRequest = TrainScanRequest()):
 
 class TrainLabelRequest(BaseModel):
     lm_model_path: Optional[str] = None
+    stems_mode: bool = False
+
+
+_STEMS_INSTRUCTION_HINT = (
+    "This audio is an isolated vocal stem with no instrumental accompaniment. "
+    "Describe only the vocal performance: singing style, vocal tone, emotion, "
+    "and technique. Do not describe any instruments — there are none present."
+)
 
 
 @app.post("/train/label")
@@ -863,6 +871,8 @@ async def train_label(req: TrainLabelRequest = TrainLabelRequest()):
     payload = {"only_unlabeled": True}
     if req.lm_model_path:
         payload["lm_model_path"] = req.lm_model_path
+    if req.stems_mode:
+        payload["instruction_hint"] = _STEMS_INSTRUCTION_HINT
     try:
         result = await dataset_auto_label_async(payload)
         return result
