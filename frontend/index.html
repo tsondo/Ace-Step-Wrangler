@@ -727,9 +727,10 @@
             <option value="">Default (startup model)</option>
             <option value="acestep-5Hz-lm-0.6B">Small (0.6B)</option>
             <option value="acestep-5Hz-lm-1.7B">Medium (1.7B)</option>
-            <option value="acestep-5Hz-lm-4B">Large (4B) — best captions</option>
+            <option value="acestep-5Hz-lm-4B">Large (4B) — best captions (32GB+ VRAM)</option>
           </select>
           <p class="batch-note">LLM used for auto-labeling. Larger = better captions but more VRAM.</p>
+          <p class="batch-note hidden" id="train-label-model-warn" style="color:var(--danger)">⚠ The 4B model requires 32GB+ VRAM. On smaller cards it may hang during loading.</p>
         </div>
 
         <details class="advanced-panel">

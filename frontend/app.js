@@ -1818,6 +1818,11 @@ function _enableLabelBtns() {
   _trainLabelBtn.disabled = false;
 }
 
+// Warn when 4B labeling model selected
+document.getElementById('train-label-model').addEventListener('change', function() {
+  document.getElementById('train-label-model-warn').classList.toggle('hidden', this.value !== 'acestep-5Hz-lm-4B');
+});
+
 // Auto-label (async with polling)
 _trainAutoLabelBtn.addEventListener('click', async () => {
   _trainAutoLabelBtn.disabled = true;
