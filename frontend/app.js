@@ -3553,6 +3553,163 @@ generateBtn.addEventListener('click', async () => {
   }, 2000);
 });
 
+// ===== Song Project Save / Load =====
+
+const _projectSaveBtn   = document.getElementById('project-save-btn');
+const _projectLoadBtn   = document.getElementById('project-load-btn');
+const _projectFileInput = document.getElementById('project-file-input');
+const _projectStatusEl  = document.getElementById('project-status');
+
+function _gatherProject() {
+  const activeTags = [...document.querySelectorAll('.tag.active:not(.track-class-tag)')].map(t => t.textContent.trim());
+  return {
+    _version: 1,
+    _saved: new Date().toISOString(),
+    mode: _currentMode,
+    createTab: _createTab,
+    // Lyrics & style
+    lyrics: lyricsText.value,
+    style: styleText.value,
+    tags: activeTags,
+    // Song params
+    bpm: document.getElementById('bpm').value,
+    keyRoot: document.getElementById('key-root').value,
+    keyMode: document.getElementById('key-mode').value,
+    timeSig: document.getElementById('time-sig').value,
+    // Main sliders
+    duration: document.getElementById('duration').value,
+    lyricAdherence: document.getElementById('lyric-adherence').value,
+    creativity: document.getElementById('creativity').value,
+    quality: document.getElementById('quality').value,
+    // Advanced — model
+    genModel: document.getElementById('gen-model').value,
+    lmModel: document.getElementById('lm-model').value,
+    batchSize: document.getElementById('batch-size').value,
+    vramTier: document.getElementById('vram-tier').value,
+    scheduler: document.getElementById('scheduler').value,
+    audioFormat: document.getElementById('audio-format').value,
+    // Advanced — raw sliders
+    guidanceLyric: document.getElementById('guidance-lyric').value,
+    guidanceAudio: document.getElementById('guidance-audio').value,
+    inferenceSteps: document.getElementById('inference-steps').value,
+    // Seed
+    seed: document.getElementById('seed').value,
+    // LoRA
+    loraPath: _loraBrowser.value || '',
+    loraScale: _loraScaleSlider.value,
+    // AI Lyrics tab
+    aiDescription: document.getElementById('ai-description').value,
+    aiLanguage: document.getElementById('ai-language').value,
+    // Rework
+    reworkApproach: _reworkApproach || 'cover',
+    reworkDirection: document.getElementById('rework-direction').value,
+  };
+}
+
+function _applyProject(proj) {
+  // Lyrics & style
+  lyricsText.value = proj.lyrics || '';
+  styleText.value = proj.style || '';
+
+  // Tags — clear all, then activate matching ones
+  document.querySelectorAll('.tag:not(.track-class-tag)').forEach(t => {
+    t.classList.toggle('active', (proj.tags || []).includes(t.textContent.trim()));
+  });
+
+  // Song params
+  document.getElementById('bpm').value = proj.bpm || '';
+  document.getElementById('key-root').value = proj.keyRoot || '';
+  document.getElementById('key-mode').value = proj.keyMode || 'major';
+  document.getElementById('time-sig').value = proj.timeSig || '4/4';
+
+  // Main sliders
+  const sliderIds = ['duration', 'lyric-adherence', 'creativity', 'quality'];
+  const projKeys = ['duration', 'lyricAdherence', 'creativity', 'quality'];
+  sliderIds.forEach((id, i) => {
+    if (proj[projKeys[i]] != null) {
+      document.getElementById(id).value = proj[projKeys[i]];
+      updateSlider(document.getElementById(id));
+    }
+  });
+
+  // Advanced — model selects
+  if (proj.genModel) document.getElementById('gen-model').value = proj.genModel;
+  if (proj.lmModel) document.getElementById('lm-model').value = proj.lmModel;
+  if (proj.batchSize) document.getElementById('batch-size').value = proj.batchSize;
+  if (proj.vramTier) document.getElementById('vram-tier').value = proj.vramTier;
+  if (proj.scheduler) document.getElementById('scheduler').value = proj.scheduler;
+  if (proj.audioFormat) document.getElementById('audio-format').value = proj.audioFormat;
+
+  // Advanced — raw sliders
+  ['guidance-lyric', 'guidance-audio', 'inference-steps'].forEach(id => {
+    const key = id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    if (proj[key] != null) {
+      document.getElementById(id).value = proj[key];
+      updateSlider(document.getElementById(id));
+    }
+  });
+
+  // Seed
+  document.getElementById('seed').value = proj.seed || '';
+
+  // LoRA — select in browser if path matches an option
+  if (proj.loraPath) {
+    for (const opt of _loraBrowser.options) {
+      if (opt.value === proj.loraPath) { _loraBrowser.value = proj.loraPath; break; }
+    }
+  }
+  if (proj.loraScale != null) {
+    _loraScaleSlider.value = proj.loraScale;
+    updateSlider(_loraScaleSlider);
+  }
+
+  // AI Lyrics tab
+  if (proj.aiDescription != null) document.getElementById('ai-description').value = proj.aiDescription;
+  if (proj.aiLanguage) document.getElementById('ai-language').value = proj.aiLanguage;
+
+  // Rework
+  if (proj.reworkDirection != null) document.getElementById('rework-direction').value = proj.reworkDirection;
+
+  // Sync all derived UI state
+  updateBatchLimit();
+  updateStyleState();
+  updateLyricsCount();
+  checkLyricsWarning();
+  updateGenerateState();
+}
+
+_projectSaveBtn.addEventListener('click', () => {
+  const proj = _gatherProject();
+  const name = (proj.style || proj.tags[0] || 'song-project').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+  const blob = new Blob([JSON.stringify(proj, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  _projectStatusEl.textContent = 'Saved';
+  setTimeout(() => { _projectStatusEl.textContent = ''; }, 2000);
+});
+
+_projectLoadBtn.addEventListener('click', () => _projectFileInput.click());
+
+_projectFileInput.addEventListener('change', async () => {
+  const file = _projectFileInput.files[0];
+  _projectFileInput.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const proj = JSON.parse(text);
+    if (!proj._version) throw new Error('Not a valid project file');
+    _applyProject(proj);
+    _projectStatusEl.textContent = 'Loaded: ' + file.name;
+    setTimeout(() => { _projectStatusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    _projectStatusEl.textContent = 'Invalid project file';
+    setTimeout(() => { _projectStatusEl.textContent = ''; }, 3000);
+  }
+});
+
 // ===== Auto Duration =====
 
 const autoDurationBtn = document.getElementById('auto-duration-btn');

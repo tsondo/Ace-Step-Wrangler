@@ -585,6 +585,13 @@
       <button class="generate-btn" id="generate-btn">&#9654; Generate</button>
       <div class="generate-hint" id="generate-hint" aria-live="assertive"></div>
 
+      <div class="project-row">
+        <button class="ghost-btn" id="project-save-btn" type="button">Save project</button>
+        <button class="ghost-btn" id="project-load-btn" type="button">Load project</button>
+        <input type="file" id="project-file-input" accept=".json" class="hidden">
+        <span class="project-status" id="project-status"></span>
+      </div>
+
       <!-- Advanced panel (collapsed by default) -->
       <details class="advanced-panel">
         <summary class="advanced-toggle">Advanced</summary>
