@@ -192,6 +192,123 @@ async def lora_status() -> dict:
         return r.json()
 
 
+# ---------------------------------------------------------------------------
+# Training pipeline (dataset + training management)
+# ---------------------------------------------------------------------------
+
+_TIMEOUT_TRAIN = httpx.Timeout(300.0)  # preprocessing/training start can block
+
+
+async def dataset_scan(audio_dir: str) -> dict:
+    """Scan a directory for audio files."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/scan",
+            json={"audio_dir": audio_dir},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_load(audio_dir: str) -> dict:
+    """Load audio files from a directory into the dataset."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/load",
+            json={"audio_dir": audio_dir},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_preprocess_async(tensor_dir: str) -> dict:
+    """Start async preprocessing of loaded dataset."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/dataset/preprocess_async",
+            json={"tensor_dir": tensor_dir},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_preprocess_status(task_id: str | None = None) -> dict:
+    """Poll preprocessing progress."""
+    if task_id:
+        url = f"{ACESTEP_BASE_URL}/v1/dataset/preprocess_status/{task_id}"
+    else:
+        url = f"{ACESTEP_BASE_URL}/v1/dataset/preprocess_status"
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.get(url)
+        r.raise_for_status()
+        return r.json()
+
+
+async def dataset_samples() -> dict:
+    """List loaded dataset samples."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.get(f"{ACESTEP_BASE_URL}/v1/dataset/samples")
+        r.raise_for_status()
+        return r.json()
+
+
+async def training_start(payload: dict) -> dict:
+    """Start LoRA training from preprocessed tensors."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/training/start",
+            json=payload,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def training_start_lokr(payload: dict) -> dict:
+    """Start LoKR training from preprocessed tensors."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/training/start_lokr",
+            json=payload,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def training_status() -> dict:
+    """Get current training status."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.get(f"{ACESTEP_BASE_URL}/v1/training/status")
+        r.raise_for_status()
+        return r.json()
+
+
+async def training_stop() -> dict:
+    """Stop the current training run."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(f"{ACESTEP_BASE_URL}/v1/training/stop")
+        r.raise_for_status()
+        return r.json()
+
+
+async def training_export(export_path: str, lora_output_dir: str) -> dict:
+    """Export trained adapter to a destination path."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
+        r = await client.post(
+            f"{ACESTEP_BASE_URL}/v1/training/export",
+            json={"export_path": export_path, "lora_output_dir": lora_output_dir},
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def reinitialize_service() -> dict:
+    """Reinitialize model components after training."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:
+        r = await client.post(f"{ACESTEP_BASE_URL}/v1/reinitialize")
+        r.raise_for_status()
+        return r.json()
+
+
 async def get_audio_bytes(path: str) -> tuple[bytes, str]:
     """
     Download audio and return (bytes, content_type).

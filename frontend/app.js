@@ -264,6 +264,9 @@ const modeBtns      = document.querySelectorAll('.mode-btn');
 const createPanel   = document.getElementById('create-panel');
 const reworkPanel   = document.getElementById('rework-panel');
 const analyzePanel  = document.getElementById('analyze-panel');
+const trainPanel    = document.getElementById('train-panel');
+const genControls   = document.getElementById('gen-controls');
+const trainControls = document.getElementById('train-controls');
 
 function switchMode(mode) {
   // Block mode switch during active generation
@@ -279,27 +282,44 @@ function switchMode(mode) {
   createPanel.classList.toggle('hidden', mode !== 'create');
   reworkPanel.classList.toggle('hidden', mode !== 'rework');
   analyzePanel.classList.toggle('hidden', mode !== 'analyze');
+  trainPanel.classList.toggle('hidden', mode !== 'train');
+
+  // Toggle right panel: generation controls vs training controls
+  genControls.classList.toggle('hidden', mode === 'train');
+  trainControls.classList.toggle('hidden', mode !== 'train');
 
   // Show/hide create tabs — only visible in create and rework modes
-  document.querySelector('.create-tabs').classList.toggle('hidden', mode === 'analyze');
+  document.querySelector('.create-tabs').classList.toggle('hidden', mode === 'analyze' || mode === 'train');
 
-  // Center column: hide all create tab content when in analyze mode
+  // Center column content switching
   if (mode === 'analyze') {
     document.getElementById('tab-my-lyrics').classList.add('hidden');
     document.getElementById('tab-ai-lyrics').classList.add('hidden');
     document.getElementById('tab-instrumental').classList.add('hidden');
+    document.getElementById('tab-train').classList.add('hidden');
     document.getElementById('tab-analyze').classList.remove('hidden');
+  } else if (mode === 'train') {
+    document.getElementById('tab-my-lyrics').classList.add('hidden');
+    document.getElementById('tab-ai-lyrics').classList.add('hidden');
+    document.getElementById('tab-instrumental').classList.add('hidden');
+    document.getElementById('tab-analyze').classList.add('hidden');
+    document.getElementById('tab-train').classList.remove('hidden');
+    _startTrainStatusPoll();
   } else {
     document.getElementById('tab-analyze').classList.add('hidden');
+    document.getElementById('tab-train').classList.add('hidden');
     // Restore the active create tab
     switchCreateTab(_createTab);
   }
 
-  // Waveform: clear when switching to create or analyze
-  if (mode === 'create' || mode === 'analyze') {
+  // Waveform: clear when switching to create, analyze, or train
+  if (mode === 'create' || mode === 'analyze' || mode === 'train') {
     clearWaveform();
     setOutputState('now-playing');
   }
+
+  // Stop polling when leaving train mode
+  if (mode !== 'train') _stopTrainStatusPoll();
 
   // Lock gen-model to base in Analyze mode; restore on exit
   const genModelEl = document.getElementById('gen-model');
@@ -1410,6 +1430,357 @@ _loraScaleSlider.addEventListener('input', () => {
 // Initialize on load
 _refreshLoraBrowser();
 _refreshLoraStatus();
+
+// ===== Training Tab =====
+
+let _trainPollTimer = null;
+let _trainFiles = [];
+let _trainPreprocessed = false;
+
+const _trainFileInput    = document.getElementById('train-file-input');
+const _trainUploadZone   = document.getElementById('train-upload-zone');
+const _trainBrowseBtn    = document.getElementById('train-browse-btn');
+const _trainFileListEl   = document.getElementById('train-file-list');
+const _trainFilesEl      = document.getElementById('train-files');
+const _trainFileCountEl  = document.getElementById('train-file-count');
+const _trainClearBtn     = document.getElementById('train-clear-files-btn');
+const _trainScanBtn      = document.getElementById('train-scan-btn');
+const _trainPreprocessBtn = document.getElementById('train-preprocess-btn');
+const _trainPipelineStatus = document.getElementById('train-pipeline-status');
+const _trainStartBtn     = document.getElementById('train-start-btn');
+const _trainStopBtn      = document.getElementById('train-stop-btn');
+const _trainHint         = document.getElementById('train-hint');
+const _trainStatusLabel  = document.getElementById('train-status-label');
+const _trainEpochInfo    = document.getElementById('train-epoch-info');
+const _trainLossDisplay  = document.getElementById('train-loss-display');
+const _trainLossValue    = document.getElementById('train-loss-value');
+const _trainLossBarFill  = document.getElementById('train-loss-bar-fill');
+const _trainProgress     = document.getElementById('train-progress');
+const _trainProgressFill = document.getElementById('train-progress-fill');
+const _trainProgressText = document.getElementById('train-progress-text');
+const _trainLog          = document.getElementById('train-log');
+const _trainCompleteActions = document.getElementById('train-complete-actions');
+const _trainExportBtn    = document.getElementById('train-export-btn');
+const _trainReinitBtn    = document.getElementById('train-reinit-btn');
+
+function _setPipelineStatus(text, state) {
+  _trainPipelineStatus.textContent = text;
+  _trainPipelineStatus.classList.toggle('ok', state === 'ok');
+  _trainPipelineStatus.classList.toggle('error', state === 'error');
+}
+
+function _updateTrainFileList() {
+  _trainFileCountEl.textContent = _trainFiles.length;
+  _trainFilesEl.textContent = '';
+  _trainFiles.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'train-file-entry';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'train-file-name';
+    nameSpan.textContent = f.filename;
+    el.appendChild(nameSpan);
+    _trainFilesEl.appendChild(el);
+  });
+  _trainFileListEl.classList.toggle('hidden', _trainFiles.length === 0);
+  _trainScanBtn.disabled = _trainFiles.length === 0;
+}
+
+// File upload
+_trainBrowseBtn.addEventListener('click', () => _trainFileInput.click());
+
+_trainFileInput.addEventListener('change', async () => {
+  if (!_trainFileInput.files.length) return;
+  const formData = new FormData();
+  for (const file of _trainFileInput.files) formData.append('files', file);
+  _setPipelineStatus('Uploading...', '');
+  try {
+    const r = await fetch('/train/upload', { method: 'POST', body: formData });
+    const data = await r.json();
+    if (r.ok) {
+      _trainFiles.push(...(data.files || []));
+      _updateTrainFileList();
+      _setPipelineStatus(data.uploaded + ' file(s) uploaded', 'ok');
+      _trainPreprocessed = false;
+    } else {
+      _setPipelineStatus(data.detail || 'Upload failed', 'error');
+    }
+  } catch {
+    _setPipelineStatus('Upload failed', 'error');
+  }
+  _trainFileInput.value = '';
+});
+
+// Drag-and-drop
+_trainUploadZone.addEventListener('dragover', e => { e.preventDefault(); _trainUploadZone.classList.add('drag-over'); });
+_trainUploadZone.addEventListener('dragleave', () => _trainUploadZone.classList.remove('drag-over'));
+_trainUploadZone.addEventListener('drop', async e => {
+  e.preventDefault();
+  _trainUploadZone.classList.remove('drag-over');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('audio/'));
+  if (!files.length) return;
+  const formData = new FormData();
+  files.forEach(f => formData.append('files', f));
+  _setPipelineStatus('Uploading...', '');
+  try {
+    const r = await fetch('/train/upload', { method: 'POST', body: formData });
+    const data = await r.json();
+    if (r.ok) {
+      _trainFiles.push(...(data.files || []));
+      _updateTrainFileList();
+      _setPipelineStatus(data.uploaded + ' file(s) uploaded', 'ok');
+      _trainPreprocessed = false;
+    } else {
+      _setPipelineStatus(data.detail || 'Upload failed', 'error');
+    }
+  } catch {
+    _setPipelineStatus('Upload failed', 'error');
+  }
+});
+
+_trainClearBtn.addEventListener('click', () => {
+  _trainFiles = [];
+  _updateTrainFileList();
+  _trainPreprocessed = false;
+  _trainStartBtn.disabled = true;
+  _trainPreprocessBtn.disabled = true;
+  _setPipelineStatus('', '');
+});
+
+// Scan & Load
+_trainScanBtn.addEventListener('click', async () => {
+  _trainScanBtn.disabled = true;
+  _setPipelineStatus('Scanning...', '');
+  try {
+    const r = await fetch('/train/scan', { method: 'POST' });
+    const data = await r.json();
+    if (r.ok) {
+      _setPipelineStatus('Dataset loaded', 'ok');
+      _trainPreprocessBtn.disabled = false;
+    } else {
+      _setPipelineStatus(data.detail || 'Scan failed', 'error');
+    }
+  } catch {
+    _setPipelineStatus('Scan failed', 'error');
+  } finally {
+    _trainScanBtn.disabled = _trainFiles.length === 0;
+  }
+});
+
+// Preprocess
+_trainPreprocessBtn.addEventListener('click', async () => {
+  _trainPreprocessBtn.disabled = true;
+  _setPipelineStatus('Preprocessing...', '');
+  try {
+    const r = await fetch('/train/preprocess', { method: 'POST' });
+    if (!r.ok) {
+      const data = await r.json();
+      _setPipelineStatus(data.detail || 'Preprocess failed', 'error');
+      _trainPreprocessBtn.disabled = false;
+      return;
+    }
+    // Poll preprocess status
+    const pollPreprocess = async () => {
+      try {
+        const sr = await fetch('/train/preprocess/status');
+        const sd = await sr.json();
+        const info = sd.data || sd;
+        if (info.status === 'completed' || info.status === 'done') {
+          _setPipelineStatus('Preprocessing complete', 'ok');
+          _trainPreprocessed = true;
+          _trainStartBtn.disabled = false;
+          _trainPreprocessBtn.disabled = false;
+          return;
+        } else if (info.status === 'failed' || info.status === 'error') {
+          _setPipelineStatus(info.error || 'Preprocessing failed', 'error');
+          _trainPreprocessBtn.disabled = false;
+          return;
+        }
+        const progress = info.progress || (info.current && info.total ? info.current + '/' + info.total : '');
+        _setPipelineStatus('Preprocessing... ' + progress, '');
+        setTimeout(pollPreprocess, 2000);
+      } catch {
+        _setPipelineStatus('Status check failed', 'error');
+        _trainPreprocessBtn.disabled = false;
+      }
+    };
+    setTimeout(pollPreprocess, 2000);
+  } catch {
+    _setPipelineStatus('Preprocess failed', 'error');
+    _trainPreprocessBtn.disabled = false;
+  }
+});
+
+// Start training
+_trainStartBtn.addEventListener('click', async () => {
+  _trainStartBtn.disabled = true;
+  _trainStartBtn.classList.add('hidden');
+  _trainStopBtn.classList.remove('hidden');
+  _trainHint.textContent = '';
+  _trainCompleteActions.classList.add('hidden');
+
+  const payload = {
+    adapter_type: document.getElementById('train-adapter-type').value,
+    lora_rank: Number(document.getElementById('train-rank').value),
+    lora_alpha: Number(document.getElementById('train-alpha').value),
+    lora_dropout: Number(document.getElementById('train-dropout').value),
+    learning_rate: Number(document.getElementById('train-lr').value),
+    train_epochs: Number(document.getElementById('train-epochs').value),
+    train_batch_size: Number(document.getElementById('train-batch').value),
+    gradient_accumulation: Number(document.getElementById('train-grad-accum').value),
+    save_every_n_epochs: Number(document.getElementById('train-save-every').value),
+    training_seed: Number(document.getElementById('train-seed').value),
+    gradient_checkpointing: document.getElementById('train-grad-ckpt').checked,
+  };
+
+  try {
+    const r = await fetch('/train/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      const msg = (data.data && data.data.error) || data.detail || 'Failed to start training';
+      _trainHint.textContent = msg;
+      _trainStartBtn.classList.remove('hidden');
+      _trainStopBtn.classList.add('hidden');
+      _trainStartBtn.disabled = false;
+      return;
+    }
+    _trainStatusLabel.textContent = 'Training...';
+    _trainLog.textContent = 'Training started. Monitoring progress...';
+    _trainLossDisplay.classList.remove('hidden');
+    _trainProgress.classList.remove('hidden');
+    _startTrainStatusPoll();
+  } catch (e) {
+    _trainHint.textContent = 'Connection error';
+    _trainStartBtn.classList.remove('hidden');
+    _trainStopBtn.classList.add('hidden');
+    _trainStartBtn.disabled = false;
+  }
+});
+
+// Stop training
+_trainStopBtn.addEventListener('click', async () => {
+  _trainStopBtn.disabled = true;
+  try {
+    await fetch('/train/stop', { method: 'POST' });
+  } catch { /* best-effort */ }
+  _trainStopBtn.disabled = false;
+});
+
+// Status polling
+function _startTrainStatusPoll() {
+  _stopTrainStatusPoll();
+  _pollTrainStatus();
+  _trainPollTimer = setInterval(_pollTrainStatus, 2000);
+}
+
+function _stopTrainStatusPoll() {
+  if (_trainPollTimer) { clearInterval(_trainPollTimer); _trainPollTimer = null; }
+}
+
+async function _pollTrainStatus() {
+  try {
+    const r = await fetch('/train/status');
+    if (!r.ok) return;
+    const raw = await r.json();
+    const d = raw.data || raw;
+
+    if (d.is_training) {
+      _trainStatusLabel.textContent = 'Training...';
+      const epochText = d.current_epoch ? 'Epoch ' + d.current_epoch + (d.config && d.config.epochs ? '/' + d.config.epochs : '') : '';
+      _trainEpochInfo.textContent = epochText;
+
+      if (d.current_loss != null) {
+        _trainLossValue.textContent = d.current_loss.toFixed(4);
+        _trainLossDisplay.classList.remove('hidden');
+        // Scale bar: assume loss starts around 1.0, goes toward 0
+        const pct = Math.max(0, Math.min(100, (1 - d.current_loss) * 100));
+        _trainLossBarFill.style.width = pct + '%';
+      }
+
+      if (d.config && d.config.epochs && d.current_epoch) {
+        const pct = (d.current_epoch / d.config.epochs) * 100;
+        _trainProgressFill.style.width = pct + '%';
+        _trainProgressText.textContent = Math.round(pct) + '%';
+        _trainProgress.classList.remove('hidden');
+      }
+
+      _trainStartBtn.classList.add('hidden');
+      _trainStopBtn.classList.remove('hidden');
+      _trainCompleteActions.classList.add('hidden');
+
+      if (d.status) {
+        _trainLog.textContent = d.status;
+      }
+    } else {
+      // Not training
+      _trainStopBtn.classList.add('hidden');
+      _trainStartBtn.classList.remove('hidden');
+      _trainStartBtn.disabled = !_trainPreprocessed;
+
+      if (d.error) {
+        _trainStatusLabel.textContent = 'Error';
+        _trainLog.textContent = d.error;
+        _trainHint.textContent = d.error;
+      } else if (d.current_step > 0) {
+        // Training completed
+        _trainStatusLabel.textContent = 'Complete';
+        _trainEpochInfo.textContent = '';
+        _trainCompleteActions.classList.remove('hidden');
+        _stopTrainStatusPoll();
+      } else {
+        _trainStatusLabel.textContent = 'Idle';
+        _trainEpochInfo.textContent = '';
+      }
+    }
+  } catch { /* ignore poll errors */ }
+}
+
+// Export trained adapter
+_trainExportBtn.addEventListener('click', async () => {
+  const name = prompt('Name for the exported adapter:', 'my_trained_lora');
+  if (!name) return;
+  _trainExportBtn.disabled = true;
+  try {
+    const r = await fetch('/train/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      _trainHint.textContent = 'Exported! You can now load it in the Style Adapter section.';
+      // Refresh the LoRA browser
+      _refreshLoraBrowser();
+    } else {
+      _trainHint.textContent = (data.data && data.data.error) || data.detail || 'Export failed';
+    }
+  } catch {
+    _trainHint.textContent = 'Export failed';
+  } finally {
+    _trainExportBtn.disabled = false;
+  }
+});
+
+// Reinitialize model after training
+_trainReinitBtn.addEventListener('click', async () => {
+  _trainReinitBtn.disabled = true;
+  _trainHint.textContent = 'Reloading generation model...';
+  try {
+    const r = await fetch('/train/reinitialize', { method: 'POST' });
+    if (r.ok) {
+      _trainHint.textContent = 'Generation model restored. You can switch back to Create mode.';
+    } else {
+      _trainHint.textContent = 'Reinitialize failed — you may need to restart the server.';
+    }
+  } catch {
+    _trainHint.textContent = 'Connection error';
+  } finally {
+    _trainReinitBtn.disabled = false;
+  }
+});
 
 // ===== Waveform Timeline =====
 

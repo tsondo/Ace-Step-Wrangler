@@ -1156,6 +1156,203 @@ details[open] > .advanced-toggle {
 }
 
 /* ============================================================
+   Training UI
+   ============================================================ */
+
+/* Dataset file list */
+.train-file-list {
+  margin-top: 8px;
+}
+
+.train-files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 6px 0;
+}
+
+.train-file-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 3px 6px;
+  background: var(--bg);
+  border-radius: 4px;
+}
+
+.train-file-entry .train-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Pipeline steps */
+.train-pipeline {
+  display: flex;
+  gap: 8px;
+}
+
+.train-pipeline .ghost-btn {
+  flex: 1;
+  text-align: center;
+}
+
+.train-pipeline-status {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  min-height: 1.4em;
+  padding: 4px 0;
+}
+
+.train-pipeline-status.ok {
+  color: var(--accent);
+}
+
+.train-pipeline-status.error {
+  color: var(--warning, #e8a33d);
+}
+
+/* Training monitor (center panel) */
+.train-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.train-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.train-status-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.train-epoch-info {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.train-loss-display {
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.train-loss-current {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.train-loss-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.train-loss-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.train-loss-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.train-loss-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.train-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.train-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.train-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.train-progress-text {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.train-log {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 300px;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.train-complete-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Training controls (right panel) */
+.control-label-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.control-label-inline input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.train-stop-btn {
+  background: var(--warning, #e8a33d);
+  border-color: var(--warning, #e8a33d);
+}
+
+.train-stop-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* ============================================================
    Output Panel / Now Playing Bar
    ============================================================ */
 #output-panel {

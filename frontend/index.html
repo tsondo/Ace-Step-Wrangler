@@ -299,6 +299,39 @@
         <p class="panel-hint analyze-note">Requires base generation model</p>
       </div>
 
+      <!-- Train mode panel -->
+      <div id="train-panel" class="mode-panel hidden">
+        <h2 class="panel-title">Training Dataset</h2>
+
+        <!-- Audio upload zone -->
+        <div class="audio-upload-zone" id="train-upload-zone">
+          <div class="upload-prompt" id="train-upload-prompt">
+            <span class="upload-icon">&#9835;</span>
+            <span class="upload-label">Drop audio files here or</span>
+            <button class="ghost-btn" id="train-browse-btn" type="button">Browse</button>
+          </div>
+          <input type="file" id="train-file-input" accept="audio/*" multiple hidden>
+        </div>
+
+        <!-- File list -->
+        <div class="train-file-list hidden" id="train-file-list">
+          <span class="tag-group-label">Files (<span id="train-file-count">0</span>)</span>
+          <div class="train-files" id="train-files"></div>
+          <button class="ghost-btn" id="train-clear-files-btn" type="button">Clear all</button>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Pipeline steps -->
+        <div class="train-pipeline">
+          <button class="ghost-btn" id="train-scan-btn" type="button" disabled>1. Scan &amp; Load</button>
+          <button class="ghost-btn" id="train-preprocess-btn" type="button" disabled>2. Preprocess</button>
+        </div>
+        <div class="train-pipeline-status" id="train-pipeline-status"></div>
+
+        <p class="panel-hint">Upload audio samples, then scan and preprocess before training.</p>
+      </div>
+
     </section>
 
     <!-- Center: Lyrics -->
@@ -308,6 +341,7 @@
           <button class="mode-btn active" data-mode="create" role="tab" aria-selected="true">Create</button>
           <button class="mode-btn" data-mode="rework" role="tab" aria-selected="false">Rework</button>
           <button class="mode-btn" data-mode="analyze" role="tab" aria-selected="false">Analyze</button>
+          <button class="mode-btn" data-mode="train" role="tab" aria-selected="false">Train</button>
         </div>
         <div class="create-tabs" role="tablist">
           <button class="create-tab active" data-tab="my-lyrics" role="tab" aria-selected="true">My Lyrics</button>
@@ -422,10 +456,53 @@
 
         <div class="tab-result-area hidden" id="tab-analyze-results"></div>
       </div>
+
+      <!-- Tab: Train (shown when Train mode is active) -->
+      <div id="tab-train" class="create-tab-content hidden">
+        <div class="train-monitor">
+          <div class="train-status-header">
+            <span class="train-status-label" id="train-status-label">Idle</span>
+            <span class="train-epoch-info" id="train-epoch-info"></span>
+          </div>
+
+          <!-- Loss display -->
+          <div class="train-loss-display hidden" id="train-loss-display">
+            <div class="train-loss-current">
+              <span class="train-loss-label">Loss</span>
+              <span class="train-loss-value" id="train-loss-value">--</span>
+            </div>
+            <div class="train-loss-bar">
+              <div class="train-loss-bar-fill" id="train-loss-bar-fill"></div>
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="train-progress hidden" id="train-progress">
+            <div class="train-progress-bar">
+              <div class="train-progress-fill" id="train-progress-fill"></div>
+            </div>
+            <span class="train-progress-text" id="train-progress-text"></span>
+          </div>
+
+          <!-- Log output -->
+          <div class="train-log" id="train-log">
+            <p class="panel-hint">Configure training in the right panel, then start.</p>
+          </div>
+
+          <!-- Completion actions -->
+          <div class="train-complete-actions hidden" id="train-complete-actions">
+            <button class="ghost-btn" id="train-export-btn" type="button">Export to loras/</button>
+            <button class="ghost-btn" id="train-reinit-btn" type="button">Restore generation model</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Right: Controls -->
     <section class="panel" id="controls-panel">
+
+      <!-- Generation controls (hidden in train mode) -->
+      <div id="gen-controls">
       <h2 class="panel-title">Controls</h2>
 
       <div class="control-group">
@@ -595,6 +672,80 @@
 
         </div>
       </details>
+      </div>
+
+      <!-- Training controls (shown in train mode) -->
+      <div id="train-controls" class="hidden">
+        <h2 class="panel-title">Training Config</h2>
+
+        <div class="control-group">
+          <label class="field-label" for="train-adapter-type">Adapter type</label>
+          <select id="train-adapter-type" class="select-input">
+            <option value="lora" selected>LoRA</option>
+            <option value="lokr">LoKR</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label class="field-label" for="train-rank">Rank</label>
+          <input type="number" id="train-rank" class="number-input" value="64" min="1" max="256">
+        </div>
+
+        <div class="control-group">
+          <label class="field-label" for="train-epochs">Epochs</label>
+          <input type="number" id="train-epochs" class="number-input" value="10" min="1" max="1000">
+        </div>
+
+        <div class="control-group">
+          <label class="field-label" for="train-lr">Learning rate</label>
+          <input type="number" id="train-lr" class="number-input" value="0.0001" min="0" max="1" step="0.00001">
+        </div>
+
+        <details class="advanced-panel">
+          <summary class="advanced-toggle">Advanced</summary>
+          <div class="advanced-content">
+            <div class="control-group">
+              <label class="field-label" for="train-alpha">Alpha</label>
+              <input type="number" id="train-alpha" class="number-input" value="128" min="1" max="512">
+            </div>
+            <div class="control-group">
+              <label class="field-label" for="train-dropout">Dropout</label>
+              <input type="number" id="train-dropout" class="number-input" value="0.1" min="0" max="1" step="0.05">
+            </div>
+            <div class="control-group">
+              <label class="field-label" for="train-batch">Batch size</label>
+              <input type="number" id="train-batch" class="number-input" value="1" min="1" max="8">
+            </div>
+            <div class="control-group">
+              <label class="field-label" for="train-grad-accum">Gradient accumulation</label>
+              <input type="number" id="train-grad-accum" class="number-input" value="4" min="1" max="64">
+            </div>
+            <div class="control-group">
+              <label class="field-label" for="train-save-every">Save every N epochs</label>
+              <input type="number" id="train-save-every" class="number-input" value="5" min="1">
+            </div>
+            <div class="control-group">
+              <label class="field-label" for="train-seed">Seed</label>
+              <input type="number" id="train-seed" class="number-input" value="42" min="0">
+            </div>
+            <div class="control-group">
+              <label class="control-label-inline">
+                <input type="checkbox" id="train-grad-ckpt" checked> Gradient checkpointing
+              </label>
+              <p class="batch-note">Saves VRAM at the cost of speed</p>
+            </div>
+          </div>
+        </details>
+
+        <div class="section-divider"></div>
+
+        <button class="generate-btn" id="train-start-btn" disabled>Start Training</button>
+        <button class="generate-btn train-stop-btn hidden" id="train-stop-btn">Stop Training</button>
+        <div class="generate-hint" id="train-hint" aria-live="assertive"></div>
+
+        <p class="panel-hint">Training offloads the generation model. You cannot generate while training is active.</p>
+      </div>
+
     </section>
 
   </main>

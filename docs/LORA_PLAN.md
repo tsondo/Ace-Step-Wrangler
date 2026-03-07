@@ -85,18 +85,24 @@ LoRA loading fails if the model is quantized (int8/fp8). The status message from
 ### What it does
 Train a custom LoRA adapter from a collection of audio files. Uses ACE-Step's training_v2 (Side-Step) pipeline, which fixes critical bugs in the original trainer.
 
-### Architecture decision: subprocess, not API
-Training_v2 has no REST API endpoints — it's CLI-only. Rather than building API routes inside ACE-Step (which we don't modify), the Wrangler backend will:
-1. Launch `train.py` as a **managed subprocess** (similar to how `run.py` launches both servers)
-2. Parse its stdout/stderr for progress updates
-3. Expose progress via a Wrangler endpoint that the frontend polls
+### Architecture decision: proxy the existing training API
+ACE-Step already has a complete training API (`/v1/training/*`, `/v1/dataset/*`)
+that runs training in-process using `RuntimeComponentManager` to offload
+VAE/text encoder/LLM to CPU, keeping only the decoder on GPU. This is far
+more VRAM-efficient than a separate subprocess (no duplicate model load).
 
-This keeps the boundary clean: we don't modify vendor code, and training runs in its own process with its own GPU lifecycle.
+The Wrangler proxies these endpoints — same pattern as Phase 1 and all
+other AceStep communication. Note: this uses V1's `LoRATrainer`, not
+training_v2's corrected trainer. V2 integration would require either
+upstream API support or a subprocess approach (future work).
 
-### Training cannot run during generation
-ACE-Step loads the model differently for training vs inference. The Wrangler must enforce mutual exclusion:
-- When training starts: disable the Generate button, show "Training in progress"
-- When training ends: re-enable generation (may need model reload)
+After training completes, `POST /v1/reinitialize` restores all model
+components for generation.
+
+### Training and generation are mutually exclusive
+AceStep offloads model components during training, so generation is
+unavailable. The UI shows a clear warning and disables mode switching
+during active training.
 
 ### UI: New "Train" mode tab
 Add a fourth mode button alongside Create / Rework / Analyze:

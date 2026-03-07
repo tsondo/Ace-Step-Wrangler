@@ -16,6 +16,17 @@ Endpoints:
   GET  /lora/status                 Current adapter state
   GET  /lora/browse                 List adapters in loras/ directory
 
+  POST /train/upload                Upload audio files for training
+  POST /train/scan                  Scan + load audio into AceStep dataset
+  POST /train/preprocess            Start async preprocessing
+  GET  /train/preprocess/status     Poll preprocessing progress
+  GET  /train/samples               List loaded dataset samples
+  POST /train/start                 Start LoRA/LoKR training
+  GET  /train/status                Poll training progress
+  POST /train/stop                  Stop current training
+  POST /train/export                Export adapter to loras/ directory
+  POST /train/reinitialize          Reload model after training
+
 Static frontend is served from /  (catch-all, mounted last).
 """
 
@@ -50,6 +61,17 @@ from acestep_wrapper import (
     lora_toggle,
     lora_scale,
     lora_status,
+    dataset_scan,
+    dataset_load,
+    dataset_preprocess_async,
+    dataset_preprocess_status,
+    dataset_samples,
+    training_start,
+    training_start_lokr,
+    training_status,
+    training_stop,
+    training_export,
+    reinitialize_service,
     _LANG_LABELS,
 )
 
@@ -716,6 +738,197 @@ async def lora_browse():
             })
 
     return {"adapters": adapters, "lora_dir": str(_LORA_DIR)}
+
+
+# ---------------------------------------------------------------------------
+# Training pipeline
+# ---------------------------------------------------------------------------
+
+_TRAIN_DIR = Path(os.environ.get("TRAIN_DIR", str(Path(__file__).parent.parent / "training")))
+_TRAIN_AUDIO_DIR = _TRAIN_DIR / "audio"
+_TRAIN_TENSOR_DIR = _TRAIN_DIR / "tensors"
+_TRAIN_OUTPUT_DIR = _TRAIN_DIR / "output"
+
+
+class TrainStartRequest(BaseModel):
+    tensor_dir: str = ""
+    adapter_type: str = "lora"  # lora | lokr
+    lora_rank: int = 64
+    lora_alpha: int = 128
+    lora_dropout: float = 0.1
+    learning_rate: float = 1e-4
+    train_epochs: int = 10
+    train_batch_size: int = 1
+    gradient_accumulation: int = 4
+    save_every_n_epochs: int = 5
+    training_seed: int = 42
+    output_dir: str = ""
+    gradient_checkpointing: bool = True
+
+
+class TrainExportRequest(BaseModel):
+    name: str
+    output_dir: str = ""
+
+
+@app.post("/train/upload")
+async def train_upload(files: List[UploadFile]):
+    """Accept multiple audio files for training dataset."""
+    _TRAIN_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    saved = []
+    for file in files:
+        if not file.content_type or not file.content_type.startswith("audio/"):
+            continue
+        fname = file.filename or "audio.wav"
+        # Sanitise filename
+        safe_name = Path(fname).name
+        dest = _TRAIN_AUDIO_DIR / safe_name
+        # Avoid overwrites
+        if dest.exists():
+            stem, suffix = dest.stem, dest.suffix
+            counter = 1
+            while dest.exists():
+                dest = _TRAIN_AUDIO_DIR / f"{stem}_{counter}{suffix}"
+                counter += 1
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        saved.append({"filename": safe_name, "path": str(dest)})
+    return {"uploaded": len(saved), "files": saved, "audio_dir": str(_TRAIN_AUDIO_DIR)}
+
+
+@app.post("/train/scan")
+async def train_scan():
+    """Scan the training audio directory and load files into AceStep's dataset."""
+    audio_dir = str(_TRAIN_AUDIO_DIR)
+    if not _TRAIN_AUDIO_DIR.is_dir():
+        raise HTTPException(status_code=400, detail="No audio files uploaded yet")
+    try:
+        scan_result = await dataset_scan(audio_dir)
+        load_result = await dataset_load(audio_dir)
+        return {"scan": scan_result, "load": load_result}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/train/preprocess")
+async def train_preprocess():
+    """Start async preprocessing of the loaded dataset."""
+    _TRAIN_TENSOR_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        result = await dataset_preprocess_async(str(_TRAIN_TENSOR_DIR))
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.get("/train/preprocess/status")
+async def train_preprocess_status(task_id: Optional[str] = None):
+    """Poll preprocessing progress."""
+    try:
+        result = await dataset_preprocess_status(task_id)
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.get("/train/samples")
+async def train_samples():
+    """List loaded dataset samples."""
+    try:
+        result = await dataset_samples()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/train/start")
+async def train_start(req: TrainStartRequest):
+    """Start LoRA/LoKR training from preprocessed tensors."""
+    tensor_dir = req.tensor_dir or str(_TRAIN_TENSOR_DIR)
+    output_dir = req.output_dir or str(_TRAIN_OUTPUT_DIR)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    try:
+        if req.adapter_type == "lokr":
+            payload = {
+                "tensor_dir": tensor_dir,
+                "lokr_linear_dim": req.lora_rank,
+                "lokr_linear_alpha": req.lora_alpha,
+                "learning_rate": req.learning_rate,
+                "train_epochs": req.train_epochs,
+                "train_batch_size": req.train_batch_size,
+                "gradient_accumulation": req.gradient_accumulation,
+                "save_every_n_epochs": req.save_every_n_epochs,
+                "training_seed": req.training_seed,
+                "output_dir": output_dir,
+                "gradient_checkpointing": req.gradient_checkpointing,
+            }
+            result = await training_start_lokr(payload)
+        else:
+            payload = {
+                "tensor_dir": tensor_dir,
+                "lora_rank": req.lora_rank,
+                "lora_alpha": req.lora_alpha,
+                "lora_dropout": req.lora_dropout,
+                "learning_rate": req.learning_rate,
+                "train_epochs": req.train_epochs,
+                "train_batch_size": req.train_batch_size,
+                "gradient_accumulation": req.gradient_accumulation,
+                "save_every_n_epochs": req.save_every_n_epochs,
+                "training_seed": req.training_seed,
+                "lora_output_dir": output_dir,
+                "gradient_checkpointing": req.gradient_checkpointing,
+            }
+            result = await training_start(payload)
+        return result
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text if exc.response else str(exc)
+        raise HTTPException(status_code=exc.response.status_code, detail=detail)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.get("/train/status")
+async def train_status():
+    """Get current training status."""
+    try:
+        result = await training_status()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/train/stop")
+async def train_stop():
+    """Stop the current training run."""
+    try:
+        result = await training_stop()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/train/export")
+async def train_export(req: TrainExportRequest):
+    """Export trained adapter to the loras directory for immediate use."""
+    output_dir = req.output_dir or str(_TRAIN_OUTPUT_DIR)
+    safe_name = re.sub(r'[^\w\-.]', '_', req.name.strip()) or "trained_adapter"
+    export_path = str(_LORA_DIR / safe_name)
+    try:
+        result = await training_export(export_path, output_dir)
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+@app.post("/train/reinitialize")
+async def train_reinitialize():
+    """Reinitialize model components after training completes."""
+    try:
+        result = await reinitialize_service()
+        return result
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
 
 
 # ---------------------------------------------------------------------------
