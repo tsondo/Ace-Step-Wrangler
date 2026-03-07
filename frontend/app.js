@@ -1472,60 +1472,67 @@ function _onAceStepReady() {
   _trainScanBtn.disabled = _trainFiles.length === 0;
   _trainPreprocessBtn.disabled = !_trainScanned;
   _trainStartBtn.disabled = !_trainPreprocessed;
-  _recoverPreprocessState();
+  _recoverPipelineState();
 }
 
-async function _recoverPreprocessState() {
+async function _recoverPipelineState() {
+  // 1. Check AceStep's in-memory preprocess task (survives page refresh but not server restart)
   try {
     const r = await fetch('/train/preprocess/status');
-    if (!r.ok) return;
-    const raw = await r.json();
-    const info = raw.data || raw;
-    if (!info || info.status === 'idle') return;
+    if (r.ok) {
+      const raw = await r.json();
+      const info = raw.data || raw;
+      if (info && info.status === 'running') {
+        _trainPreprocessBtn.disabled = true;
+        _setPipelineStatus('Preprocessing', '');
+        _startPreprocessAnim();
+        const pollRecover = async () => {
+          try {
+            const sr = await fetch('/train/preprocess/status');
+            const sd = await sr.json();
+            const d = sd.data || sd;
+            if (d.status === 'completed' || d.status === 'done') {
+              _stopPreprocessAnim();
+              _setPipelineStatus('Preprocessing complete', 'ok');
+              _trainPreprocessed = true;
+              _trainStartBtn.disabled = false;
+              _trainPreprocessBtn.disabled = false;
+              return;
+            } else if (d.status === 'failed' || d.status === 'error') {
+              _stopPreprocessAnim();
+              _setPipelineStatus(d.error || 'Preprocessing failed', 'error');
+              _trainPreprocessBtn.disabled = false;
+              return;
+            }
+            if (d.current && d.total && d.total > 0) {
+              const pct = Math.round((d.current / d.total) * 100);
+              _setPipelineStatus('Preprocessing ' + d.current + '/' + d.total + ' (' + pct + '%)', '');
+            }
+            setTimeout(pollRecover, 2000);
+          } catch { _stopPreprocessAnim(); }
+        };
+        setTimeout(pollRecover, 2000);
+        return; // active task found — don't fall through to disk check
+      }
+    }
+  } catch { /* AceStep may not have task state */ }
 
-    if (info.status === 'running') {
-      // Resume polling an in-progress preprocess
-      _trainPreprocessBtn.disabled = true;
-      _setPipelineStatus('Preprocessing', '');
-      _startPreprocessAnim();
-      const pollRecover = async () => {
-        try {
-          const sr = await fetch('/train/preprocess/status');
-          const sd = await sr.json();
-          const d = sd.data || sd;
-          if (d.status === 'completed' || d.status === 'done') {
-            _stopPreprocessAnim();
-            _setPipelineStatus('Preprocessing complete', 'ok');
-            _trainPreprocessed = true;
-            _trainStartBtn.disabled = false;
-            _trainPreprocessBtn.disabled = false;
-            return;
-          } else if (d.status === 'failed' || d.status === 'error') {
-            _stopPreprocessAnim();
-            _setPipelineStatus(d.error || 'Preprocessing failed', 'error');
-            _trainPreprocessBtn.disabled = false;
-            return;
-          }
-          if (d.current && d.total && d.total > 0) {
-            const pct = Math.round((d.current / d.total) * 100);
-            _setPipelineStatus('Preprocessing ' + d.current + '/' + d.total + ' (' + pct + '%)', '');
-          }
-          setTimeout(pollRecover, 2000);
-        } catch {
-          _stopPreprocessAnim();
-        }
-      };
-      setTimeout(pollRecover, 2000);
-    } else if (info.status === 'completed' || info.status === 'done') {
+  // 2. Fall back to checking what exists on disk (survives server restart)
+  try {
+    const r = await fetch('/train/pipeline-state');
+    if (!r.ok) return;
+    const state = await r.json();
+    if (state.has_tensors) {
       _trainPreprocessed = true;
       _trainStartBtn.disabled = false;
       _trainPreprocessBtn.disabled = false;
-      _setPipelineStatus('Preprocessing complete', 'ok');
-    } else if (info.status === 'failed' || info.status === 'error') {
-      _setPipelineStatus(info.error || 'Preprocessing failed', 'error');
-      _trainPreprocessBtn.disabled = false;
+      _setPipelineStatus(state.tensor_count + ' preprocessed tensors ready', 'ok');
+    } else if (state.has_audio) {
+      _trainScanned = false;
+      _trainPreprocessBtn.disabled = true;
+      _setPipelineStatus(state.audio_count + ' audio file(s) uploaded — scan to continue', '');
     }
-  } catch { /* ignore — not critical */ }
+  } catch { /* ignore */ }
 }
 
 // ===== Training Tab =====

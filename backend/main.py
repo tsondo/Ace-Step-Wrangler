@@ -795,6 +795,24 @@ async def train_upload(files: List[UploadFile]):
     return {"uploaded": len(saved), "files": saved, "audio_dir": str(_TRAIN_AUDIO_DIR)}
 
 
+@app.get("/train/pipeline-state")
+async def train_pipeline_state():
+    """Report what training data exists on disk (survives restarts)."""
+    audio_files = []
+    if _TRAIN_AUDIO_DIR.is_dir():
+        audio_files = [f.name for f in _TRAIN_AUDIO_DIR.iterdir()
+                       if f.is_file() and f.suffix.lower() in ('.wav', '.mp3', '.flac', '.ogg', '.m4a')]
+    tensor_files = []
+    if _TRAIN_TENSOR_DIR.is_dir():
+        tensor_files = [f.name for f in _TRAIN_TENSOR_DIR.iterdir() if f.suffix == '.pt']
+    return {
+        "audio_count": len(audio_files),
+        "tensor_count": len(tensor_files),
+        "has_audio": len(audio_files) > 0,
+        "has_tensors": len(tensor_files) > 0,
+    }
+
+
 @app.post("/train/scan")
 async def train_scan():
     """Scan the training audio directory and load files into AceStep's dataset."""
