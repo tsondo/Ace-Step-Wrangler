@@ -329,6 +329,10 @@
           <button class="ghost-btn" id="train-preprocess-btn" type="button" disabled>3. Preprocess</button>
         </div>
         <div class="train-pipeline-status" id="train-pipeline-status"></div>
+        <div class="train-label-progress hidden" id="train-label-progress">
+          <div class="train-progress-bar"><div class="train-progress-fill" id="train-label-progress-fill"></div></div>
+          <span class="train-progress-text" id="train-label-progress-text"></span>
+        </div>
 
         <p class="panel-hint">Upload audio samples, then scan, label, and preprocess before training.</p>
       </div>
@@ -469,10 +473,6 @@
               <button class="ghost-btn" id="train-auto-label-btn" type="button">Auto-label</button>
               <button class="ghost-btn" id="train-save-dataset-btn" type="button">Save</button>
             </div>
-          </div>
-          <div class="train-label-progress hidden" id="train-label-progress">
-            <div class="train-progress-bar"><div class="train-progress-fill" id="train-label-progress-fill"></div></div>
-            <span class="train-progress-text" id="train-label-progress-text"></span>
           </div>
           <div class="train-samples-table" id="train-samples-table">
             <!-- rows injected by JS -->
