@@ -194,6 +194,11 @@ def main() -> None:
     if gpu:
         acestep_env["CUDA_VISIBLE_DEVICES"] = gpu
 
+    # Strip LD_LIBRARY_PATH to prevent system CUDA libs (e.g. cuBLAS from a
+    # newer toolkit) from shadowing the versions bundled with PyTorch.
+    # This avoids CUBLAS_STATUS_INVALID_VALUE errors caused by version mismatch.
+    acestep_env.pop("LD_LIBRARY_PATH", None)
+
     # --- Build environment for Wrangler (no GPU needed) ---------------------
     wrangler_env = os.environ.copy()
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)
