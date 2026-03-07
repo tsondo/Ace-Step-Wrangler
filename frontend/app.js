@@ -1744,7 +1744,7 @@ function _renderSampleTable() {
     captionEl.className = 'train-sample-caption';
     captionEl.value = sample.caption || '';
     captionEl.placeholder = 'No label';
-    captionEl.rows = 1;
+    captionEl.rows = 3;
 
     const saveBtn = document.createElement('button');
     saveBtn.className = 'ghost-btn train-sample-save';
