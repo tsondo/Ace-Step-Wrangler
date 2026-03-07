@@ -859,9 +859,14 @@ class TrainLabelRequest(BaseModel):
 
 
 _STEMS_INSTRUCTION_HINT = (
-    "This audio is an isolated vocal stem with no instrumental accompaniment. "
-    "Describe only the vocal performance: singing style, vocal tone, emotion, "
-    "and technique. Do not describe any instruments — there are none present."
+    "CRITICAL CONTEXT: This audio is a solo vocal stem extracted from a mix. "
+    "It contains ONLY a human voice — zero instruments, zero accompaniment. "
+    "Any harmonic content you detect is vocal resonance, overtones, or room tone, NOT instruments. "
+    "Your caption MUST describe: vocal type (male/female/choir), singing style, "
+    "vocal tone and timbre, emotional delivery, and vocal technique. "
+    "NEVER mention piano, guitar, drums, bass, strings, synth, or any instrument. "
+    "Example: 'A warm female vocal with breathy delivery and intimate phrasing, "
+    "conveying melancholy through subtle vibrato and restrained dynamics.'"
 )
 
 
