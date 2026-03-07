@@ -1539,9 +1539,7 @@ async function _recoverPipelineState() {
               _trainLabelProgressFill.style.width = pct + '%';
               _trainLabelProgressText.textContent = d.current + '/' + d.total + ' (' + pct + '%)';
             }
-            if (d.last_updated_index != null && d.last_updated_sample) {
-              _updateSampleInTable(d.last_updated_index, d.last_updated_sample);
-            }
+            await _fetchSamples();
             if (d.status === 'completed') {
               _trainLabelProgressFill.style.width = '100%';
               _trainLabelProgressText.textContent = 'Complete';
@@ -1549,7 +1547,6 @@ async function _recoverPipelineState() {
               _trainLabeled = true;
               _trainPreprocessBtn.disabled = false;
               _setPipelineStatus('All labeled — preprocess next', 'ok');
-              await _fetchSamples();
               fetch('/train/save', { method: 'POST' }).catch(() => {});
               setTimeout(() => _trainLabelProgressEl.classList.add('hidden'), 2000);
               return;
@@ -1703,13 +1700,19 @@ function _formatSecs(s) {
 async function _fetchSamples() {
   try {
     const r = await fetch('/train/samples');
-    if (!r.ok) return;
+    if (!r.ok) {
+      console.warn('fetchSamples failed:', r.status, await r.text());
+      return;
+    }
     const raw = await r.json();
     const data = raw.data || raw;
-    _trainSamples = data.samples || [];
-    _renderSampleTable();
-    _trainDatasetView.classList.toggle('hidden', _trainSamples.length === 0);
-  } catch { /* ignore */ }
+    const samples = data.samples || [];
+    if (samples.length > 0) {
+      _trainSamples = samples;
+      _renderSampleTable();
+      _trainDatasetView.classList.remove('hidden');
+    }
+  } catch (e) { console.warn('fetchSamples error:', e); }
 }
 
 function _renderSampleTable() {
@@ -1872,10 +1875,8 @@ _trainAutoLabelBtn.addEventListener('click', async () => {
           _trainLabelProgressText.textContent = info.current + '/' + info.total + ' (' + pct + '%)';
         }
 
-        // Update individual sample in table as it gets labeled
-        if (info.last_updated_index != null && info.last_updated_sample) {
-          _updateSampleInTable(info.last_updated_index, info.last_updated_sample);
-        }
+        // Refresh table to show newly labeled samples
+        await _fetchSamples();
 
         if (info.status === 'completed') {
           _trainLabelProgressFill.style.width = '100%';
@@ -1884,8 +1885,6 @@ _trainAutoLabelBtn.addEventListener('click', async () => {
           _trainLabeled = true;
           _trainPreprocessBtn.disabled = false;
           _setPipelineStatus('All labeled — preprocess next', 'ok');
-          // Refresh full sample list
-          await _fetchSamples();
           // Auto-save after labeling
           fetch('/train/save', { method: 'POST' }).catch(() => {});
           setTimeout(() => _trainLabelProgressEl.classList.add('hidden'), 2000);
