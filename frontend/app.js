@@ -1494,7 +1494,7 @@ async function _recoverPipelineState() {
             if (d.status === 'completed' || d.status === 'done') {
               _stopPreprocessAnim();
               _setPipelineStatus('Preprocessing complete', 'ok');
-              _trainPreprocessed = true;
+              _trainPreprocessed = true; _syncSnapshotBtn();
               _trainStartBtn.disabled = false;
               _trainPreprocessBtn.disabled = false;
               fetch('/train/save', { method: 'POST' }).catch(() => {});
@@ -1600,7 +1600,7 @@ async function _recoverPipelineState() {
     }
 
     if (state.has_tensors) {
-      _trainPreprocessed = true;
+      _trainPreprocessed = true; _syncSnapshotBtn();
       _trainScanned = true;
       _trainLabeled = true;
       _trainStartBtn.disabled = false;
@@ -1911,7 +1911,7 @@ _trainFileInput.addEventListener('change', async () => {
       let msg = data.uploaded + ' file(s) uploaded';
       if (data.skipped) msg += ', ' + data.skipped + ' duplicate(s) skipped';
       _setPipelineStatus(msg, 'ok');
-      _trainPreprocessed = false;
+      _trainPreprocessed = false; _syncSnapshotBtn();
     } else {
       _setPipelineStatus(data.detail || 'Upload failed', 'error');
     }
@@ -1941,7 +1941,7 @@ _trainUploadZone.addEventListener('drop', async e => {
       let msg = data.uploaded + ' file(s) uploaded';
       if (data.skipped) msg += ', ' + data.skipped + ' duplicate(s) skipped';
       _setPipelineStatus(msg, 'ok');
-      _trainPreprocessed = false;
+      _trainPreprocessed = false; _syncSnapshotBtn();
     } else {
       _setPipelineStatus(data.detail || 'Upload failed', 'error');
     }
@@ -1956,7 +1956,7 @@ _trainClearBtn.addEventListener('click', async () => {
   _updateTrainFileList();
   _trainScanned = false;
   _trainLabeled = false;
-  _trainPreprocessed = false;
+  _trainPreprocessed = false; _syncSnapshotBtn();
   _trainStartBtn.disabled = true;
   _trainPreprocessBtn.disabled = true;
   _trainLabelBtn.disabled = true;
@@ -2046,7 +2046,7 @@ _trainPreprocessBtn.addEventListener('click', async () => {
         if (info.status === 'completed' || info.status === 'done') {
           _stopPreprocessAnim();
           _setPipelineStatus('Preprocessing complete', 'ok');
-          _trainPreprocessed = true;
+          _trainPreprocessed = true; _syncSnapshotBtn();
           _trainStartBtn.disabled = false;
           _trainPreprocessBtn.disabled = false;
           fetch('/train/save', { method: 'POST' }).catch(() => {});
@@ -2083,6 +2083,12 @@ _trainPreprocessBtn.addEventListener('click', async () => {
 const _snapshotNameInput = document.getElementById('train-snapshot-name');
 const _snapshotSaveBtn   = document.getElementById('train-snapshot-save-btn');
 const _snapshotListEl    = document.getElementById('train-snapshot-list');
+
+_snapshotSaveBtn.disabled = true;
+
+function _syncSnapshotBtn() {
+  _snapshotSaveBtn.disabled = !(_trainLabeled && _trainPreprocessed);
+}
 
 async function _loadSnapshotList() {
   try {
@@ -2139,7 +2145,7 @@ async function _loadSnapshotList() {
               }
             }
             if (result.restored.tensors > 0) {
-              _trainPreprocessed = true;
+              _trainPreprocessed = true; _syncSnapshotBtn();
               _trainStartBtn.disabled = false;
               _setPipelineStatus('Snapshot "' + snap.name + '" loaded — ' + result.restored.tensors + ' tensors ready', 'ok');
             } else if (result.restored.dataset) {
@@ -2181,8 +2187,8 @@ async function _loadSnapshotList() {
 }
 
 _snapshotSaveBtn.addEventListener('click', async () => {
-  const name = _snapshotNameInput.value.trim();
-  if (!name) { _snapshotNameInput.focus(); return; }
+  const name = _snapshotNameInput.value.trim()
+    || new Date().toISOString().replace(/[T]/g, ' ').replace(/[:]/g, '-').slice(0, 19);
   _snapshotSaveBtn.disabled = true;
   _snapshotSaveBtn.textContent = 'Saving...';
   try {
@@ -2204,7 +2210,7 @@ _snapshotSaveBtn.addEventListener('click', async () => {
   }
   setTimeout(() => {
     _snapshotSaveBtn.textContent = 'Save snapshot';
-    _snapshotSaveBtn.disabled = false;
+    _syncSnapshotBtn();
   }, 1500);
 });
 
