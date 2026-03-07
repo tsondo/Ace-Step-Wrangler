@@ -1613,12 +1613,31 @@ _trainScanBtn.addEventListener('click', async () => {
 });
 
 // Preprocess
+let _preprocessDots = 0;
+let _preprocessAnimTimer = null;
+
+function _startPreprocessAnim() {
+  _preprocessDots = 0;
+  _preprocessAnimTimer = setInterval(() => {
+    _preprocessDots = (_preprocessDots + 1) % 4;
+    const dots = '.'.repeat(_preprocessDots) + '\u2008'.repeat(3 - _preprocessDots);
+    const current = _trainPipelineStatus.textContent.replace(/[.\u2008]+$/, '');
+    _trainPipelineStatus.textContent = current + dots;
+  }, 500);
+}
+
+function _stopPreprocessAnim() {
+  if (_preprocessAnimTimer) { clearInterval(_preprocessAnimTimer); _preprocessAnimTimer = null; }
+}
+
 _trainPreprocessBtn.addEventListener('click', async () => {
   _trainPreprocessBtn.disabled = true;
-  _setPipelineStatus('Preprocessing...', '');
+  _setPipelineStatus('Preprocessing', '');
+  _startPreprocessAnim();
   try {
     const r = await fetch('/train/preprocess', { method: 'POST' });
     if (!r.ok) {
+      _stopPreprocessAnim();
       const data = await r.json();
       _setPipelineStatus(data.detail || 'Preprocess failed', 'error');
       _trainPreprocessBtn.disabled = false;
@@ -1631,26 +1650,34 @@ _trainPreprocessBtn.addEventListener('click', async () => {
         const sd = await sr.json();
         const info = sd.data || sd;
         if (info.status === 'completed' || info.status === 'done') {
+          _stopPreprocessAnim();
           _setPipelineStatus('Preprocessing complete', 'ok');
           _trainPreprocessed = true;
           _trainStartBtn.disabled = false;
           _trainPreprocessBtn.disabled = false;
           return;
         } else if (info.status === 'failed' || info.status === 'error') {
+          _stopPreprocessAnim();
           _setPipelineStatus(info.error || 'Preprocessing failed', 'error');
           _trainPreprocessBtn.disabled = false;
           return;
         }
-        const progress = info.progress || (info.current && info.total ? info.current + '/' + info.total : '');
-        _setPipelineStatus('Preprocessing... ' + progress, '');
+        if (info.current && info.total && info.total > 0) {
+          const pct = Math.round((info.current / info.total) * 100);
+          _setPipelineStatus('Preprocessing ' + info.current + '/' + info.total + ' (' + pct + '%)', '');
+        } else {
+          _setPipelineStatus('Preprocessing', '');
+        }
         setTimeout(pollPreprocess, 2000);
       } catch {
+        _stopPreprocessAnim();
         _setPipelineStatus('Status check failed', 'error');
         _trainPreprocessBtn.disabled = false;
       }
     };
     setTimeout(pollPreprocess, 2000);
   } catch {
+    _stopPreprocessAnim();
     _setPipelineStatus('Preprocess failed', 'error');
     _trainPreprocessBtn.disabled = false;
   }
