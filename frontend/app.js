@@ -1656,6 +1656,7 @@ let _trainFiles = [];
 let _trainPreprocessed = false;
 let _trainScanned = false;
 let _trainLabeled = false;
+let _needsReinit = false;
 let _trainSamples = [];  // sample data from AceStep after scan
 
 const _trainFileInput    = document.getElementById('train-file-input');
@@ -1692,7 +1693,6 @@ const _trainSamplesTable    = document.getElementById('train-samples-table');
 const _trainLog          = document.getElementById('train-log');
 const _trainCompleteActions = document.getElementById('train-complete-actions');
 const _trainExportBtn    = document.getElementById('train-export-btn');
-const _trainReinitBtn    = document.getElementById('train-reinit-btn');
 
 function _setPipelineStatus(text, state) {
   _trainPipelineStatus.textContent = text;
@@ -2453,7 +2453,8 @@ async function _pollTrainStatus() {
         _trainLog.textContent = d.error;
         _trainHint.textContent = d.error;
       } else if (d.current_step > 0) {
-        // Training completed
+        // Training completed — model needs reinit before next generation
+        _needsReinit = true;
         _trainStatusLabel.textContent = 'Complete';
         _trainEpochInfo.textContent = '';
         _trainProgressFill.style.width = '100%';
@@ -2495,23 +2496,6 @@ _trainExportBtn.addEventListener('click', async () => {
   }
 });
 
-// Reinitialize model after training
-_trainReinitBtn.addEventListener('click', async () => {
-  _trainReinitBtn.disabled = true;
-  _trainHint.textContent = 'Reloading generation model...';
-  try {
-    const r = await fetch('/train/reinitialize', { method: 'POST' });
-    if (r.ok) {
-      _trainHint.textContent = 'Generation model restored. You can switch back to Create mode.';
-    } else {
-      _trainHint.textContent = 'Reinitialize failed — you may need to restart the server.';
-    }
-  } catch {
-    _trainHint.textContent = 'Connection error';
-  } finally {
-    _trainReinitBtn.disabled = false;
-  }
-});
 
 // ===== Waveform Timeline =====
 
@@ -3486,6 +3470,23 @@ generateBtn.addEventListener('click', async () => {
   // Hide stale result waveform when starting a new analyze generation
   if (_currentMode === 'analyze') {
     document.getElementById('analyze-wf-result-section').classList.add('hidden');
+  }
+
+  // Restore model if training modified it
+  if (_needsReinit) {
+    generateBtn.disabled = true;
+    generateHint.textContent = 'Restoring generation model\u2026';
+    try {
+      const r = await fetch('/train/reinitialize', { method: 'POST' });
+      if (!r.ok) throw new Error('reinitialize failed');
+      _needsReinit = false;
+      generateHint.textContent = '';
+    } catch (err) {
+      generateHint.textContent = 'Model restore failed: ' + err.message;
+      generateBtn.disabled = false;
+      return;
+    }
+    generateBtn.disabled = false;
   }
 
   const payload = buildPayload();
