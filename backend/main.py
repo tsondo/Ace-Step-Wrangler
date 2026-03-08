@@ -728,15 +728,19 @@ async def lora_browse():
         return {"adapters": adapters, "lora_dir": str(_LORA_DIR)}
 
     for entry in sorted(_LORA_DIR.iterdir()):
-        # PEFT LoRA: directory with adapter_config.json
-        if entry.is_dir() and (entry / "adapter_config.json").exists():
-            size_bytes = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
-            adapters.append({
-                "name": entry.name,
-                "path": str(entry),
-                "type": "lora",
-                "size_mb": round(size_bytes / 1_048_576, 1),
-            })
+        # PEFT LoRA: directory with adapter_config.json (may be nested in adapter/ subdir)
+        if entry.is_dir():
+            adapter_dir = entry
+            if (entry / "adapter" / "adapter_config.json").exists():
+                adapter_dir = entry / "adapter"
+            if (adapter_dir / "adapter_config.json").exists():
+                size_bytes = sum(f.stat().st_size for f in entry.rglob("*") if f.is_file())
+                adapters.append({
+                    "name": entry.name,
+                    "path": str(adapter_dir),
+                    "type": "lora",
+                    "size_mb": round(size_bytes / 1_048_576, 1),
+                })
         # LoKR: single .safetensors file
         elif entry.is_file() and entry.suffix == ".safetensors":
             adapters.append({
