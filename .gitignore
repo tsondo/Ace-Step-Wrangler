@@ -208,3 +208,4 @@ __marimo__/
 
 # Training data (audio, tensors, snapshots — user-specific, often large)
 training/
+loras/
