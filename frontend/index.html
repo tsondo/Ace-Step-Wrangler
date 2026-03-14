@@ -187,6 +187,17 @@
           <div class="slider-bounds"><span>Subtle</span><span>Dramatic</span></div>
         </div>
 
+        <!-- Cover noise blend (Reimagine only) -->
+        <div class="control-group" id="cover-noise-group">
+          <div class="control-label-row">
+            <label class="field-label" for="cover-noise-strength">Noise blend</label>
+            <span class="control-value" id="cover-noise-strength-value">0%</span>
+          </div>
+          <input type="range" id="cover-noise-strength" class="slider" min="0" max="100" value="0" step="1">
+          <div class="slider-bounds"><span>Max AI creativity</span><span>Closest to original</span></div>
+          <p class="panel-hint">How the AI starts — 0% begins from pure noise (most creative), 100% begins from the original audio</p>
+        </div>
+
         <!-- Region selection (Fix & Blend only) -->
         <div class="region-inputs hidden" id="region-inputs">
           <span class="tag-group-label">Region to fix</span>
@@ -215,6 +226,9 @@
             rows="3"
           ></textarea>
         </div>
+
+        <p class="panel-hint" id="rework-lyrics-hint">Use the lyrics panel to the right to set new lyrics for the reimagined version, or switch to Instrumental for a lyrics-free result.</p>
+        <button class="ghost-btn" id="rework-extract-btn" type="button" disabled title="Coming soon — extracts lyrics, BPM, key, and style from the loaded song">Extract from loaded song</button>
       </div>
 
       <!-- Analyze mode panel -->

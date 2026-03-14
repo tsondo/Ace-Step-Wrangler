@@ -244,6 +244,9 @@ function updateSlider(slider) {
     case 'lora-scale':
       valueEl.textContent = `${val}%`;
       break;
+    case 'cover-noise-strength':
+      valueEl.textContent = `${val}%`;
+      break;
   }
 }
 
@@ -826,12 +829,15 @@ audioUploadZone.addEventListener('drop', (e) => {
 // Approach selector (scoped to rework panel — analyze has its own buttons)
 const approachBtns       = document.querySelectorAll('#rework-panel .approach-btn');
 const coverStrengthGroup = document.getElementById('cover-strength-group');
+const coverNoiseGroup    = document.getElementById('cover-noise-group');
 const regionInputs       = document.getElementById('region-inputs');
 
 function switchApproach(approach) {
   _reworkApproach = approach;
   approachBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.approach === approach));
   coverStrengthGroup.classList.toggle('hidden', approach !== 'cover');
+  coverNoiseGroup.classList.toggle('hidden', approach !== 'cover');
+  document.getElementById('rework-lyrics-hint').classList.toggle('hidden', approach !== 'cover');
   regionInputs.classList.toggle('hidden', approach !== 'repaint');
 
   // Update waveform selection visibility: show handles for Fix & Blend, hide for Reimagine
@@ -3191,6 +3197,7 @@ function buildReworkPayload() {
 
   if (taskType === 'cover') {
     payload.audio_cover_strength = Number(coverStrengthSlider.value) / 100;
+    payload.cover_noise_strength = Number(document.getElementById('cover-noise-strength').value) / 100;
   } else {
     payload.repainting_start = Number(document.getElementById('region-start').value);
     payload.repainting_end   = Number(document.getElementById('region-end').value);
@@ -3633,6 +3640,7 @@ function _gatherProject() {
     // Rework
     reworkApproach: _reworkApproach || 'cover',
     reworkDirection: document.getElementById('rework-direction').value,
+    coverNoiseStrength: document.getElementById('cover-noise-strength').value,
     // Last used seed (for recall)
     lastSeed: _lastSeed,
   };
@@ -3701,6 +3709,10 @@ function _applyProject(proj) {
 
   // Rework
   if (proj.reworkDirection != null) document.getElementById('rework-direction').value = proj.reworkDirection;
+  if (proj.coverNoiseStrength != null) {
+    document.getElementById('cover-noise-strength').value = proj.coverNoiseStrength;
+    updateSlider(document.getElementById('cover-noise-strength'));
+  }
 
   // Last seed recall
   if (proj.lastSeed != null) {

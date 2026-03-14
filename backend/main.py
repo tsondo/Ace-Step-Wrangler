@@ -157,8 +157,16 @@ class GenerateRequest(BaseModel):
     task_type:             str             = "text2music"  # text2music | cover | repaint | extract | lego | complete
     src_audio_path:        Optional[str]   = None
     audio_cover_strength:  Optional[float] = None          # 0.0–1.0 for cover
+    cover_noise_strength:  Optional[float] = None          # 0.0–1.0 noise init for cover
     repainting_start:      Optional[float] = None          # seconds, for repaint
     repainting_end:        Optional[float] = None          # seconds, for repaint
+
+    # Conditioning
+    reference_audio_path:  Optional[str]   = None          # style/timbre reference (separate from src)
+    audio_code_string:     str             = ""            # pre-extracted VQ tokens as structural blueprint
+    use_adg:               bool            = False         # angle-based guidance (base/sft only)
+    cfg_interval_start:    float           = 0.0           # guidance active from this step fraction
+    cfg_interval_end:      float           = 1.0           # guidance active until this step fraction
 
     # Analyze mode (extract / lego / complete)
     track_name:    Optional[str]       = None   # single track for extract/lego
@@ -212,6 +220,19 @@ def _build_payload(req: GenerateRequest) -> dict:
     if req.audio_guidance_scale is not None:
         payload["audio_guidance_scale"] = req.audio_guidance_scale
 
+    # Conditioning params
+    if req.reference_audio_path:
+        payload["reference_audio_path"] = req.reference_audio_path
+    if req.audio_code_string:
+        payload["audio_code_string"] = req.audio_code_string
+        payload["thinking"] = False  # codes bypass LM code generation
+    if req.use_adg:
+        payload["use_adg"] = True
+    if req.cfg_interval_start > 0.0:
+        payload["cfg_interval_start"] = req.cfg_interval_start
+    if req.cfg_interval_end < 1.0:
+        payload["cfg_interval_end"] = req.cfg_interval_end
+
     if req.sample_query:
         # AceStep ignores vocal_language="en" in sample_query mode — embed the
         # language label in the query text so _parse_description_hints() picks it up.
@@ -231,6 +252,8 @@ def _build_payload(req: GenerateRequest) -> dict:
             payload["src_audio_path"] = req.src_audio_path
         if req.task_type == "cover" and req.audio_cover_strength is not None:
             payload["audio_cover_strength"] = req.audio_cover_strength
+        if req.task_type == "cover" and req.cover_noise_strength is not None:
+            payload["cover_noise_strength"] = req.cover_noise_strength
         if req.task_type == "repaint":
             if req.repainting_start is not None:
                 payload["repainting_start"] = req.repainting_start
@@ -435,11 +458,18 @@ def _ensure_in_tmp(path: str) -> str:
 
 @app.post("/generate")
 async def generate(req: GenerateRequest):
-    # AceStep rejects absolute src_audio_path values outside /tmp — copy if needed
+    # AceStep rejects absolute audio paths outside /tmp — copy if needed
+    updates = {}
     if req.src_audio_path:
-        safe_path = _ensure_in_tmp(req.src_audio_path)
-        if safe_path != req.src_audio_path:
-            req = req.model_copy(update={"src_audio_path": safe_path})
+        safe = _ensure_in_tmp(req.src_audio_path)
+        if safe != req.src_audio_path:
+            updates["src_audio_path"] = safe
+    if req.reference_audio_path:
+        safe = _ensure_in_tmp(req.reference_audio_path)
+        if safe != req.reference_audio_path:
+            updates["reference_audio_path"] = safe
+    if updates:
+        req = req.model_copy(update=updates)
     payload = _build_payload(req)
     try:
         task_id = await release_task(payload)
@@ -511,6 +541,59 @@ async def generate_lyrics(req: GenerateLyricsRequest):
             raise HTTPException(status_code=502, detail="Lyrics generation failed")
 
     raise HTTPException(status_code=504, detail="Lyrics generation timed out")
+
+
+class AnalyzeAudioRequest(BaseModel):
+    audio_path: str
+
+
+@app.post("/analyze-audio")
+async def analyze_audio(req: AnalyzeAudioRequest):
+    """Analyze uploaded audio: extract BPM, key, lyrics, style description, and audio codes.
+
+    Uses AceStep's full_analysis_only mode: VAE-encodes audio, VQ-tokenizes to
+    discrete codes, then the LLM reverse-engineers metadata from the codes.
+    No audio generation occurs — this is analysis only.
+    """
+    if not req.audio_path:
+        raise HTTPException(status_code=422, detail="audio_path is required")
+
+    safe_path = _ensure_in_tmp(req.audio_path)
+    try:
+        task_id = await release_task({
+            "full_analysis_only": True,
+            "src_audio_path": safe_path,
+        })
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+    # Server-side polling — analysis is LM-only, typically ~10-30s
+    for _ in range(150):  # 150 × 2s = 5 min timeout
+        await asyncio.sleep(2)
+        try:
+            data = await query_result(task_id)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"AceStep poll error: {exc}")
+
+        if data["status"] == "done":
+            results = data.get("results") or []
+            if not results:
+                raise HTTPException(status_code=502, detail="No results returned")
+            result = results[0]
+            meta = result.get("meta") or {}
+            return {
+                "caption": result.get("prompt", ""),
+                "lyrics": result.get("lyrics", ""),
+                "bpm": meta.get("bpm"),
+                "key_scale": meta.get("keyscale", ""),
+                "time_signature": meta.get("timesignature", "4/4"),
+                "vocal_language": meta.get("language", ""),
+                "duration": meta.get("duration"),
+            }
+        elif data["status"] == "error":
+            raise HTTPException(status_code=502, detail="Audio analysis failed")
+
+    raise HTTPException(status_code=504, detail="Audio analysis timed out")
 
 
 @app.get("/status/{task_id}")
