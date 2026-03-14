@@ -269,6 +269,7 @@
           <button class="approach-btn active" data-analyze="extract">Extract (isolate a stem)</button>
           <button class="approach-btn" data-analyze="lego">Lego (replace a track)</button>
           <button class="approach-btn" data-analyze="complete">Complete (fill missing tracks)</button>
+          <button class="approach-btn" data-analyze="understand">Understand (get metadata)</button>
         </div>
 
         <!-- Track name dropdown (Extract / Lego) -->
@@ -478,6 +479,43 @@
         </div>
 
         <div class="tab-result-area hidden" id="tab-analyze-results"></div>
+
+        <!-- Understand results (shown when analyze mode = understand) -->
+        <div class="hidden" id="tab-analyze-understand">
+          <div class="understand-status" id="understand-status"></div>
+          <div class="understand-results hidden" id="understand-results">
+            <div class="understand-grid">
+              <div class="field-group">
+                <label class="field-label">BPM</label>
+                <input type="text" id="understand-bpm" class="number-input" readonly>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Key</label>
+                <input type="text" id="understand-key" class="text-input" readonly>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Time Sig</label>
+                <input type="text" id="understand-timesig" class="text-input" readonly>
+              </div>
+              <div class="field-group">
+                <label class="field-label">Language</label>
+                <input type="text" id="understand-language" class="text-input" readonly>
+              </div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Style description</label>
+              <textarea id="understand-caption" class="text-input" rows="3" readonly></textarea>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Lyrics</label>
+              <textarea id="understand-lyrics" class="text-input" rows="6" readonly></textarea>
+            </div>
+            <div class="understand-actions">
+              <button class="ghost-btn" id="understand-apply-create-btn" type="button">Apply to Create</button>
+              <button class="ghost-btn" id="understand-apply-rework-btn" type="button">Apply to Rework</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Tab: Train (shown when Train mode is active) -->
@@ -748,6 +786,19 @@
                 <button class="ghost-btn" id="ref-remove-btn" type="button">Remove</button>
               </div>
             </div>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <!-- Blueprint code (audio code string) -->
+          <div class="control-group" id="audio-code-section">
+            <span class="tag-group-label">Blueprint Code</span>
+            <textarea id="audio-code-string" class="text-input mono-input"
+              placeholder="Paste a code string extracted from audio analysis…"
+              rows="3"></textarea>
+            <p class="panel-hint">A compact structural blueprint extracted from audio analysis. When provided, overrides the planning intelligence model for structure.</p>
+            <p class="batch-note hidden" id="audio-code-note">Blueprint code is active — planning model will not generate structure</p>
+            <button class="ghost-btn" id="audio-code-clear-btn" type="button">Clear</button>
           </div>
 
           <div class="section-divider"></div>

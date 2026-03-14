@@ -319,6 +319,9 @@ function switchMode(mode) {
   // Sound reference: available in create & rework, hidden otherwise
   document.getElementById('reference-audio-section').classList.toggle('hidden', mode === 'analyze' || mode === 'train');
 
+  // Blueprint code: only available in create mode
+  document.getElementById('audio-code-section').classList.toggle('hidden', mode !== 'create');
+
   // Waveform: clear when switching to create, analyze, or train
   if (mode === 'create' || mode === 'analyze' || mode === 'train') {
     clearWaveform();
@@ -355,7 +358,7 @@ function updateControlsForMode(mode) {
     if (mode === 'create') {
       genBtn.textContent = '▶ Generate';
     } else if (mode === 'analyze') {
-      const labels = { extract: '▶ Extract', lego: '▶ Replace Track', complete: '▶ Complete' };
+      const labels = { extract: '▶ Extract', lego: '▶ Replace Track', complete: '▶ Complete', understand: '▶ Analyze Track' };
       genBtn.textContent = labels[_analyzeMode] || '▶ Analyze';
     } else {
       genBtn.textContent = _reworkApproach === 'cover' ? '▶ Reimagine' : '▶ Fix & Blend';
@@ -420,7 +423,7 @@ modeBtns.forEach(btn =>
 
 // ===== Analyze mode — state & sub-mode switching =====
 
-let _analyzeMode = 'extract';       // 'extract' | 'lego' | 'complete'
+let _analyzeMode = 'extract';       // 'extract' | 'lego' | 'complete' | 'understand'
 let _analyzeAudioPath = null;
 let _analyzeAudioDuration = null;
 
@@ -460,11 +463,18 @@ function switchAnalyzeMode(mode) {
     btn.classList.toggle('active', btn.dataset.analyze === mode)
   );
 
-  // Extract & Lego: single track dropdown; Complete: multi-select tags
-  document.getElementById('analyze-track-group').classList.toggle('hidden', mode === 'complete');
+  const isUnderstand = mode === 'understand';
+
+  // Extract & Lego: single track dropdown; Complete: multi-select tags; Understand: neither
+  document.getElementById('analyze-track-group').classList.toggle('hidden', mode === 'complete' || isUnderstand);
   document.getElementById('analyze-tracks-multi').classList.toggle('hidden', mode !== 'complete');
 
-  updateAnalyzeTrackHint();
+  // Center column: show understand results pane or the standard analyze content
+  document.getElementById('tab-analyze-understand').classList.toggle('hidden', !isUnderstand);
+  document.getElementById('analyze-description').parentElement.classList.toggle('hidden', isUnderstand);
+  document.getElementById('analyze-track-hint').classList.toggle('hidden', isUnderstand);
+
+  if (!isUnderstand) updateAnalyzeTrackHint();
   updateControlsForMode(_currentMode);
   updateGenerateState();
 }
@@ -484,6 +494,140 @@ document.querySelectorAll('.track-class-tag').forEach(tag => {
 
 // Track dropdown change → update hint (vocal vs instrument context)
 document.getElementById('analyze-track').addEventListener('change', updateAnalyzeTrackHint);
+
+// ===== Understand Music — audio analysis =====
+
+async function runAudioAnalysis(audioPath) {
+  if (!audioPath) return;
+  const statusEl = document.getElementById('understand-status');
+  const resultsEl = document.getElementById('understand-results');
+  resultsEl.classList.add('hidden');
+  statusEl.textContent = 'Analyzing audio…';
+  generateBtn.disabled = true;
+  generateBtn.textContent = 'Analyzing…';
+
+  try {
+    const res = await fetch('/analyze-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_path: audioPath }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+
+    // Populate result fields
+    document.getElementById('understand-bpm').value = data.bpm || '';
+    document.getElementById('understand-key').value = data.key_scale || '';
+    document.getElementById('understand-timesig').value = data.time_signature || '';
+    document.getElementById('understand-language').value = data.vocal_language || '';
+    document.getElementById('understand-caption').value = data.caption || '';
+    document.getElementById('understand-lyrics').value = data.lyrics || '';
+
+    statusEl.textContent = '';
+    resultsEl.classList.remove('hidden');
+  } catch (err) {
+    statusEl.textContent = 'Analysis failed: ' + err.message;
+  } finally {
+    generateBtn.disabled = false;
+    generateBtn.textContent = getGenerateLabel();
+  }
+}
+
+function applyAnalysisToCreate() {
+  const caption = document.getElementById('understand-caption').value.trim();
+  const lyrics = document.getElementById('understand-lyrics').value.trim();
+  const bpm = document.getElementById('understand-bpm').value.trim();
+  const key = document.getElementById('understand-key').value.trim();
+  const timeSig = document.getElementById('understand-timesig').value.trim();
+
+  if (caption) styleText.value = caption;
+  if (lyrics) lyricsText.value = lyrics;
+  if (bpm) document.getElementById('bpm').value = bpm;
+  if (key) {
+    // Parse "C# minor" → root="C#", mode="minor"
+    const parts = key.split(/\s+/);
+    if (parts.length >= 2) {
+      document.getElementById('key-root').value = parts[0];
+      document.getElementById('key-mode').value = parts.slice(1).join(' ');
+    } else if (parts.length === 1) {
+      document.getElementById('key-root').value = parts[0];
+    }
+  }
+  if (timeSig) document.getElementById('time-sig').value = timeSig;
+
+  switchMode('create');
+  switchCreateTab('my-lyrics');
+  updateStyleState();
+  updateLyricsCount();
+  checkLyricsWarning();
+  updateGenerateState();
+}
+
+function applyAnalysisToRework() {
+  const caption = document.getElementById('understand-caption').value.trim();
+  const lyrics = document.getElementById('understand-lyrics').value.trim();
+
+  if (caption) document.getElementById('rework-direction').value = caption;
+  if (lyrics) lyricsText.value = lyrics;
+
+  switchMode('rework');
+  updateGenerateState();
+}
+
+document.getElementById('understand-apply-create-btn').addEventListener('click', applyAnalysisToCreate);
+document.getElementById('understand-apply-rework-btn').addEventListener('click', applyAnalysisToRework);
+
+// ===== Blueprint Code (audio code string) =====
+
+const _audioCodeInput = document.getElementById('audio-code-string');
+const _audioCodeNote = document.getElementById('audio-code-note');
+
+_audioCodeInput.addEventListener('input', () => {
+  const hasCode = _audioCodeInput.value.trim().length > 0;
+  _audioCodeNote.classList.toggle('hidden', !hasCode);
+});
+
+document.getElementById('audio-code-clear-btn').addEventListener('click', () => {
+  _audioCodeInput.value = '';
+  _audioCodeNote.classList.add('hidden');
+});
+
+// ===== Rework — Extract from loaded song =====
+
+const _reworkExtractBtn = document.getElementById('rework-extract-btn');
+
+_reworkExtractBtn.addEventListener('click', async () => {
+  if (!_uploadedAudioPath) return;
+  _reworkExtractBtn.disabled = true;
+  _reworkExtractBtn.textContent = 'Analyzing…';
+  try {
+    const res = await fetch('/analyze-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_path: _uploadedAudioPath }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    // Apply extracted data to rework fields
+    if (data.caption) document.getElementById('rework-direction').value = data.caption;
+    if (data.lyrics) lyricsText.value = data.lyrics;
+    updateLyricsCount();
+    checkLyricsWarning();
+    updateGenerateState();
+  } catch (err) {
+    const hint = document.getElementById('generate-hint');
+    if (hint) hint.textContent = 'Extract failed: ' + err.message;
+  } finally {
+    _reworkExtractBtn.disabled = false;
+    _reworkExtractBtn.textContent = 'Extract from loaded song';
+  }
+});
 
 function getSelectedTrackClasses() {
   return [...document.querySelectorAll('.track-class-tag.active')].map(t => t.dataset.track);
@@ -764,6 +908,8 @@ function handleAudioUpload(file) {
     .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
     .then(data => {
       _uploadedAudioPath = data.path;
+      _reworkExtractBtn.disabled = false;
+      _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
       updateGenerateState();
       loadWaveformForRework(data.path, _uploadedAudioDuration, lyricsText.value);
     })
@@ -790,6 +936,8 @@ function removeAudio() {
   uploadLoaded.classList.add('hidden');
   clearWaveform();
   setOutputState('now-playing');
+  _reworkExtractBtn.disabled = true;
+  _reworkExtractBtn.title = 'Upload a song first to extract its properties';
   updateGenerateState();
 }
 
@@ -1130,6 +1278,8 @@ aiDescription.addEventListener('input', updateGenerateState);
 
 function loadAudioIntoRework(audioPath, label, lyrics, knownDuration) {
   _uploadedAudioPath = audioPath;
+  _reworkExtractBtn.disabled = false;
+  _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
   audioPreview.src = '/audio?path=' + encodeURIComponent(audioPath);
 
   function applyDuration(dur) {
@@ -3197,6 +3347,7 @@ const generateHint = document.getElementById('generate-hint');
 
 function hasContent() {
   if (_currentMode === 'analyze') {
+    if (_analyzeMode === 'understand') return !!_analyzeAudioPath;
     return !!_analyzeAudioPath;
   }
   if (_currentMode === 'rework') {
@@ -3257,6 +3408,7 @@ function buildCreatePayload() {
     key:            keyRoot ? `${keyRoot} ${keyMode}` : '',
     bpm:            bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
     time_signature: document.getElementById('time-sig').value,
+    audio_code_string: document.getElementById('audio-code-string').value.trim(),
   };
 
   // AI Lyrics tab — always send sample_query built from description + style context.
@@ -3335,7 +3487,7 @@ function setOutputState(state) {
 
 function getGenerateLabel() {
   if (_currentMode === 'analyze') {
-    const labels = { extract: '▶ Extract', lego: '▶ Replace Track', complete: '▶ Complete' };
+    const labels = { extract: '▶ Extract', lego: '▶ Replace Track', complete: '▶ Complete', understand: '▶ Analyze Track' };
     return labels[_analyzeMode] || '▶ Analyze';
   }
   if (_currentMode === 'rework') {
@@ -3560,6 +3712,12 @@ generateBtn.addEventListener('click', async () => {
   if (!validateRegion()) return;
   generateHint.textContent = '';
 
+  // Understand mode — route to audio analysis instead of generation
+  if (_currentMode === 'analyze' && _analyzeMode === 'understand') {
+    runAudioAnalysis(_analyzeAudioPath);
+    return;
+  }
+
   // Hide stale result waveform when starting a new analyze generation
   if (_currentMode === 'analyze') {
     document.getElementById('analyze-wf-result-section').classList.add('hidden');
@@ -3732,6 +3890,8 @@ function _gatherProject() {
     reworkApproach: _reworkApproach || 'cover',
     reworkDirection: document.getElementById('rework-direction').value,
     coverNoiseStrength: document.getElementById('cover-noise-strength').value,
+    // Blueprint code
+    audioCodeString: document.getElementById('audio-code-string').value,
     // Last used seed (for recall)
     lastSeed: _lastSeed,
   };
@@ -3806,6 +3966,12 @@ function _applyProject(proj) {
   if (proj.coverNoiseStrength != null) {
     document.getElementById('cover-noise-strength').value = proj.coverNoiseStrength;
     updateSlider(document.getElementById('cover-noise-strength'));
+  }
+
+  // Blueprint code
+  if (proj.audioCodeString != null) {
+    document.getElementById('audio-code-string').value = proj.audioCodeString;
+    document.getElementById('audio-code-note').classList.toggle('hidden', !proj.audioCodeString.trim());
   }
 
   // Last seed recall

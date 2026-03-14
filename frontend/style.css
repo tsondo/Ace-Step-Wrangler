@@ -1996,3 +1996,30 @@ details[open] > .advanced-toggle {
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ============================================================
+   Understand Music Results
+   ============================================================ */
+.understand-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.understand-status {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.understand-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mono-input {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
