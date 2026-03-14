@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -258,7 +259,9 @@ def main() -> None:
             "--port", str(args.acestep_port),
         ]
         print(f"[run] Starting AceStep API server on port {args.acestep_port}...")
-        acestep_proc = subprocess.Popen(acestep_cmd, env=acestep_env)
+        acestep_proc = subprocess.Popen(
+            acestep_cmd, env=acestep_env, start_new_session=True,
+        )
         procs.append(acestep_proc)
 
         # Brief pause so AceStep begins initialization before Wrangler starts
@@ -269,7 +272,9 @@ def main() -> None:
             sys.executable, str(_HERE / "backend" / "main.py"),
         ]
         print(f"[run] Starting Wrangler UI on port {args.port}...")
-        wrangler_proc = subprocess.Popen(wrangler_cmd, env=wrangler_env)
+        wrangler_proc = subprocess.Popen(
+            wrangler_cmd, env=wrangler_env, start_new_session=True,
+        )
         procs.append(wrangler_proc)
 
         # Wait for either process to exit (or Ctrl+C)
@@ -287,14 +292,22 @@ def main() -> None:
     except SystemExit:
         pass
     finally:
+        # Send SIGTERM to the entire process group of each subprocess,
+        # catching any grandchild processes (uvicorn workers, CUDA, etc.)
         for proc in procs:
             if proc.poll() is None:
-                proc.terminate()
+                try:
+                    os.killpg(proc.pid, signal.SIGTERM)
+                except OSError:
+                    proc.terminate()
         for proc in procs:
             try:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except OSError:
+                    proc.kill()
         print("[run] All servers stopped.")
 
 
