@@ -319,8 +319,6 @@ function switchMode(mode) {
   // Sound reference: available in create & rework, hidden otherwise
   document.getElementById('reference-audio-section').classList.toggle('hidden', mode === 'analyze' || mode === 'train');
 
-  // Blueprint code: only available in create mode
-  document.getElementById('audio-code-section').classList.toggle('hidden', mode !== 'create');
 
   // Waveform: clear when switching to create, analyze, or train
   if (mode === 'create' || mode === 'analyze' || mode === 'train') {
@@ -579,21 +577,6 @@ function applyAnalysisToRework() {
 
 document.getElementById('understand-apply-create-btn').addEventListener('click', applyAnalysisToCreate);
 document.getElementById('understand-apply-rework-btn').addEventListener('click', applyAnalysisToRework);
-
-// ===== Blueprint Code (audio code string) =====
-
-const _audioCodeInput = document.getElementById('audio-code-string');
-const _audioCodeNote = document.getElementById('audio-code-note');
-
-_audioCodeInput.addEventListener('input', () => {
-  const hasCode = _audioCodeInput.value.trim().length > 0;
-  _audioCodeNote.classList.toggle('hidden', !hasCode);
-});
-
-document.getElementById('audio-code-clear-btn').addEventListener('click', () => {
-  _audioCodeInput.value = '';
-  _audioCodeNote.classList.add('hidden');
-});
 
 // ===== Rework — Extract from loaded song =====
 
@@ -3408,7 +3391,6 @@ function buildCreatePayload() {
     key:            keyRoot ? `${keyRoot} ${keyMode}` : '',
     bpm:            bpmRaw !== '' ? parseInt(bpmRaw, 10) : null,
     time_signature: document.getElementById('time-sig').value,
-    audio_code_string: document.getElementById('audio-code-string').value.trim(),
   };
 
   // AI Lyrics tab — always send sample_query built from description + style context.
@@ -3890,8 +3872,6 @@ function _gatherProject() {
     reworkApproach: _reworkApproach || 'cover',
     reworkDirection: document.getElementById('rework-direction').value,
     coverNoiseStrength: document.getElementById('cover-noise-strength').value,
-    // Blueprint code
-    audioCodeString: document.getElementById('audio-code-string').value,
     // Last used seed (for recall)
     lastSeed: _lastSeed,
   };
@@ -3966,12 +3946,6 @@ function _applyProject(proj) {
   if (proj.coverNoiseStrength != null) {
     document.getElementById('cover-noise-strength').value = proj.coverNoiseStrength;
     updateSlider(document.getElementById('cover-noise-strength'));
-  }
-
-  // Blueprint code
-  if (proj.audioCodeString != null) {
-    document.getElementById('audio-code-string').value = proj.audioCodeString;
-    document.getElementById('audio-code-note').classList.toggle('hidden', !proj.audioCodeString.trim());
   }
 
   // Last seed recall
