@@ -1129,6 +1129,7 @@ a.player-save {
 }
 
 .advanced-toggle::-webkit-details-marker { display: none; }
+.advanced-toggle.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
 
 .advanced-toggle::before {
   content: '▶';

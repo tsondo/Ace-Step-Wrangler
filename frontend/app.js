@@ -397,6 +397,25 @@ function updateControlsForMode(mode) {
     autoDurBtn.disabled = false;
     if (lockNote) lockNote.classList.add('hidden');
   }
+
+  // Understand mode: analysis-only, no generation — disable all generation controls
+  // Other analyze modes: generation happens but lyric adherence is irrelevant
+  const isUnderstand = mode === 'analyze' && _analyzeMode === 'understand';
+  const isAnalyze = mode === 'analyze';
+
+  // Main sliders
+  document.getElementById('lyric-adherence').disabled = isAnalyze;
+  document.getElementById('creativity').disabled = isUnderstand;
+  document.getElementById('quality').disabled = isUnderstand;
+
+  // Collapse and lock the Advanced panel in Understand mode
+  const advancedPanel = document.querySelector('.advanced-panel');
+  if (isUnderstand) {
+    advancedPanel.removeAttribute('open');
+    advancedPanel.querySelector('.advanced-toggle').classList.add('disabled');
+  } else {
+    advancedPanel.querySelector('.advanced-toggle').classList.remove('disabled');
+  }
 }
 
 // Per-tab audio results — each create tab remembers its own last generation
