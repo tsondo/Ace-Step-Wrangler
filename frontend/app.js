@@ -316,6 +316,9 @@ function switchMode(mode) {
     switchCreateTab(_createTab);
   }
 
+  // Sound reference: available in create & rework, hidden otherwise
+  document.getElementById('reference-audio-section').classList.toggle('hidden', mode === 'analyze' || mode === 'train');
+
   // Waveform: clear when switching to create, analyze, or train
   if (mode === 'create' || mode === 'analyze' || mode === 'train') {
     clearWaveform();
@@ -824,6 +827,69 @@ audioUploadZone.addEventListener('drop', (e) => {
   audioUploadZone.classList.remove('drag-over');
   const file = e.dataTransfer.files[0];
   if (file) handleAudioUpload(file);
+});
+
+// ===== Sound reference — style conditioning upload =====
+
+let _referenceAudioPath = null;
+
+const refUploadZone   = document.getElementById('ref-upload-zone');
+const refUploadPrompt = document.getElementById('ref-upload-prompt');
+const refUploadLoaded = document.getElementById('ref-upload-loaded');
+
+function handleReferenceAudioUpload(file) {
+  if (!file || !file.type.startsWith('audio/')) return;
+  document.getElementById('ref-upload-filename').textContent = file.name;
+  refUploadPrompt.classList.add('hidden');
+  refUploadLoaded.classList.remove('hidden');
+
+  const formData = new FormData();
+  formData.append('file', file);
+  fetch('/upload-audio', { method: 'POST', body: formData })
+    .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+    .then(data => { _referenceAudioPath = data.path; })
+    .catch(err => {
+      removeReferenceAudio();
+      const hint = document.getElementById('generate-hint');
+      if (hint) hint.textContent = `Reference upload failed: ${err.message}`;
+    });
+}
+
+function removeReferenceAudio() {
+  _referenceAudioPath = null;
+  document.getElementById('ref-upload-filename').textContent = '';
+  refUploadPrompt.classList.remove('hidden');
+  refUploadLoaded.classList.add('hidden');
+}
+
+document.getElementById('ref-browse-btn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'audio/*';
+  input.addEventListener('change', () => {
+    if (input.files[0]) handleReferenceAudioUpload(input.files[0]);
+  });
+  input.click();
+});
+
+document.getElementById('ref-remove-btn').addEventListener('click', removeReferenceAudio);
+
+refUploadZone.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  refUploadZone.classList.add('drag-over');
+});
+refUploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+refUploadZone.addEventListener('dragleave', (e) => {
+  if (!refUploadZone.contains(e.relatedTarget)) refUploadZone.classList.remove('drag-over');
+});
+refUploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  refUploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleReferenceAudioUpload(file);
 });
 
 // Approach selector (scoped to rework panel — analyze has its own buttons)
@@ -3156,6 +3222,7 @@ function buildSharedPayload() {
     guidance_scale_raw:   Number(document.getElementById('guidance-lyric').value),
     audio_guidance_scale: Number(document.getElementById('guidance-audio').value),
     inference_steps_raw:  Number(document.getElementById('inference-steps').value),
+    reference_audio_path: _referenceAudioPath,
   };
 }
 

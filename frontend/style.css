@@ -562,6 +562,16 @@ html, body {
   transition: border-color 0.15s, background 0.15s;
 }
 
+.audio-upload-zone--compact {
+  padding: 10px;
+}
+
+.audio-upload-zone--compact .upload-loaded {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .audio-upload-zone.drag-over {
   border-color: var(--accent);
   background: var(--accent-glow);
