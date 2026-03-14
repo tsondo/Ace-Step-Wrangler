@@ -35,7 +35,6 @@
 
   /* Danger */
   --danger:          #f87171;
-  --danger-dim:      rgba(248, 113, 113, 0.12);
 
   /* Typography */
   --font-ui:   system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -47,7 +46,6 @@
 
   /* Layout */
   --header-h:   52px;
-  --output-h:  158px;
   --col-left:  260px;
   --col-right: 520px;
 }

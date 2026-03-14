@@ -217,17 +217,6 @@ async def dataset_scan(payload: dict | str) -> dict:
         return r.json()
 
 
-async def dataset_load(dataset_path: str) -> dict:
-    """Load an existing dataset from a JSON file."""
-    async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:
-        r = await client.post(
-            f"{ACESTEP_BASE_URL}/v1/dataset/load",
-            json={"dataset_path": dataset_path},
-        )
-        r.raise_for_status()
-        return r.json()
-
-
 async def dataset_preprocess_async(output_dir: str) -> dict:
     """Start async preprocessing of loaded dataset."""
     async with httpx.AsyncClient(timeout=_TIMEOUT_TRAIN) as client:

@@ -3163,14 +3163,14 @@ function createCardWaveform(containerEl, canvasEl, audioEl, sections) {
     state.sections.forEach(function(sec) {
       // Tick at section boundary
       if (sec.start > 0) {
-        var tick = document.createElement('div');
+        const tick = document.createElement('div');
         tick.className = 'card-wf-section-tick';
         tick.style.left = (sec.start / state.duration * 100) + '%';
         sectionsEl.appendChild(tick);
       }
 
       // Label pill
-      var lbl = document.createElement('div');
+      const lbl = document.createElement('div');
       lbl.className = 'card-wf-section-label';
       lbl.textContent = sec.name;
       lbl.style.left = (sec.start / state.duration * 100) + '%';
@@ -3187,11 +3187,11 @@ function createCardWaveform(containerEl, canvasEl, audioEl, sections) {
   // Click-to-seek on the waveform body
   containerEl.addEventListener('click', function(e) {
     if (e.target.classList.contains('card-wf-section-label')) return;
-    var dur = isFinite(audioEl.duration) ? audioEl.duration
+    const dur = isFinite(audioEl.duration) ? audioEl.duration
             : (state.duration > 0 ? state.duration : 0);
     if (dur <= 0) return;
-    var rect = containerEl.getBoundingClientRect();
-    var x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const rect = containerEl.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     audioEl.currentTime = (x / rect.width) * dur;
     _stopOthers(audioEl);
     audioEl.play();
@@ -3206,7 +3206,7 @@ function createCardWaveform(containerEl, canvasEl, audioEl, sections) {
         playhead.classList.remove('active');
         return;
       }
-      var dur = state.duration || audioEl.duration || 0;
+      const dur = state.duration || audioEl.duration || 0;
       if (dur > 0) {
         playhead.style.left = (audioEl.currentTime / dur * 100) + '%';
       }
@@ -3229,38 +3229,38 @@ function createCardWaveform(containerEl, canvasEl, audioEl, sections) {
   // Render — fetch, decode, downsample, draw
   async function render(audioUrl) {
     try {
-      var resp = await fetch(audioUrl);
+      const resp = await fetch(audioUrl);
       if (!resp.ok) return;
-      var arrayBuf = await resp.arrayBuffer();
+      const arrayBuf = await resp.arrayBuffer();
 
-      var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      var audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
       audioCtx.close();
 
       state.duration = audioBuf.duration;
 
       // Mono mixdown
-      var channels = audioBuf.numberOfChannels;
-      var length = audioBuf.length;
-      var mono = new Float32Array(length);
-      for (var ch = 0; ch < channels; ch++) {
-        var chData = audioBuf.getChannelData(ch);
-        for (var s = 0; s < length; s++) {
+      const channels = audioBuf.numberOfChannels;
+      const length = audioBuf.length;
+      const mono = new Float32Array(length);
+      for (let ch = 0; ch < channels; ch++) {
+        const chData = audioBuf.getChannelData(ch);
+        for (let s = 0; s < length; s++) {
           mono[s] += chData[s] / channels;
         }
       }
 
       // Downsample to peaks
       resizeCanvas();
-      var barCount = Math.floor(canvasEl.width / (2 * (window.devicePixelRatio || 1)));
+      let barCount = Math.floor(canvasEl.width / (2 * (window.devicePixelRatio || 1)));
       if (barCount < 1) barCount = 1;
-      var samplesPerBar = Math.floor(length / barCount);
+      const samplesPerBar = Math.floor(length / barCount);
       state.data = new Float32Array(barCount);
-      for (var i = 0; i < barCount; i++) {
-        var peak = 0;
-        var offset = i * samplesPerBar;
-        for (var j = 0; j < samplesPerBar; j++) {
-          var abs = Math.abs(mono[offset + j] || 0);
+      for (let i = 0; i < barCount; i++) {
+        let peak = 0;
+        const offset = i * samplesPerBar;
+        for (let j = 0; j < samplesPerBar; j++) {
+          const abs = Math.abs(mono[offset + j] || 0);
           if (abs > peak) peak = abs;
         }
         state.data[i] = peak;
@@ -3630,17 +3630,17 @@ async function showResultCards(taskId, results, fmt) {
   }
 
   // Fetch section estimates (shared across batch — same lyrics/duration/BPM)
-  var sections = [];
-  var lyricsForSections = '';
+  let sections = [];
+  let lyricsForSections = '';
   if (_createTab === 'my-lyrics') lyricsForSections = lyricsText.value;
   else if (_createTab === 'ai-lyrics' && results[0] && results[0].lyrics) lyricsForSections = results[0].lyrics;
 
   if (lyricsForSections && lyricsForSections.trim()) {
     try {
-      var bpmVal = document.getElementById('bpm').value.trim();
-      var timeSig = document.getElementById('time-sig').value;
-      var dur = Number(document.getElementById('duration').value) || 30;
-      var secRes = await fetch('/estimate-sections', {
+      const bpmVal = document.getElementById('bpm').value.trim();
+      const timeSig = document.getElementById('time-sig').value;
+      const dur = Number(document.getElementById('duration').value) || 30;
+      const secRes = await fetch('/estimate-sections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3651,7 +3651,7 @@ async function showResultCards(taskId, results, fmt) {
         }),
       });
       if (secRes.ok) {
-        var secData = await secRes.json();
+        const secData = await secRes.json();
         sections = secData.sections || [];
       }
     } catch (_) { /* sections are optional */ }

@@ -66,7 +66,6 @@ from acestep_wrapper import (
     lora_scale,
     lora_status,
     dataset_scan,
-    dataset_auto_label,
     dataset_auto_label_async,
     dataset_auto_label_status,
     dataset_sample_update,
