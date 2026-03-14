@@ -1847,10 +1847,8 @@ _trainLabelBtn.addEventListener('click', async () => {
   _trainLabelProgressFill.style.width = '0%';
 
   const labelModel = document.getElementById('train-label-model').value;
-  const stemsMode = document.getElementById('train-stems-mode')?.checked || false;
   const body = {};
   if (labelModel) body.lm_model_path = labelModel;
-  if (stemsMode) body.stems_mode = true;
 
   try {
     const r = await fetch('/train/label', {
