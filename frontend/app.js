@@ -1341,6 +1341,24 @@ function updateBatchLimit() {
 
 updateBatchLimit();
 
+// ===== ADG guidance mode — enforce base/sft-only =====
+
+function checkAdgCompat() {
+  const genModel = document.getElementById('gen-model').value;
+  const guidanceMode = document.getElementById('guidance-mode');
+  const adgNote = document.getElementById('adg-note');
+  if (genModel === 'turbo' && guidanceMode.value === 'adg') {
+    guidanceMode.value = 'apg';
+    adgNote.classList.remove('hidden');
+  } else {
+    adgNote.classList.add('hidden');
+  }
+}
+
+document.getElementById('gen-model').addEventListener('change', checkAdgCompat);
+document.getElementById('guidance-mode').addEventListener('change', checkAdgCompat);
+checkAdgCompat();
+
 // ===== Seed — Last / Random buttons =====
 let _lastSeed = null;
 const _seedInput     = document.getElementById('seed');
@@ -3223,6 +3241,9 @@ function buildSharedPayload() {
     audio_guidance_scale: Number(document.getElementById('guidance-audio').value),
     inference_steps_raw:  Number(document.getElementById('inference-steps').value),
     reference_audio_path: _referenceAudioPath,
+    use_adg:              document.getElementById('guidance-mode').value === 'adg',
+    cfg_interval_start:   Number(document.getElementById('cfg-start').value),
+    cfg_interval_end:     Number(document.getElementById('cfg-end').value),
   };
 }
 
@@ -3705,6 +3726,9 @@ function _gatherProject() {
     aiDescription: document.getElementById('ai-description').value,
     aiLanguage: document.getElementById('ai-language').value,
     // Rework
+    guidanceMode: document.getElementById('guidance-mode').value,
+    cfgStart: document.getElementById('cfg-start').value,
+    cfgEnd: document.getElementById('cfg-end').value,
     reworkApproach: _reworkApproach || 'cover',
     reworkDirection: document.getElementById('rework-direction').value,
     coverNoiseStrength: document.getElementById('cover-noise-strength').value,
@@ -3746,6 +3770,9 @@ function _applyProject(proj) {
   if (proj.vramTier) document.getElementById('vram-tier').value = proj.vramTier;
   if (proj.scheduler) document.getElementById('scheduler').value = proj.scheduler;
   if (proj.audioFormat) document.getElementById('audio-format').value = proj.audioFormat;
+  if (proj.guidanceMode) document.getElementById('guidance-mode').value = proj.guidanceMode;
+  if (proj.cfgStart != null) document.getElementById('cfg-start').value = proj.cfgStart;
+  if (proj.cfgEnd != null) document.getElementById('cfg-end').value = proj.cfgEnd;
 
   // Advanced — raw sliders
   ['guidance-lyric', 'guidance-audio', 'inference-steps'].forEach(id => {
