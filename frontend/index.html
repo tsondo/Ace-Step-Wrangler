@@ -595,27 +595,6 @@
         <div class="slider-bounds"><span>Raw</span><span>Polished</span></div>
       </div>
 
-      <!-- Sound reference (style conditioning — works in Create & Rework) -->
-      <details class="advanced-panel" id="reference-audio-section">
-        <summary class="advanced-toggle">Sound reference</summary>
-        <div class="advanced-content">
-          <p class="panel-hint">Upload a track to match its vibe and production style. This shapes timbre and feel — not structure or lyrics.</p>
-          <div class="audio-upload-zone audio-upload-zone--compact" id="ref-upload-zone">
-            <div class="upload-prompt" id="ref-upload-prompt">
-              <span class="upload-icon">♫</span>
-              <span class="upload-label">Drop reference audio or</span>
-              <button class="ghost-btn" id="ref-browse-btn" type="button">Browse</button>
-            </div>
-            <div class="upload-loaded hidden" id="ref-upload-loaded">
-              <div class="upload-file-info">
-                <span class="upload-filename" id="ref-upload-filename"></span>
-              </div>
-              <button class="ghost-btn" id="ref-remove-btn" type="button">Remove</button>
-            </div>
-          </div>
-        </div>
-      </details>
-
       <button class="generate-btn" id="generate-btn">&#9654; Generate</button>
       <div class="generate-hint" id="generate-hint" aria-live="assertive"></div>
 
@@ -724,6 +703,27 @@
             </div>
             <input type="range" id="guidance-audio" class="slider" min="1" max="15" value="4" step="0.5">
             <div class="slider-bounds"><span>1</span><span>15</span></div>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <!-- Sound reference (style conditioning) -->
+          <div class="control-group" id="reference-audio-section">
+            <span class="tag-group-label">Sound Reference</span>
+            <p class="panel-hint">Upload a track to match its vibe and production style. Shapes timbre and feel — not structure or lyrics.</p>
+            <div class="audio-upload-zone audio-upload-zone--compact" id="ref-upload-zone">
+              <div class="upload-prompt" id="ref-upload-prompt">
+                <span class="upload-icon">♫</span>
+                <span class="upload-label">Drop reference audio or</span>
+                <button class="ghost-btn" id="ref-browse-btn" type="button">Browse</button>
+              </div>
+              <div class="upload-loaded hidden" id="ref-upload-loaded">
+                <div class="upload-file-info">
+                  <span class="upload-filename" id="ref-upload-filename"></span>
+                </div>
+                <button class="ghost-btn" id="ref-remove-btn" type="button">Remove</button>
+              </div>
+            </div>
           </div>
 
           <div class="section-divider"></div>

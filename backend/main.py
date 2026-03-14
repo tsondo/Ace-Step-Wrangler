@@ -104,8 +104,8 @@ _upload_dir = Path(tempfile.mkdtemp(prefix="wrangler-uploads-"))
 # Parameter mapping tables
 # ---------------------------------------------------------------------------
 
-_LYRIC_ADHERENCE = [3.0, 7.0, 12.0]   # Loose, Med, Strict  → guidance_scale
-_QUALITY_STEPS   = [15,  60,  120]    # Raw, Balanced, Polished → inference_steps
+_LYRIC_ADHERENCE = [3.0, 6.0, 10.0]   # Little, Some, Strong → guidance_scale
+_QUALITY_STEPS   = [20,  40,  100]    # Raw, Balanced, Polished → inference_steps
 
 _GEN_MODEL = {
     "turbo": "acestep-v15-turbo",
