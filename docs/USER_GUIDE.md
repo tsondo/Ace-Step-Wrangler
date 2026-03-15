@@ -29,12 +29,12 @@ The interface is a three-column layout with a persistent strip across the bottom
 
 | Column | Contents |
 |---|---|
-| Left | **Style** (Create mode) or **Rework** controls |
-| Centre | **Create / Rework** toggle at the top, then **My Lyrics / AI Lyrics / Instrumental** sub-tabs; result cards appear below each tab's content after generation |
-| Right | **Controls** — duration, quality, generate button |
+| Left | **Style** (Create), **Rework** controls, **Analyze** controls, or **Train** wizard — depends on the active mode |
+| Centre | **My Lyrics / AI Lyrics / Instrumental** sub-tabs (Create & Rework), analysis content (Analyze), or training monitor (Train); result cards appear below after generation |
+| Right | **Controls** — duration, quality, generate button (Create/Rework/Analyze) or **Training Config** (Train) |
 | Bottom | **Now Playing** bar — always visible; waveform timeline appears above it in Rework mode |
 
-Switch between **Create** and **Rework** mode using the toggle at the top of the centre Lyrics panel, directly above the My Lyrics / AI Lyrics / Instrumental tabs.
+Switch between **Create**, **Rework**, **Analyze**, and **Train** modes using the tab bar at the top of the centre panel.
 
 ---
 
@@ -52,7 +52,7 @@ Build a style description by combining tags and free text. The assembled prompt 
 
 ### Lyrics Panel (centre column)
 
-At the top of the panel, the **Create / Rework** toggle selects the overall mode. Directly below it, three sub-tabs — **My Lyrics**, **AI Lyrics**, and **Instrumental** — select what kind of content to generate. Each tab independently remembers its last generated song — you can have a different result in each and rework any of them.
+Three sub-tabs — **My Lyrics**, **AI Lyrics**, and **Instrumental** — select what kind of content to generate. Each tab independently remembers its last generated song — you can have a different result in each and rework any of them.
 
 **My Lyrics** (default)
 
@@ -68,9 +68,8 @@ Lines go here
 
 Actions in the toolbar:
 - **Language selector** (EN / ZH / JA / …) — tells AceStep the vocal language
-- **Load file** — load lyrics from a `.txt` or `.lrc` file (you can also drag and drop onto the panel)
+- **Load lyrics** — load lyrics from a `.txt` or `.lrc` file (you can also drag and drop onto the panel)
 - **Clear** — empty the textarea
-- **Load music** — load an existing audio file (WAV/FLAC/MP3) and optionally a companion JSON. If the JSON is included, lyrics, style, BPM, duration, key, and other settings are restored from it. The audio is stored so switching to Rework auto-loads it.
 
 A character count and a lyrics-too-long warning appear as you type. If the lyrics are likely too long for the chosen duration, adjust the Duration slider before generating.
 
@@ -119,7 +118,7 @@ Rework takes an existing audio file and transforms part or all of it.
 
 - **Drag and drop** an audio file onto the upload zone, or click **Browse**
 - Or simply click the **Rework** tab — it auto-loads the last result from whichever lyrics tab (My Lyrics / AI Lyrics / Instrumental) is currently active
-- Or use **Load music** on the My Lyrics tab to load an existing audio file for reworking
+- Or use **Load music** in the Rework upload zone to load an existing audio file with an optional companion JSON. If the JSON is included, lyrics, style, BPM, duration, key, and other settings are restored from it.
 
 Once loaded, the filename, duration, and an audio player appear. The output panel shows a **waveform timeline** of the audio.
 
@@ -159,6 +158,71 @@ The bottom bar stays on the waveform view with the reworked audio loaded. You ca
 
 ---
 
+## Analyze Mode
+
+Analyze uses AceStep to inspect, extract, or manipulate individual stems within an audio file.
+
+### Loading Audio
+
+Same as Rework — drag and drop, browse, or auto-load from the active lyrics tab. The Analyze panel has its own upload zone.
+
+### Operations
+
+Four sub-modes, selected via buttons in the Analyze panel:
+
+**Extract** — isolates a single stem (e.g. vocals, drums, bass) from the mix. Select the target track from the dropdown and click **▶ Extract**. The result is a solo audio file of that stem.
+
+**Replace Track (Lego)** — regenerates a single stem while keeping the rest of the mix intact. Select which track to replace, optionally provide style direction, and click **▶ Replace Track**. Useful for swapping out a drum pattern or replacing a guitar part.
+
+**Complete** — fills in missing tracks to complete an arrangement. Select which tracks to generate (multiple selections allowed) and click **▶ Complete**. For example, add strings and keyboard to a track that only has vocals and guitar.
+
+**Analyze Track (Understand)** — extracts metadata and structural information from the audio without generating new audio. Results appear in a dedicated analysis display.
+
+### Track Options
+
+Available stems: Vocals, Backing Vocals, Drums, Bass, Guitar, Keyboard, Strings.
+
+---
+
+## Train Mode
+
+Train custom style adapters (LoRA/LoKR) from your own audio files, then use them immediately in generation.
+
+### Training Pipeline (left column)
+
+A three-step pipeline processes your audio into training data:
+
+1. **Scan** — upload audio files (drag-and-drop or browse) and scan them to build a dataset
+2. **Auto-label** — uses AceStep's language model to generate captions and lyrics for each sample. A checkbox ("Training data is vocal stems") marks samples as a cappella when appropriate
+3. **Preprocess** — converts audio into the tensor format needed for training
+
+Each step must complete before the next becomes available.
+
+### Training Monitor (centre column)
+
+Once preprocessing is complete, the centre panel shows:
+
+- **Samples table** — lists loaded audio files with labeling status
+- **Snapshots** — save, load, or delete named dataset snapshots so you can resume later
+- **Training progress** — status label, current loss, progress bar, and streaming log output
+- **Export** — when training finishes, click "Export to loras/" to save the adapter where it's immediately available in the Style Adapter dropdown
+
+### Training Config (right column)
+
+The right column switches from generation controls to training configuration:
+
+| Setting | Options | Default |
+|---|---|---|
+| **Adapter type** | LoRA, LoKR | LoRA |
+| **Rank** | 1–256 | 64 |
+| **Epochs** | 1–1000 | 10 |
+| **Learning rate** | Number | 0.0001 |
+| **Labeling model** | Default, Small (0.6B), Medium (1.7B), Large (4B) | Default |
+
+Click **Start Training** when ready. Training and generation are mutually exclusive — AceStep offloads model components during training, so the Generate button is disabled in other modes until training completes.
+
+---
+
 ## Playback Controls
 
 Every audio player in the app uses the same transport controls.
@@ -179,6 +243,27 @@ Additional behaviours:
 
 ---
 
+## Project Save & Load
+
+Save and restore your complete UI state — lyrics, style, sliders, advanced settings, and more.
+
+### Saving
+
+Click **Save project** (below the Generate button). A `.wrgl` file is downloaded containing all current settings. The filename is derived from your style description.
+
+### Loading
+
+Click **Load project** and pick a file. Two file types are accepted:
+
+- **`.wrgl` files** — native project files saved by Wrangler. Restores all settings exactly as they were.
+- **`.json` song metadata files** — the JSON files downloaded alongside generated audio. When you load one of these, Wrangler imports the generation parameters (lyrics, style, duration, model settings, guidance values, etc.) and sets up the UI to match. The original seed is placed on the **Use Last Seed** button rather than pre-filled, so you get a fresh random seed by default — click Use Last Seed if you want to reproduce the exact same result.
+
+The status line shows which type was loaded: "Loaded project: ..." for `.wrgl` files, or "Imported song settings: ..." for song metadata files.
+
+**Note:** Song metadata files don't include everything a project file does (e.g. tag selections, VRAM tier, LoRA settings). Settings not present in the metadata keep their current values.
+
+---
+
 ## Advanced Settings
 
 Click **Advanced** in the Controls panel to expand.
@@ -195,6 +280,22 @@ Click **Advanced** in the Controls panel to expand.
 | **Inference steps** | 10–150 | More steps = slower but more refined; overrides the Quality preset |
 | **Guidance scale (lyric)** | 1–15 | Raw control over lyric adherence; overrides the Strictly follow lyrics preset |
 | **Guidance scale (audio)** | 1–15 | Raw control over audio style adherence |
+| **Guidance mode** | Standard (default), Precise | Precise (angle-based guidance) available only with High Quality or Base models |
+| **Guidance focus** | Start % / End % | Controls when guidance is active during the diffusion process (0–100%) |
+
+### Sound Reference
+
+Upload an audio track to match its vibe and production style. This shapes the timbre and feel of the output — not its structure or lyrics. Drag and drop or browse to load a reference file. Available in Create and Rework modes.
+
+### Style Adapter (LoRA)
+
+Load a pre-trained style adapter to influence generation. Adapters trained in Train mode are automatically available here.
+
+- **Select adapter** — dropdown lists adapters found in the `loras/` directory
+- **Load / Unload** — activate or deactivate the selected adapter
+- **Style influence** — slider (0–100%) controlling how strongly the adapter shapes the output
+
+Note: LoRA adapters are not compatible with quantized models. If you see an error when loading, try switching to a non-quantized generation model.
 
 ### Batch size limits
 
@@ -225,11 +326,13 @@ When the batch size is locked, an inline note explains why.
 - **Use AI Lyrics** when you want the AI to write them. Describe the song you want and your style panel settings (tags, key, BPM) feed directly into what the LM generates — set those first for better results. Copy the generated lyrics to My Lyrics if you want to edit them.
 - **Instrumental mode** is the fastest path to background music or loop generation — no lyrics needed, just set the style and hit Generate.
 - **Each tab remembers its last song.** You can generate from My Lyrics, switch to AI Lyrics, generate something different, and switch back — both results are still there. Switching to Rework auto-loads from whichever tab is active.
-- **Load music** to rework existing tracks — load a WAV/FLAC/MP3 with its companion JSON to restore all the original settings, then switch to Rework.
+- **Import a previous song's settings** by loading its JSON metadata file via Load Project. This sets up all the parameters for a variation — just hit Generate for a new take with a fresh seed, or click Use Last Seed to reproduce the original.
 - **Fix & Blend on small regions** works better than trying to repaint large portions of a song. For a big change, use Reimagine instead.
+- **Load music** in the Rework upload zone lets you bring in any audio file with an optional companion JSON to restore all the original settings.
 - **Now Playing bar** lets you control playback without scrolling or switching tabs — start a song in AI Lyrics, move to My Lyrics to edit, and the bottom bar keeps playing and lets you pause or rewind.
 - **Save button (⬇)** on every player bar (including Now Playing) lets you quickly download audio at any point.
 - **Seed** is your best friend for reproducibility. Once you have a result you like, note the seed from the downloaded JSON before running variations.
+- **Train your own style** using the Train tab. Upload reference audio, auto-label it, train a LoRA adapter, and it appears immediately in the Style Adapter dropdown.
 
 ---
 

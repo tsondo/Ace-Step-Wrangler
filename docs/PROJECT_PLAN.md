@@ -229,7 +229,7 @@ Musicians, producers, and creatives who are comfortable with DAW software but ha
 
 ## Out of Scope (for now)
 
-- Multi-track / stems support
-- Project save/load
 - Cloud deployment
 - User accounts
+
+*Previously listed as out of scope but now shipped: multi-track/stems support (Analyze mode), project save/load (.wrgl files + song metadata import).*

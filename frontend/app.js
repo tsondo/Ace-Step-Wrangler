@@ -4014,8 +4014,8 @@ function _songMetaToProject(song) {
     keyRoot = parts[0] || '';
     keyMode = parts[1] || 'major';
   }
-  // Map use_adg bool → guidanceMode string
-  const guidanceMode = p.use_adg ? 'adg' : 'cfg';
+  // Map use_adg bool → guidanceMode string (HTML values: 'apg' = Standard, 'adg' = Precise)
+  const guidanceMode = p.use_adg ? 'adg' : 'apg';
 
   // Determine mode and subtab from task_type
   let mode = 'create', createTab = 'my-lyrics', reworkApproach = 'cover';

@@ -1,5 +1,7 @@
 # LoRA Integration Plan
 
+> **Note:** Both phases described here have been implemented and shipped. See `docs/USER_GUIDE.md` for current user-facing documentation. The shipped implementation uses ACE-Step's in-process training API (V1 LoRATrainer) rather than the subprocess approach originally described in Phase 2.
+
 ## Overview
 
 Two-phase integration of ACE-Step's LoRA capabilities into the Wrangler UI:

@@ -28,8 +28,14 @@ ACE-Step-Wrangler/
 ├── uv.lock                 ← auto-generated, commit this
 ├── vendor/
 │   └── ACE-Step-1.5/      ← git submodule — upstream ACE-Step (do not modify)
+├── loras/                  ← trained LoRA adapters (auto-scanned by UI)
 ├── docs/
-│   └── PROJECT_PLAN.md     ← full design spec, read this first
+│   ├── USER_GUIDE.md       ← current user-facing documentation
+│   ├── LYRICS_GUIDE.md     ← tips for writing effective lyrics
+│   ├── PROJECT_PLAN.md     ← original design spec (historical)
+│   ├── DESIGN_SPEC_V2.md   ← v2 design spec (historical)
+│   ├── LORA_PLAN.md        ← LoRA integration plan (historical)
+│   └── FUTURE_PLANS.md     ← planned future features
 ├── backend/
 │   ├── main.py             ← FastAPI app entry point
 │   └── acestep_wrapper.py  ← thin wrapper around AceStep REST API

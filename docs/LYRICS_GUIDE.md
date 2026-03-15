@@ -2,7 +2,7 @@
 
 ACE-Step is a melody-first singing model. It prioritizes musical phrasing and expressive delivery over literal text reproduction. It may skip, merge, or reorder lines to serve the music. You can reduce this by structuring lyrics clearly, but you cannot eliminate it — ACE-Step is not a text-to-speech engine.
 
-Note: The "Lyrical influence" slider controls how much your lyrics shape the mood and feel of the generated music. It does not affect how accurately ACE-Step sings the words.
+Note: The "Strictly follow lyrics" slider controls how closely the model tracks your lyrics. Even at the Strict setting, ACE-Step may still adapt phrasing for musical reasons.
 
 ---
 
@@ -88,11 +88,11 @@ This is experimental — results vary.
 
 ---
 
-## Caption Matters More Than You Think
+## Style Description Matters More Than You Think
 
-The caption (style description) is the single most important input affecting the generated music. Be specific about genre, instruments, mood, and production style. Vague captions give the model too much freedom; detailed captions anchor it.
+The style description (tags + custom text in the Style panel) is the single most important input affecting the generated music. Be specific about genre, instruments, mood, and production style. Vague descriptions give the model too much freedom; detailed ones anchor it.
 
-See the upstream [Songwriting Guide](../vendor/ACE-Step-1.5/.claude/skills/acestep-songwriting/SKILL.md) for caption-writing principles.
+See the upstream [Songwriting Guide](../vendor/ACE-Step-1.5/.claude/skills/acestep-songwriting/SKILL.md) for style-writing principles.
 
 ---
 

@@ -1,5 +1,7 @@
 # ACE-Step-Wrangler v2 — Design Spec & Build Plan
 
+> **Note:** This is the original v2 design document. All features described here have been implemented and shipped. The shipped implementation evolved beyond this spec — see `docs/USER_GUIDE.md` for current behaviour.
+
 ## Summary
 
 This spec adds three major features to ACE-Step-Wrangler:
@@ -317,9 +319,7 @@ The `_build_payload()` function passes `task_type`, source audio path, and repai
 
 ## 6. Out of Scope (for now)
 
-- Waveform visualization with draggable region handles (future enhancement for region selection)
 - "Sing over accompaniment" / Vocal2BGM (backlogged — different pipeline)
-- Extract mode (separate stems from audio) — could be a third top-level mode later
-- Lego / Complete modes — exposed in Advanced panel task_type dropdown for power users
 - LRC timestamp generation
-- LoRA training UI
+
+*Previously listed as out of scope but now shipped: waveform visualization with draggable region handles, Extract/Lego/Complete modes (Analyze tab), LoRA training UI (Train tab).*

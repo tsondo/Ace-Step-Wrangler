@@ -6,16 +6,21 @@ ACE-Step-Wrangler replaces the default Gradio interface with a dark, DAW-inspire
 
 ## Features
 
+- **Four modes** — **Create** (new songs from scratch), **Rework** (reimagine or fix regions of existing audio), **Analyze** (extract, replace, or complete stems), and **Train** (build custom style adapters)
 - **Three lyrics modes** — **My Lyrics** (write/paste/load), **AI Lyrics** (describe a song and let AceStep write the words), and **Instrumental** (no vocals)
 - **Per-tab results** — each lyrics tab keeps its own generated audio independently; switch tabs without losing your results
-- **Now Playing bar** — a persistent transport strip at the bottom shows what is playing and which tab it came from; works across all three tabs and Rework mode
-- **Friendly controls** — sliders like "Lyrical influence" and "Creativity" instead of raw model parameters
+- **Now Playing bar** — a persistent transport strip at the bottom shows what is playing and which tab it came from; works across all tabs and modes
+- **Friendly controls** — sliders like "Creativity" and "Quality" instead of raw model parameters
 - **Genre + mood tag picker** — click presets or type your own style description
 - **Song parameters** — set key (e.g. A minor), BPM, and time signature; appended to the AceStep prompt automatically
 - **Auto duration** — estimates song length from your lyrics and tempo using AceStep's LM planner, with a heuristic fallback
-- **Load Music** — load an existing audio file (WAV/FLAC/MP3) with an optional companion JSON to restore lyrics and settings for reworking
-- **Smart warnings** — get notified if your song duration is too short for your lyrics before you generate
 - **Rework mode** — reimagine a full song or fix and blend a selected region using the waveform editor; auto-loads from whichever lyrics tab is active
+- **Analyze mode** — extract individual stems, replace a single track, or complete an arrangement with missing instruments
+- **Train mode** — train LoRA/LoKR style adapters from your own audio, then use them immediately in generation
+- **Style Adapter (LoRA)** — load trained adapters to shape the model's style; adjust influence with a slider
+- **Sound reference** — upload a track to match its vibe and production style without changing lyrics or structure
+- **Project save & load** — save all UI settings to a `.wrgl` file; also import settings from song metadata JSON files to create variations on previous generations
+- **Smart warnings** — get notified if your song duration is too short for your lyrics before you generate
 - **DAW-style audio transport** — Play/Pause toggle, Stop, Rewind, scrubber, and save button on every player
 - **Advanced panel** — raw AceStep parameters (guidance scale, inference steps, scheduler, seed, batch size, audio format) still accessible for power users
 - **Dark DAW aesthetic** — feels at home next to your other music tools
@@ -142,10 +147,14 @@ ACE-Step-Wrangler/
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
+├── loras/                    # Trained LoRA adapters (auto-scanned by Style Adapter)
 └── docs/
-    ├── PROJECT_PLAN.md       # Original design spec and build plan
     ├── USER_GUIDE.md         # Current user-facing documentation
-    └── LYRICS_GUIDE.md       # Tips for writing lyrics that work with ACE-Step
+    ├── LYRICS_GUIDE.md       # Tips for writing lyrics that work with ACE-Step
+    ├── PROJECT_PLAN.md       # Original design spec (historical)
+    ├── DESIGN_SPEC_V2.md     # v2 design spec (historical)
+    ├── LORA_PLAN.md          # LoRA integration plan (historical)
+    └── FUTURE_PLANS.md       # Planned future features
 ```
 
 ## Compatibility
@@ -160,6 +169,11 @@ Wrangler itself has no GPU dependencies — GPU/platform support comes entirely 
 ## Status
 
 Complete — all build stages shipped and end-to-end tested. The full generation loop works: style + song parameters → AceStep → audio playback, download, and JSON metadata export.
+
+## Contact
+
+- **General inquiries:** info@tsondo.com
+- **Contributors:** dev@tsondo.com
 
 ## License
 
