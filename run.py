@@ -11,12 +11,40 @@ Usage:
 """
 
 import argparse
+import fcntl
 import os
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+# Cross-process GPU lock — prevents Wrangler and StemForge from running
+# simultaneously.  Uses fcntl.flock() which is kernel-enforced and
+# automatically released on process exit (even on crash).
+_GPU_LOCK_PATH = Path.home() / ".local" / "share" / "stemforge" / "gpu.lock"
+
+
+def _acquire_gpu_lock() -> object:
+    """Acquire exclusive GPU lock.  Returns the open file handle (must stay open)."""
+    _GPU_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fh = open(_GPU_LOCK_PATH, "w")
+    try:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        try:
+            with open(_GPU_LOCK_PATH) as rf:
+                holder = rf.read().strip() or "another GPU application"
+        except OSError:
+            holder = "another GPU application"
+        print(f"\n  ERROR: GPU is locked by {holder}")
+        print("  Only one GPU application (StemForge or Wrangler) can run at a time.")
+        print("  Stop the other application first, then try again.\n")
+        fh.close()
+        sys.exit(1)
+    fh.write(f"Wrangler (PID {os.getpid()})\n")
+    fh.flush()
+    return fh
 
 # AceStep environment variables that are forwarded if set by the user.
 # These are never set by default — they are user overrides only.
@@ -190,6 +218,9 @@ def main() -> None:
         help="Completed job TTL in minutes (default: env or 120)",
     )
     args = parser.parse_args()
+
+    # --- GPU exclusion lock (must be first — before any heavy work) ---
+    _gpu_lock_fh = _acquire_gpu_lock()  # noqa: F841  (must stay open)
 
     # --- Load .env from project root (won't override existing env vars) -----
     _env_file = _HERE / ".env"
