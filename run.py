@@ -165,6 +165,30 @@ def main() -> None:
         default=7860,
         help="Port for the Wrangler UI server (default: 7860)",
     )
+    parser.add_argument(
+        "--max-users",
+        type=int,
+        default=None,
+        help="Max concurrent authenticated users (0=unlimited, default: env or 0)",
+    )
+    parser.add_argument(
+        "--max-jobs-per-user",
+        type=int,
+        default=None,
+        help="Max pending generation jobs per user (default: env or 2)",
+    )
+    parser.add_argument(
+        "--session-timeout",
+        type=int,
+        default=None,
+        help="Session inactivity timeout in minutes (default: env or 60)",
+    )
+    parser.add_argument(
+        "--job-ttl",
+        type=int,
+        default=None,
+        help="Completed job TTL in minutes (default: env or 120)",
+    )
     args = parser.parse_args()
 
     # --- Load .env from project root (won't override existing env vars) -----
@@ -207,6 +231,16 @@ def main() -> None:
     # --- Build environment for Wrangler (no GPU needed) ---------------------
     wrangler_env = os.environ.copy()
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)
+
+    # Forward multi-user CLI args as env vars
+    if args.max_users is not None:
+        wrangler_env["MAX_USERS"] = str(args.max_users)
+    if args.max_jobs_per_user is not None:
+        wrangler_env["MAX_JOBS_PER_USER"] = str(args.max_jobs_per_user)
+    if args.session_timeout is not None:
+        wrangler_env["SESSION_TIMEOUT_MINUTES"] = str(args.session_timeout)
+    if args.job_ttl is not None:
+        wrangler_env["JOB_TTL_MINUTES"] = str(args.job_ttl)
 
     # --- Startup banner -----------------------------------------------------
     gpu_info = _get_gpu_info(gpu) if gpu else None

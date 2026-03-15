@@ -3771,9 +3771,19 @@ generateBtn.addEventListener('click', async () => {
       if (!res.ok) throw new Error(res.statusText);
       const data = await res.json();
 
+      // Queue position display while waiting
+      if (data.status === 'processing' && data.queue_position >= 0) {
+        if (data.queue_position === 0) {
+          generateHint.textContent = 'Your job is being processed\u2026';
+        } else {
+          generateHint.textContent = `Queue position: ${data.queue_position + 1} of ${data.queue_depth}`;
+        }
+      }
+
       if (data.status === 'done') {
         clearInterval(_pollInterval);
         setGenerating(false);
+        generateHint.textContent = '';
         if (_currentMode === 'analyze') {
           // Show result cards in the analyze result area
           await showAnalyzeResults(taskId, data.results, payload.audio_format);
@@ -4185,3 +4195,17 @@ document.getElementById('bpm').addEventListener('input', () => {
 });
 
 updateGenerateState();
+
+// ===== Session — fetch user identity on load =====
+(async () => {
+  try {
+    const r = await fetch('/api/session');
+    if (!r.ok) return;
+    const s = await r.json();
+    if (s.user && s.user !== 'local') {
+      const el = document.getElementById('user-label');
+      el.textContent = s.user;
+      el.classList.remove('hidden');
+    }
+  } catch (_) { /* ignore — local dev mode */ }
+})();

@@ -35,9 +35,12 @@ Static frontend is served from /  (catch-all, mounted last).
 """
 
 import json
+import logging
+import os
 import re
 import shutil
 import tempfile
+import time
 import uuid
 import mimetypes
 import uvicorn
@@ -46,12 +49,16 @@ from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse, parse_qs
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import httpx
 
 import asyncio
+
+logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
+logger = logging.getLogger("wrangler")
 
 from acestep_wrapper import (
     health_check,
@@ -86,18 +93,98 @@ from acestep_wrapper import (
 app = FastAPI(title="ACE-Step Wrangler")
 
 # ---------------------------------------------------------------------------
-# In-process job store (cleared on restart — acceptable for now)
+# Multi-user configuration (all overridable via env)
 # ---------------------------------------------------------------------------
 
-# task_id → { "results": [...], "params": dict, "format": str }
+MAX_USERS = int(os.environ.get("MAX_USERS", "0"))                # 0 = unlimited
+MAX_JOBS_PER_USER = int(os.environ.get("MAX_JOBS_PER_USER", "2"))
+SESSION_TIMEOUT_MIN = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "60"))
+JOB_TTL_MIN = int(os.environ.get("JOB_TTL_MINUTES", "120"))
+UPLOAD_TTL_MIN = int(os.environ.get("UPLOAD_TTL_MINUTES", "120"))
+
+# ---------------------------------------------------------------------------
+# User middleware — inject request.state.user from reverse proxy header
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def inject_user(request: Request, call_next):
+    user = request.headers.get("x-auth-user", "local")
+    request.state.user = user
+
+    now = time.monotonic()
+    # Session tracking
+    if user not in _sessions:
+        # Enforce max users (skip for "local" — single-user/dev mode)
+        if user != "local" and MAX_USERS > 0:
+            timeout = SESSION_TIMEOUT_MIN * 60
+            active = sum(
+                1 for s in _sessions.values()
+                if now - s["last_seen"] < timeout
+            )
+            if active >= MAX_USERS:
+                from starlette.responses import JSONResponse
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "Server is at capacity. Try again later."},
+                )
+        _sessions[user] = {"first_seen": now, "last_seen": now}
+    else:
+        _sessions[user]["last_seen"] = now
+
+    response = await call_next(request)
+    return response
+
+# ---------------------------------------------------------------------------
+# In-process stores (cleared on restart — acceptable for now)
+# ---------------------------------------------------------------------------
+
+# task_id → { "results": [...], "params": dict, "format": str, "user": str, "created_at": float }
 _jobs: dict[str, dict] = {}
 
-# task_id → { "params": dict, "format": str }  (pending, before results arrive)
+# task_id → { "params": dict, "format": str, "user": str, "created_at": float }
 _pending: dict[str, dict] = {}
 
-# upload_id → { "path": str, "filename": str }
+# upload_id → { "path": str, "filename": str, "user": str, "created_at": float }
 _uploads: dict[str, dict] = {}
 _upload_dir = Path(tempfile.mkdtemp(prefix="wrangler-uploads-"))
+
+# (task_id, user) — tracks submission order for queue position
+_queue_order: list[tuple[str, str]] = []
+
+# user → { "last_seen": float, "first_seen": float }
+_sessions: dict[str, dict] = {}
+
+# "lora"|"training" → { "user": str, "acquired_at": float, "action": str }
+_resource_locks: dict[str, dict] = {}
+_LOCK_TIMEOUT = 300  # auto-release stale locks after 5 min
+
+
+def _acquire_lock(resource: str, user: str, action: str) -> str | None:
+    """Try to acquire a resource lock. Returns error message on conflict, None on success."""
+    now = time.monotonic()
+    lock = _resource_locks.get(resource)
+    if lock:
+        # Same user refreshes their own lock
+        if lock["user"] == user:
+            lock["acquired_at"] = now
+            lock["action"] = action
+            return None
+        # Stale lock — auto-release
+        if now - lock["acquired_at"] > _LOCK_TIMEOUT:
+            logger.info("lock.expired resource=%s user=%s", resource, lock["user"])
+        else:
+            return f"Resource is in use by another user."
+    _resource_locks[resource] = {"user": user, "acquired_at": now, "action": action}
+    return None
+
+
+def _release_lock(resource: str, user: str) -> None:
+    """Release a lock if owned by user (or expired)."""
+    lock = _resource_locks.get(resource)
+    if not lock:
+        return
+    if lock["user"] == user or time.monotonic() - lock["acquired_at"] > _LOCK_TIMEOUT:
+        del _resource_locks[resource]
 
 # ---------------------------------------------------------------------------
 # Parameter mapping tables
@@ -456,7 +543,18 @@ def _ensure_in_tmp(path: str) -> str:
 
 
 @app.post("/generate")
-async def generate(req: GenerateRequest):
+async def generate(req: GenerateRequest, request: Request):
+    user = request.state.user
+
+    # Per-user rate limit (skip for "local" user)
+    if user != "local":
+        user_pending = sum(1 for p in _pending.values() if p.get("user") == user)
+        if user_pending >= MAX_JOBS_PER_USER:
+            raise HTTPException(
+                status_code=429,
+                detail=f"You already have {user_pending} jobs in progress. Wait for one to finish.",
+            )
+
     # AceStep rejects absolute audio paths outside /tmp — copy if needed
     updates = {}
     if req.src_audio_path:
@@ -478,7 +576,11 @@ async def generate(req: GenerateRequest):
     _pending[task_id] = {
         "params": req.model_dump(),
         "format": req.audio_format,
+        "user": user,
+        "created_at": time.monotonic(),
     }
+    _queue_order.append((task_id, user))
+    logger.info("generate user=%s task_id=%s duration=%s batch=%s", user, task_id, req.duration, req.batch_size)
     return {"task_id": task_id}
 
 
@@ -488,7 +590,7 @@ class GenerateLyricsRequest(BaseModel):
 
 
 @app.post("/generate-lyrics")
-async def generate_lyrics(req: GenerateLyricsRequest):
+async def generate_lyrics(req: GenerateLyricsRequest, request: Request):
     """Generate structured lyrics from a natural language description.
 
     Uses AceStep's sample_query mode: the LM generates lyrics + metadata,
@@ -498,6 +600,7 @@ async def generate_lyrics(req: GenerateLyricsRequest):
     """
     if not req.description.strip():
         raise HTTPException(status_code=422, detail="Description cannot be empty")
+    logger.info("generate-lyrics user=%s desc=%.60s", request.state.user, req.description)
 
     try:
         task_id = await create_sample(req.description, req.vocal_language)
@@ -547,7 +650,7 @@ class AnalyzeAudioRequest(BaseModel):
 
 
 @app.post("/analyze-audio")
-async def analyze_audio(req: AnalyzeAudioRequest):
+async def analyze_audio(req: AnalyzeAudioRequest, request: Request):
     """Analyze uploaded audio: extract BPM, key, lyrics, style description, and audio codes.
 
     Uses AceStep's full_analysis_only mode: VAE-encodes audio, VQ-tokenizes to
@@ -608,7 +711,22 @@ async def status(task_id: str):
             "results": data["results"],
             "params":  pending.get("params", {}),
             "format":  pending.get("format", "mp3"),
+            "user":    pending.get("user", "local"),
+            "created_at": pending.get("created_at", time.monotonic()),
         }
+        # Remove from queue
+        _queue_order[:] = [(t, u) for t, u in _queue_order if t != task_id]
+        logger.info("complete user=%s task_id=%s results=%d", pending.get("user", "?"), task_id, len(data.get("results", [])))
+
+    elif data["status"] == "error" and task_id in _pending:
+        pending = _pending.pop(task_id, {})
+        _queue_order[:] = [(t, u) for t, u in _queue_order if t != task_id]
+        logger.warning("failed user=%s task_id=%s", pending.get("user", "?"), task_id)
+
+    # Add queue position info
+    pos = next((i for i, (t, _) in enumerate(_queue_order) if t == task_id), -1)
+    data["queue_position"] = pos
+    data["queue_depth"] = len(_queue_order)
 
     return data
 
@@ -676,9 +794,12 @@ async def estimate_sections(req: EstimateSectionsRequest):
 
 
 @app.get("/download/{job_id}/{index}/audio")
-async def download_audio(job_id: str, index: int):
+async def download_audio(job_id: str, index: int, request: Request):
     job = _jobs.get(job_id)
     if not job or index >= len(job["results"]):
+        raise HTTPException(status_code=404, detail="Result not found")
+    user = request.state.user
+    if user != "local" and job.get("user") != user:
         raise HTTPException(status_code=404, detail="Result not found")
 
     audio_url = job["results"][index]["audio_url"]
@@ -697,9 +818,12 @@ async def download_audio(job_id: str, index: int):
 
 
 @app.get("/download/{job_id}/{index}/json")
-async def download_json(job_id: str, index: int):
+async def download_json(job_id: str, index: int, request: Request):
     job = _jobs.get(job_id)
     if not job or index >= len(job["results"]):
+        raise HTTPException(status_code=404, detail="Result not found")
+    user = request.state.user
+    if user != "local" and job.get("user") != user:
         raise HTTPException(status_code=404, detail="Result not found")
 
     payload = {
@@ -716,26 +840,31 @@ async def download_json(job_id: str, index: int):
 
 
 @app.post("/upload-audio")
-async def upload_audio(file: UploadFile):
+async def upload_audio(file: UploadFile, request: Request):
     """Accept an audio file upload, save to temp dir, return server-side path."""
     if not file.content_type or not file.content_type.startswith("audio/"):
         raise HTTPException(status_code=422, detail="Only audio files are supported")
 
+    user = request.state.user
     upload_id = uuid.uuid4().hex[:12]
     suffix = Path(file.filename or "audio").suffix or ".wav"
     dest = _upload_dir / f"{upload_id}{suffix}"
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    _uploads[upload_id] = {"path": str(dest), "filename": file.filename or "audio"}
+    _uploads[upload_id] = {
+        "path": str(dest),
+        "filename": file.filename or "audio",
+        "user": user,
+        "created_at": time.monotonic(),
+    }
+    logger.info("upload user=%s file=%s", user, file.filename)
     return {"upload_id": upload_id, "path": str(dest), "filename": file.filename}
 
 
 # ---------------------------------------------------------------------------
 # LoRA adapter management
 # ---------------------------------------------------------------------------
-
-import os
 
 _LORA_DIR = Path(os.environ.get("LORA_DIR", str(Path(__file__).parent.parent / "loras")))
 
@@ -755,19 +884,29 @@ class LoRAScaleRequest(BaseModel):
 
 
 @app.post("/lora/load")
-async def lora_load_route(req: LoRALoadRequest):
+async def lora_load_route(req: LoRALoadRequest, request: Request):
+    user = request.state.user
+    err = _acquire_lock("lora", user, "load")
+    if err:
+        raise HTTPException(status_code=409, detail="Style adapter is being changed by another user.")
+    logger.info("lora.load user=%s path=%s", user, req.lora_path)
     try:
         result = await lora_load(req.lora_path, req.adapter_name)
         return result
     except httpx.HTTPStatusError as exc:
+        _release_lock("lora", user)
         detail = exc.response.text if exc.response else str(exc)
         raise HTTPException(status_code=exc.response.status_code, detail=detail)
     except Exception as exc:
+        _release_lock("lora", user)
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
 
 
 @app.post("/lora/unload")
-async def lora_unload_route():
+async def lora_unload_route(request: Request):
+    user = request.state.user
+    logger.info("lora.unload user=%s", user)
+    _release_lock("lora", user)
     try:
         result = await lora_unload()
         return result
@@ -776,7 +915,11 @@ async def lora_unload_route():
 
 
 @app.post("/lora/toggle")
-async def lora_toggle_route(req: LoRAToggleRequest):
+async def lora_toggle_route(req: LoRAToggleRequest, request: Request):
+    user = request.state.user
+    lock = _resource_locks.get("lora")
+    if lock and lock["user"] != user and time.monotonic() - lock["acquired_at"] < _LOCK_TIMEOUT:
+        raise HTTPException(status_code=409, detail="Style adapter is being changed by another user.")
     try:
         result = await lora_toggle(req.use_lora)
         return result
@@ -785,7 +928,11 @@ async def lora_toggle_route(req: LoRAToggleRequest):
 
 
 @app.post("/lora/scale")
-async def lora_scale_route(req: LoRAScaleRequest):
+async def lora_scale_route(req: LoRAScaleRequest, request: Request):
+    user = request.state.user
+    lock = _resource_locks.get("lora")
+    if lock and lock["user"] != user and time.monotonic() - lock["acquired_at"] < _LOCK_TIMEOUT:
+        raise HTTPException(status_code=409, detail="Style adapter is being changed by another user.")
     try:
         result = await lora_scale(req.scale, req.adapter_name)
         return result
@@ -797,6 +944,9 @@ async def lora_scale_route(req: LoRAScaleRequest):
 async def lora_status_route():
     try:
         result = await lora_status()
+        lock = _resource_locks.get("lora")
+        if isinstance(result, dict):
+            result["locked_by"] = lock["user"] if lock else None
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
@@ -1033,9 +1183,7 @@ async def train_load():
 # Snapshots — named save/load of dataset + tensors
 # ---------------------------------------------------------------------------
 
-import re as _re
-
-_SNAPSHOT_NAME_RE = _re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 _-]{0,62}[a-zA-Z0-9]$|^[a-zA-Z0-9]$")
+_SNAPSHOT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 _-]{0,62}[a-zA-Z0-9]$|^[a-zA-Z0-9]$")
 
 
 def _safe_snapshot_name(name: str) -> str:
@@ -1175,8 +1323,14 @@ async def train_samples():
 
 
 @app.post("/train/start")
-async def train_start(req: TrainStartRequest):
+async def train_start(req: TrainStartRequest, request: Request):
     """Start LoRA/LoKR training from preprocessed tensors."""
+    user = request.state.user
+    err = _acquire_lock("training", user, "train")
+    if err:
+        raise HTTPException(status_code=409, detail="Training is in progress by another user.")
+    logger.info("train.start user=%s adapter=%s epochs=%d", user, req.adapter_type, req.train_epochs)
+
     tensor_dir = req.tensor_dir or str(_TRAIN_TENSOR_DIR)
     output_dir = req.output_dir or str(_TRAIN_OUTPUT_DIR)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -1226,14 +1380,20 @@ async def train_status():
     """Get current training status."""
     try:
         result = await training_status()
+        lock = _resource_locks.get("training")
+        if isinstance(result, dict):
+            result["locked_by"] = lock["user"] if lock else None
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
 
 
 @app.post("/train/stop")
-async def train_stop():
+async def train_stop(request: Request):
     """Stop the current training run."""
+    user = request.state.user
+    logger.info("train.stop user=%s", user)
+    _release_lock("training", user)
     try:
         result = await training_stop()
         return result
@@ -1242,8 +1402,11 @@ async def train_stop():
 
 
 @app.post("/train/export")
-async def train_export(req: TrainExportRequest):
+async def train_export(req: TrainExportRequest, request: Request):
     """Export trained adapter to the loras directory for immediate use."""
+    user = request.state.user
+    logger.info("train.export user=%s name=%s", user, req.name)
+    _release_lock("training", user)
     output_dir = req.output_dir or str(_TRAIN_OUTPUT_DIR)
     safe_name = re.sub(r'[^\w\-.]', '_', req.name.strip()) or "trained_adapter"
     export_path = str(_LORA_DIR / safe_name)
@@ -1255,13 +1418,96 @@ async def train_export(req: TrainExportRequest):
 
 
 @app.post("/train/reinitialize")
-async def train_reinitialize():
+async def train_reinitialize(request: Request):
     """Reinitialize model components after training completes."""
+    user = request.state.user
+    logger.info("train.reinitialize user=%s", user)
+    _release_lock("training", user)
     try:
         result = await reinitialize_service()
         return result
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Session info endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/api/session")
+async def api_session(request: Request):
+    user = request.state.user
+    now = time.monotonic()
+    timeout = SESSION_TIMEOUT_MIN * 60
+    active = sum(1 for s in _sessions.values() if now - s["last_seen"] < timeout)
+    return {
+        "user": user,
+        "active_users": active,
+        "max_users": MAX_USERS,
+        "pending_jobs": sum(1 for p in _pending.values() if p.get("user") == user),
+        "max_jobs_per_user": MAX_JOBS_PER_USER,
+        "queue_depth": len(_queue_order),
+    }
+
+
+# ---------------------------------------------------------------------------
+# TTL cleanup background task
+# ---------------------------------------------------------------------------
+
+async def _cleanup_loop():
+    """Periodically expire stale jobs, uploads, sessions, and locks."""
+    while True:
+        await asyncio.sleep(60)
+        now = time.monotonic()
+        evicted = {"jobs": 0, "pending": 0, "uploads": 0, "sessions": 0, "locks": 0}
+
+        job_ttl = JOB_TTL_MIN * 60
+        upload_ttl = UPLOAD_TTL_MIN * 60
+        session_ttl = SESSION_TIMEOUT_MIN * 60
+
+        # Expire completed jobs
+        expired_jobs = [k for k, v in _jobs.items() if now - v.get("created_at", now) > job_ttl]
+        for k in expired_jobs:
+            del _jobs[k]
+            evicted["jobs"] += 1
+
+        # Expire stuck pending tasks
+        expired_pending = [k for k, v in _pending.items() if now - v.get("created_at", now) > job_ttl]
+        for k in expired_pending:
+            del _pending[k]
+            _queue_order[:] = [(t, u) for t, u in _queue_order if t != k]
+            evicted["pending"] += 1
+
+        # Expire uploads (delete files too)
+        expired_uploads = [k for k, v in _uploads.items() if now - v.get("created_at", now) > upload_ttl]
+        for k in expired_uploads:
+            info = _uploads.pop(k)
+            try:
+                Path(info["path"]).unlink(missing_ok=True)
+            except OSError:
+                pass
+            evicted["uploads"] += 1
+
+        # Expire inactive sessions
+        expired_sessions = [u for u, s in _sessions.items() if now - s["last_seen"] > session_ttl]
+        for u in expired_sessions:
+            del _sessions[u]
+            evicted["sessions"] += 1
+
+        # Release stale resource locks
+        expired_locks = [r for r, l in _resource_locks.items() if now - l["acquired_at"] > _LOCK_TIMEOUT]
+        for r in expired_locks:
+            del _resource_locks[r]
+            evicted["locks"] += 1
+
+        total = sum(evicted.values())
+        if total:
+            logger.info("cleanup evicted=%s", evicted)
+
+
+@app.on_event("startup")
+async def start_cleanup():
+    asyncio.create_task(_cleanup_loop())
 
 
 # ---------------------------------------------------------------------------
