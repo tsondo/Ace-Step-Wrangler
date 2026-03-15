@@ -3897,6 +3897,13 @@ function _gatherProject() {
 }
 
 function _applyProject(proj) {
+  // Switch mode and subtab if specified
+  if (proj.mode && (proj.mode === 'create' || proj.mode === 'rework')) {
+    switchMode(proj.mode);
+  }
+  if (proj.createTab) switchCreateTab(proj.createTab);
+  if (proj.reworkApproach) switchApproach(proj.reworkApproach);
+
   // Lyrics & style
   lyricsText.value = proj.lyrics || '';
   styleText.value = proj.style || '';
@@ -3988,7 +3995,7 @@ _projectSaveBtn.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(proj, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${name}.json`;
+  a.download = `${name}.wrgl`;
   a.click();
   URL.revokeObjectURL(a.href);
   _projectStatusEl.textContent = 'Saved';
@@ -3997,19 +4004,95 @@ _projectSaveBtn.addEventListener('click', () => {
 
 _projectLoadBtn.addEventListener('click', () => _projectFileInput.click());
 
+/** Convert a song metadata JSON (from /download/.../json) into a project object. */
+function _songMetaToProject(song) {
+  const p = song.params || {};
+  // Split combined key like "C major" into root + mode
+  let keyRoot = '', keyMode = 'major';
+  if (p.key) {
+    const parts = p.key.trim().split(/\s+/);
+    keyRoot = parts[0] || '';
+    keyMode = parts[1] || 'major';
+  }
+  // Map use_adg bool → guidanceMode string
+  const guidanceMode = p.use_adg ? 'adg' : 'cfg';
+
+  // Determine mode and subtab from task_type
+  let mode = 'create', createTab = 'my-lyrics', reworkApproach = 'cover';
+  if (p.task_type === 'cover' || p.task_type === 'repaint') {
+    mode = 'rework';
+    reworkApproach = p.task_type;
+  } else if (p.sample_query) {
+    createTab = 'ai-lyrics';
+  }
+
+  return {
+    _version: 1,
+    _imported_from: 'song-metadata',
+    mode: mode,
+    createTab: createTab,
+    // Lyrics & style
+    lyrics:   p.lyrics || '',
+    style:    p.style || '',
+    tags:     [],   // song metadata doesn't track tag selections
+    // Song params
+    bpm:      p.bpm != null ? String(p.bpm) : '',
+    keyRoot:  keyRoot,
+    keyMode:  keyMode,
+    timeSig:  p.time_signature || '4/4',
+    // Main sliders
+    duration:        p.duration != null ? p.duration : 30,
+    lyricAdherence:  p.lyric_adherence != null ? p.lyric_adherence : 1,
+    creativity:      p.creativity != null ? p.creativity : 50,
+    quality:         p.quality != null ? p.quality : 1,
+    // Advanced — model
+    genModel:    p.gen_model || 'turbo',
+    batchSize:   p.batch_size != null ? p.batch_size : 1,
+    scheduler:   p.scheduler || 'euler',
+    audioFormat: p.audio_format || 'mp3',
+    // Advanced — raw sliders
+    guidanceLyric:  p.guidance_scale_raw,
+    guidanceAudio:  p.audio_guidance_scale,
+    inferenceSteps: p.inference_steps_raw,
+    // Seed — set as lastSeed so the user can click "Use Last Seed" to reuse it
+    seed:     '',
+    lastSeed: p.seed,
+    // AI Lyrics
+    aiDescription: p.sample_query || '',
+    aiLanguage:    p.vocal_language || 'en',
+    // Rework / guidance
+    guidanceMode:       guidanceMode,
+    cfgStart:           p.cfg_interval_start != null ? p.cfg_interval_start : 0,
+    cfgEnd:             p.cfg_interval_end != null ? p.cfg_interval_end : 1,
+    reworkApproach:     reworkApproach,
+    coverNoiseStrength: p.cover_noise_strength,
+  };
+}
+
 _projectFileInput.addEventListener('change', async () => {
   const file = _projectFileInput.files[0];
   _projectFileInput.value = '';
   if (!file) return;
   try {
     const text = await file.text();
-    const proj = JSON.parse(text);
-    if (!proj._version) throw new Error('Not a valid project file');
+    const data = JSON.parse(text);
+    let proj, label;
+    if (data._version) {
+      // Native project file (.wrgl or legacy .json)
+      proj = data;
+      label = 'Loaded project: ' + file.name;
+    } else if (data.params && data.generated_at) {
+      // Song metadata JSON from a generation
+      proj = _songMetaToProject(data);
+      label = 'Imported song settings: ' + file.name;
+    } else {
+      throw new Error('Unrecognized file format');
+    }
     _applyProject(proj);
-    _projectStatusEl.textContent = 'Loaded: ' + file.name;
+    _projectStatusEl.textContent = label;
     setTimeout(() => { _projectStatusEl.textContent = ''; }, 3000);
   } catch (e) {
-    _projectStatusEl.textContent = 'Invalid project file';
+    _projectStatusEl.textContent = 'Not a valid project or song file';
     setTimeout(() => { _projectStatusEl.textContent = ''; }, 3000);
   }
 });
