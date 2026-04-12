@@ -44,6 +44,15 @@ ACE-Step-Wrangler/
     ├── style.css
     └── app.js
 ```
+## Behavior
+
+**Think before coding.** State assumptions explicitly. If multiple interpretations exist, present them — don't pick silently. If something is unclear, stop and ask.
+
+**Simplicity first.** Minimum code that solves the problem. No speculative features, no abstractions for single-use code, no "flexibility" that wasn't requested. If you write 200 lines and it could be 50, rewrite it.
+
+**Surgical changes.** Touch only what you must. Don't "improve" adjacent code, comments, or formatting. Don't refactor things that aren't broken. Match existing style even if you'd do it differently. If you notice unrelated dead code, mention it — don't delete it. **Every changed line should trace directly to the user's request.**
+
+**Push back when warranted.** If a simpler approach exists, say so. If a request conflicts with the architectural rules below (no frameworks, no build step, thin backend, AceStep as separate process, state-in-the-DOM, no inline styles), name the conflict before proceeding rather than working around it.
 
 ## Development Conventions
 
