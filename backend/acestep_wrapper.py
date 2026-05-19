@@ -1,7 +1,7 @@
 """
 Thin async wrapper around the AceStep local REST API.
 
-AceStep runs as a separate process (default: http://localhost:8001).
+AceStep runs as a separate process (default: http://localhost:8002).
 We never import AceStep directly — all communication is via HTTP.
 
 Key quirk: /query_result returns `result` as a JSON *string*, not a
@@ -10,11 +10,13 @@ nested object. parse_result() handles that.
 
 import json
 import mimetypes
+import os
 from pathlib import Path
 
 import httpx
 
-ACESTEP_BASE_URL = "http://localhost:8001"
+_acestep_port = os.environ.get("ACESTEP_PORT", "8002")
+ACESTEP_BASE_URL = f"http://localhost:{_acestep_port}"
 _TIMEOUT_SUBMIT  = httpx.Timeout(30.0)
 _TIMEOUT_POLL    = httpx.Timeout(10.0)
 _TIMEOUT_AUDIO   = httpx.Timeout(60.0)

@@ -1,7 +1,7 @@
 """
 ACE-Step Wrangler — unified launcher.
 
-Starts the AceStep API server (GPU, port 8001) and the Wrangler FastAPI UI
+Starts the AceStep API server (GPU, port 8002) and the Wrangler FastAPI UI
 server (no GPU, port 7860) as subprocesses, with graceful shutdown on Ctrl+C.
 
 Usage:
@@ -184,8 +184,8 @@ def main() -> None:
     parser.add_argument(
         "--acestep-port",
         type=int,
-        default=8001,
-        help="Port for the AceStep API server (default: 8001)",
+        default=8002,
+        help="Port for the AceStep API server (default: 8002)",
     )
     parser.add_argument(
         "--port",
@@ -262,6 +262,7 @@ def main() -> None:
     # --- Build environment for Wrangler (no GPU needed) ---------------------
     wrangler_env = os.environ.copy()
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)
+    wrangler_env["ACESTEP_PORT"] = str(args.acestep_port)
 
     # Forward multi-user CLI args as env vars
     if args.max_users is not None:
