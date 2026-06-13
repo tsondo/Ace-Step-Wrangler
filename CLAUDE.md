@@ -74,7 +74,7 @@ These friendly UI controls map to AceStep parameters:
 |---|---|---|
 | Duration | `audio_duration` | Warn if lyrics likely won't fit |
 | Lyrical influence | `guidance_scale` (lyric) | Controls how much lyrics shape mood/feel, not word-for-word fidelity |
-| Creativity | `guidance_scale` (audio) / temperature | |
+| Creativity | `shift` | Inverse mapping: 0% → shift 5.0 (restrained), 100% → shift 1.0 (wild). Lower shift = model deviates more from conditioning. |
 | Polished / Raw | `num_inference_steps` | |
 | Seed | `seed` | Advanced panel only |
 
