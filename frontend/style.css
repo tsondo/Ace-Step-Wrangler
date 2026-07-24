@@ -2024,4 +2024,42 @@ details[open] > .advanced-toggle {
   margin-top: 12px;
 }
 
+/* ===== Fix & Blend lyric alignment list ===== */
+.field-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+.lyric-align-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.lyric-align-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lyric-align-line:last-child { border-bottom: none; }
+.lyric-align-line:hover { background: var(--surface-raised); }
+.lyric-align-line.selected {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.lyric-align-line.low-confidence { color: var(--accent-bright); }
+.lyric-align-time {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 

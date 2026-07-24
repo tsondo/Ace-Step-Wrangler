@@ -1072,6 +1072,7 @@ function switchApproach(approach) {
 
   updateControlsForMode(_currentMode);
   updateGenerateState();
+  refreshAlignmentUI();
 }
 
 // Region validation (start < end, end ≤ duration)
@@ -1110,6 +1111,108 @@ coverStrengthSlider.addEventListener('input', () => {
 });
 // Init fill
 coverStrengthSlider.dispatchEvent(new Event('input'));
+
+// ===== Fix & Blend lyric selection =====
+
+const _alignGroup = document.getElementById('lyric-align-group');
+const _alignList  = document.getElementById('lyric-align-list');
+const _alignState = document.getElementById('align-state');
+let _alignLines = null;      // alignment lines for the loaded take
+let _alignSel = null;        // {first, last} indices into _alignLines
+let _alignPollTimer = null;
+const LOW_CONFIDENCE = 0.5;
+
+// Pad outward, but never cross into an adjacent unselected line. With the
+// clamp, pad+snap collapse into one rule: the range extends up to `pad`
+// seconds into the surrounding silence, stopping at a neighbour's boundary.
+function computeRepaintRange(lines, first, last, padS, duration) {
+  let start = Math.max(0, lines[first].start_s - padS);
+  let end = Math.min(duration || Infinity, lines[last].end_s + padS);
+  if (first > 0) start = Math.max(start, lines[first - 1].end_s);
+  if (last < lines.length - 1) end = Math.min(end, lines[last + 1].start_s);
+  return { start: Math.round(start * 10) / 10, end: Math.round(end * 10) / 10 };
+}
+
+function _applyAlignSelection() {
+  [..._alignList.children].forEach((el, i) => {
+    el.classList.toggle('selected',
+      _alignSel && i >= _alignSel.first && i <= _alignSel.last);
+  });
+  if (!_alignSel) return;
+  const pad = Number(document.getElementById('align-pad').value) || 0;
+  const r = computeRepaintRange(_alignLines, _alignSel.first, _alignSel.last,
+                                pad, _uploadedAudioDuration);
+  document.getElementById('region-start').value = r.start;
+  document.getElementById('region-end').value = r.end;
+  // Keep waveform region inputs in sync (existing ids from waveform controls).
+  // Dispatch 'input' (not 'change') — that's the event the existing
+  // wf-region-start/end listeners use to redraw the waveform selection.
+  const wfs = document.getElementById('wf-region-start');
+  const wfe = document.getElementById('wf-region-end');
+  if (wfs) { wfs.value = r.start; wfs.dispatchEvent(new Event('input')); }
+  if (wfe) { wfe.value = r.end;  wfe.dispatchEvent(new Event('input')); }
+}
+
+function renderAlignList(lines) {
+  _alignLines = lines;
+  _alignSel = null;
+  _alignList.innerHTML = '';
+  lines.forEach((line, i) => {
+    const row = document.createElement('div');
+    row.className = 'lyric-align-line';
+    if (line.confidence < LOW_CONFIDENCE) {
+      row.classList.add('low-confidence');
+      row.title = 'Low alignment confidence — likely garbled';
+    }
+    const text = document.createElement('span');
+    text.textContent = line.text;
+    const time = document.createElement('span');
+    time.className = 'lyric-align-time';
+    time.textContent = `${formatDuration(line.start_s)}–${formatDuration(line.end_s)}`;
+    row.append(text, time);
+    row.addEventListener('click', (e) => {
+      if (e.shiftKey && _alignSel) {
+        _alignSel = { first: Math.min(_alignSel.first, i),
+                      last:  Math.max(_alignSel.last, i) };
+      } else {
+        _alignSel = { first: i, last: i };
+      }
+      _applyAlignSelection();
+    });
+    _alignList.appendChild(row);
+  });
+}
+
+async function refreshAlignmentUI() {
+  if (_alignPollTimer) { clearTimeout(_alignPollTimer); _alignPollTimer = null; }
+  const isRepaint = _reworkApproach === 'repaint';
+  _alignGroup.classList.toggle('hidden', !isRepaint || !_reworkTakeRef);
+  if (!isRepaint || !_reworkTakeRef) return;
+  try {
+    const res = await fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}`);
+    if (!res.ok) throw new Error(res.statusText);
+    const take = await res.json();
+    if (take.alignment && take.alignment.lines.length) {
+      _alignState.textContent = '';
+      renderAlignList(take.alignment.lines);
+    } else if (take.alignment_status === 'failed') {
+      _alignState.textContent = 'Alignment failed — use the seconds fields below';
+      _alignList.innerHTML = '';
+    } else {
+      _alignState.textContent = 'Aligning…';
+      _alignList.innerHTML = '';
+      if (take.alignment_status === 'none') {
+        fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}/align`,
+              { method: 'POST' });
+      }
+      _alignPollTimer = setTimeout(refreshAlignmentUI, 3000);
+    }
+  } catch (_) {
+    _alignGroup.classList.add('hidden');
+  }
+}
+
+document.getElementById('align-pad').addEventListener('input', _applyAlignSelection);
 
 // ===== Style panel — tags, count, song params, preview =====
 
@@ -1315,6 +1418,7 @@ function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
   updateControlsForMode('rework');
   updateGenerateState();
   loadWaveformForRework(audioPath, _uploadedAudioDuration || null, lyrics || '');
+  refreshAlignmentUI();
 }
 
 // ===== Clear button =====

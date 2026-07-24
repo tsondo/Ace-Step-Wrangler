@@ -177,6 +177,15 @@
           </button>
         </div>
 
+        <div class="control-group hidden" id="lyric-align-group">
+          <div class="control-label-row">
+            <label class="field-label">Pick the lines to fix</label>
+            <span class="control-value" id="align-state"></span>
+          </div>
+          <div id="lyric-align-list" class="lyric-align-list"></div>
+          <p class="field-hint">Click a line; shift-click to extend the selection.</p>
+        </div>
+
         <!-- Cover strength (Reimagine only) -->
         <div class="control-group" id="cover-strength-group">
           <div class="control-label-row">
@@ -209,6 +218,10 @@
             <div class="field-group">
               <label class="field-label" for="region-end">End (s)</label>
               <input type="number" id="region-end" class="number-input" min="0" step="0.1" value="0" autocomplete="off">
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="align-pad">Pad (s)</label>
+              <input type="number" id="align-pad" class="number-input" min="0" max="2" step="0.1" value="0.3" autocomplete="off">
             </div>
           </div>
           <p class="repaint-tip">Tip: Fix &amp; Blend works best on specific sections rather than the whole song</p>
