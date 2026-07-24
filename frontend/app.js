@@ -3387,6 +3387,7 @@ function buildSharedPayload() {
     quality:         Number(document.getElementById('quality').value),
     seed:            seedRaw !== '' ? parseInt(seedRaw, 10) : null,
     gen_model:       document.getElementById('gen-model').value,
+    lm_model:        document.getElementById('lm-model').value,
     batch_size:      Number(document.getElementById('batch-size').value),
     scheduler:       document.getElementById('scheduler').value,
     audio_format:    document.getElementById('audio-format').value,
@@ -3469,6 +3470,7 @@ function buildPayload() {
 }
 
 let _pollInterval = null;
+let _pollFailCount = 0;
 let _timerInterval = null;
 
 // Ctrl/Cmd+Enter keyboard shortcut — trigger Generate from anywhere in the UI
@@ -3765,11 +3767,13 @@ generateBtn.addEventListener('click', async () => {
   }
 
   // Poll /status/{task_id} every 2 seconds
+  _pollFailCount = 0;
   _pollInterval = setInterval(async () => {
     try {
       const res = await fetch(`/status/${taskId}`);
       if (!res.ok) throw new Error(res.statusText);
       const data = await res.json();
+      _pollFailCount = 0;
 
       // Queue position display while waiting
       if (data.status === 'processing' && data.queue_position >= 0) {
@@ -3839,6 +3843,8 @@ generateBtn.addEventListener('click', async () => {
       }
       // 'processing' → keep polling
     } catch (err) {
+      _pollFailCount++;
+      if (_pollFailCount < 3) return; // transient hiccup — retry on next tick
       clearInterval(_pollInterval);
       setGenerating(false);
       setOutputState('now-playing');

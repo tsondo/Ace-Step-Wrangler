@@ -199,6 +199,12 @@ _GEN_MODEL = {
     "base":  "acestep-v15-base",
 }
 
+_LM_MODEL = {
+    "0.6b": "acestep-5Hz-lm-0.6B",
+    "1.7b": "acestep-5Hz-lm-1.7B",
+    "4b":   "acestep-5Hz-lm-4B",
+}
+
 _SCHEDULER = {
     "euler": "ode",
     "dpm":   "dpm",
@@ -221,6 +227,7 @@ class GenerateRequest(BaseModel):
     # Advanced panel
     seed:         Optional[int] = None
     gen_model:    str           = "turbo"
+    lm_model:     str           = "1.7b"   # none | 0.6b | 1.7b | 4b → lm_model_path
     batch_size:   int           = 1
     scheduler:    str           = "euler"
     audio_format: str           = "mp3"   # mp3 | wav | flac
@@ -330,6 +337,11 @@ def _build_payload(req: GenerateRequest) -> dict:
     model_name = _GEN_MODEL.get(req.gen_model)
     if model_name:
         payload["model"] = model_name
+
+    # "none" (or unknown) sends no path — AceStep falls back to its startup LM
+    lm_path = _LM_MODEL.get(req.lm_model)
+    if lm_path:
+        payload["lm_model_path"] = lm_path
 
     # Rework / Analyze params
     if req.task_type in ("cover", "repaint", "extract", "lego", "complete"):
@@ -1520,4 +1532,5 @@ app.mount("/", StaticFiles(directory=str(_frontend), html=True), name="frontend"
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=True)
+    _reload_dirs = [str(Path(__file__).parent), str(_frontend)]
+    uvicorn.run("main:app", host="0.0.0.0", port=7860, reload=True, reload_dirs=_reload_dirs)
