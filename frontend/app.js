@@ -3386,6 +3386,8 @@ function buildSharedPayload() {
     creativity:      Number(document.getElementById('creativity').value),
     quality:         Number(document.getElementById('quality').value),
     seed:            seedRaw !== '' ? parseInt(seedRaw, 10) : null,
+    seed_mode:       seedRaw === '' ? 'random'
+                     : (parseInt(seedRaw, 10) === _lastSeed ? 'last' : 'fixed'),
     gen_model:       document.getElementById('gen-model').value,
     lm_model:        document.getElementById('lm-model').value,
     batch_size:      Number(document.getElementById('batch-size').value),

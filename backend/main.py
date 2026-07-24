@@ -60,6 +60,7 @@ import asyncio
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 logger = logging.getLogger("wrangler")
 
+import takes
 from acestep_wrapper import (
     health_check,
     release_task,
@@ -264,6 +265,12 @@ class GenerateRequest(BaseModel):
     # Analyze mode (extract / lego / complete)
     track_name:    Optional[str]       = None   # single track for extract/lego
     track_classes: Optional[List[str]] = None   # multiple tracks for complete
+
+    # Take bookkeeping (Rework redesign)
+    seed_mode:        str            = "random"   # random | last | fixed
+    parent_take:      Optional[dict] = None       # {"job_id": str, "index": int} of rework source
+    repaint_mode:     Optional[str]  = None       # conservative | balanced | aggressive
+    repaint_strength: Optional[float] = None      # 0.0-1.0, balanced mode only
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -511,12 +518,14 @@ def _resolve_audio_path(path: str) -> str:
 
 
 # Directories from which the /audio endpoint is permitted to serve files.
-# Audio originates from two places: the system temp dir (AceStep output,
-# user uploads) and the vendor tree (AceStep's own .cache directory).
+# Audio originates from three places: the system temp dir (AceStep output,
+# user uploads), the vendor tree (AceStep's own .cache directory), and the
+# takes/ directory (persisted results).
 _VENDOR_DIR = (Path(__file__).parent.parent / "vendor").resolve()
 _ALLOWED_AUDIO_DIRS = [
     Path(tempfile.gettempdir()).resolve(),
     _VENDOR_DIR,
+    takes.TAKES_DIR.resolve(),
 ]
 
 
@@ -710,6 +719,42 @@ async def analyze_audio(req: AnalyzeAudioRequest, request: Request):
     raise HTTPException(status_code=504, detail="Audio analysis timed out")
 
 
+_PERSIST_TASK_TYPES = {"text2music", "cover", "repaint"}
+
+
+def _persist_results(task_id: str, results: list, pending: dict) -> None:
+    """Persist completed results as takes; rewrite audio_url to the durable copy."""
+    params = pending.get("params", {}) or {}
+    if params.get("task_type", "text2music") not in _PERSIST_TASK_TYPES:
+        return
+    fmt = pending.get("format", "mp3")
+    rework = None
+    if params.get("task_type") in ("cover", "repaint"):
+        rework = {
+            "task_type": params.get("task_type"),
+            "start_s": params.get("repainting_start"),
+            "end_s": params.get("repainting_end"),
+            "repaint_mode": params.get("repaint_mode"),
+            "repaint_strength": params.get("repaint_strength"),
+            "audio_cover_strength": params.get("audio_cover_strength"),
+            "seed": params.get("seed"),
+        }
+    for i, result in enumerate(results or []):
+        try:
+            take = takes.write_take(
+                task_id, i, result, params, fmt,
+                seed_mode=params.get("seed_mode", "random"),
+                parent_take=params.get("parent_take"),
+                rework=rework,
+            )
+        except Exception as exc:
+            logger.warning("take persist failed job=%s idx=%d: %s", task_id, i, exc)
+            continue
+        if take:
+            result["audio_url"] = str(takes.TAKES_DIR / task_id / take["audio_file"])
+            result["take"] = {"job_id": task_id, "index": i}
+
+
 @app.get("/status/{task_id}")
 async def status(task_id: str):
     try:
@@ -726,6 +771,7 @@ async def status(task_id: str):
             "user":    pending.get("user", "local"),
             "created_at": pending.get("created_at", time.monotonic()),
         }
+        _persist_results(task_id, data["results"], pending)
         # Remove from queue
         _queue_order[:] = [(t, u) for t, u in _queue_order if t != task_id]
         logger.info("complete user=%s task_id=%s results=%d", pending.get("user", "?"), task_id, len(data.get("results", [])))
@@ -849,6 +895,27 @@ async def download_json(job_id: str, index: int, request: Request):
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _alignment_status_for(job_id: str, index: int) -> str:
+    take = takes.read_take(job_id, index)
+    if take and take.get("alignment"):
+        return "done"
+    return "none"
+
+
+@app.get("/takes/{job_id}/{index}")
+async def get_take(job_id: str, index: int):
+    take = takes.read_take(job_id, index)
+    if take is None:
+        raise HTTPException(status_code=404, detail="Take not found")
+    take["alignment_status"] = _alignment_status_for(job_id, index)
+    return take
+
+
+@app.delete("/takes/{job_id}/{index}")
+async def discard_take(job_id: str, index: int):
+    return {"deleted": takes.delete_take(job_id, index)}
 
 
 @app.post("/upload-audio")
