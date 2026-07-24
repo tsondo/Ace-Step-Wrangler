@@ -932,6 +932,7 @@ function formatDuration(secs) {
 
 function removeAudio() {
   _uploadedAudioPath = null;
+  _reworkTakeRef = null;
   _uploadedAudioDuration = null;
   audioPreview.src = '';
   document.getElementById('upload-filename').textContent = '';
