@@ -912,6 +912,7 @@ function handleAudioUpload(file) {
     .then(data => {
       _uploadedAudioPath = data.path;
       _reworkTakeRef = null;
+      _initReworkSeed();
       _reworkExtractBtn.disabled = false;
       _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
       updateGenerateState();
