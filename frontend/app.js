@@ -1122,6 +1122,7 @@ coverStrengthSlider.addEventListener('input', () => {
   const pct = ((val - Number(coverStrengthSlider.min)) / (Number(coverStrengthSlider.max) - Number(coverStrengthSlider.min))) * 100;
   coverStrengthSlider.style.setProperty('--fill', pct + '%');
   coverStrengthValue.textContent = `${val}%`;
+  document.querySelectorAll('.change-preset-btn').forEach(b => b.classList.remove('active'));
 });
 // Init fill
 coverStrengthSlider.dispatchEvent(new Event('input'));
@@ -1152,7 +1153,9 @@ function _applyChangePreset(name) {
   } else {
     const s = document.getElementById('cover-strength');
     s.value = value;
-    s.dispatchEvent(new Event('input'));
+    const pct = ((value - Number(s.min)) / (Number(s.max) - Number(s.min))) * 100;
+    s.style.setProperty('--fill', pct + '%');
+    document.getElementById('cover-strength-value').textContent = `${value}%`;
   }
   document.getElementById('change-amount-value').textContent = '';
 }
