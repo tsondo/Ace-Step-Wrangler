@@ -61,6 +61,7 @@ logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logg
 logger = logging.getLogger("wrangler")
 
 import takes
+import alignment
 from acestep_wrapper import (
     health_check,
     release_task,
@@ -754,6 +755,7 @@ def _persist_results(task_id: str, results: list, pending: dict) -> None:
         if take:
             result["audio_url"] = str(takes.TAKES_DIR / task_id / take["audio_file"])
             result["take"] = {"job_id": task_id, "index": i}
+            _enqueue_alignment(task_id, i)
 
 
 @app.get("/status/{task_id}")
@@ -898,11 +900,51 @@ async def download_json(job_id: str, index: int, request: Request):
     )
 
 
+_align_queue: "asyncio.Queue[tuple[str, int]]" = asyncio.Queue()
+_align_status: dict[tuple[str, int], str] = {}
+
+
 def _alignment_status_for(job_id: str, index: int) -> str:
     take = takes.read_take(job_id, index)
     if take and take.get("alignment"):
         return "done"
-    return "none"
+    return _align_status.get((job_id, index), "none")
+
+
+def _enqueue_alignment(job_id: str, index: int) -> None:
+    key = (job_id, index)
+    if _alignment_status_for(job_id, index) in ("queued", "running", "done"):
+        return
+    take = takes.read_take(job_id, index)
+    if not take or not (take.get("lyrics") or "").strip():
+        return  # instrumental / unknown take: nothing to align
+    _align_status[key] = "queued"
+    _align_queue.put_nowait(key)
+
+
+async def _drain_alignment_queue_once() -> None:
+    job_id, index = await _align_queue.get()
+    key = (job_id, index)
+    _align_status[key] = "running"
+    try:
+        take = takes.read_take(job_id, index)
+        audio = takes.audio_path_for(job_id, index)
+        if take is None or audio is None:
+            _align_status[key] = "failed"
+            return
+        data = await asyncio.to_thread(alignment.run_alignment, str(audio), take["lyrics"])
+        takes.update_take(job_id, index, {"alignment": data})
+        _align_status[key] = "done"
+        logger.info("alignment done job=%s idx=%d lines=%d", job_id, index,
+                    len(data["lines"]))
+    except Exception as exc:
+        _align_status[key] = "failed"
+        logger.warning("alignment failed job=%s idx=%d: %s", job_id, index, exc)
+
+
+async def _alignment_worker() -> None:
+    while True:
+        await _drain_alignment_queue_once()
 
 
 @app.get("/takes/{job_id}/{index}")
@@ -915,6 +957,18 @@ async def get_take(job_id: str, index: int, request: Request):
         raise HTTPException(status_code=404, detail="Take not found")
     take["alignment_status"] = _alignment_status_for(job_id, index)
     return take
+
+
+@app.post("/takes/{job_id}/{index}/align")
+async def request_alignment(job_id: str, index: int, request: Request):
+    take = takes.read_take(job_id, index)
+    if take is None:
+        raise HTTPException(status_code=404, detail="Take not found")
+    user = request.state.user
+    if user != "local" and take.get("user") != user:
+        raise HTTPException(status_code=404, detail="Take not found")
+    _enqueue_alignment(job_id, index)
+    return {"status": _alignment_status_for(job_id, index)}
 
 
 @app.delete("/takes/{job_id}/{index}")
@@ -1597,6 +1651,7 @@ async def _cleanup_loop():
 @app.on_event("startup")
 async def start_cleanup():
     asyncio.create_task(_cleanup_loop())
+    asyncio.create_task(_alignment_worker())
 
 
 # ---------------------------------------------------------------------------
