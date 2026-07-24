@@ -819,6 +819,14 @@ async def status(task_id: str):
 
     _finalize_job(task_id, data)
 
+    # Serve the stored results for finalized jobs — they carry the take ref
+    # and takes-dir audio path added at persist time. Without this, a poll
+    # arriving after the background watcher finalized the job would return
+    # AceStep's raw results, silently missing the take enrichment.
+    job = _jobs.get(task_id)
+    if job is not None:
+        data["results"] = job["results"]
+
     # Add queue position info
     pos = next((i for i, (t, _) in enumerate(_queue_order) if t == task_id), -1)
     data["queue_position"] = pos
