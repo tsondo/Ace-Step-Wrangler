@@ -3827,7 +3827,7 @@ function buildPayload() {
 }
 
 let _pollInterval = null;
-let _pollFailCount = 0;
+let _pollFailSince = null;   // start of the current failure streak, or null
 let _timerInterval = null;
 
 // Ctrl/Cmd+Enter keyboard shortcut — trigger Generate from anywhere in the UI
@@ -4129,13 +4129,19 @@ generateBtn.addEventListener('click', async () => {
   }
 
   // Poll /status/{task_id} every 2 seconds
-  _pollFailCount = 0;
+  _pollFailSince = null;
   _pollInterval = setInterval(async () => {
     try {
       const res = await fetch(`/status/${taskId}`);
-      if (!res.ok) throw new Error(res.statusText);
+      if (!res.ok) {
+        const err = new Error(res.statusText);
+        // 4xx = permanent (e.g. unknown task after a backend restart);
+        // 5xx = transient (AceStep busy or still loading models)
+        err.permanent = res.status >= 400 && res.status < 500;
+        throw err;
+      }
       const data = await res.json();
-      _pollFailCount = 0;
+      _pollFailSince = null;
 
       // Queue position display while waiting
       if (data.status === 'processing' && data.queue_position >= 0) {
@@ -4229,8 +4235,13 @@ generateBtn.addEventListener('click', async () => {
       }
       // 'processing' → keep polling
     } catch (err) {
-      _pollFailCount++;
-      if (_pollFailCount < 3) return; // transient hiccup — retry on next tick
+      // Tolerate transient failures for up to 5 minutes — cold-start model
+      // loading and busy-GPU windows can stall AceStep far longer than a
+      // fixed retry count allows. Only 4xx responses give up immediately.
+      if (!err.permanent) {
+        if (_pollFailSince === null) _pollFailSince = Date.now();
+        if (Date.now() - _pollFailSince < 5 * 60 * 1000) return;
+      }
       clearInterval(_pollInterval);
       setGenerating(false);
       setOutputState('now-playing');

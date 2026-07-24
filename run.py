@@ -259,6 +259,11 @@ def main() -> None:
     # for meaningful speed gains on Ampere+ GPUs (3090, 4080, 5090, etc.).
     acestep_env.setdefault("TORCH_FLOAT32_MATMUL_PRECISION", "medium")
 
+    # Load models at startup instead of on first request. AceStep's lazy
+    # default makes the first Generate hang for ~2 minutes while models load,
+    # during which its API returns 500s and polls fail. Overridable via env.
+    acestep_env.setdefault("ACESTEP_NO_INIT", "false")
+
     # --- Build environment for Wrangler (no GPU needed) ---------------------
     wrangler_env = os.environ.copy()
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)

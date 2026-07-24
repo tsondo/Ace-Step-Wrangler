@@ -762,13 +762,9 @@ def _persist_results(task_id: str, results: list, pending: dict) -> None:
             _enqueue_alignment(task_id, i)
 
 
-@app.get("/status/{task_id}")
-async def status(task_id: str):
-    try:
-        data = await query_result(task_id)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
-
+def _finalize_job(task_id: str, data: dict) -> None:
+    """Apply a job's terminal state to the in-process stores. Idempotent —
+    safe to call from both /status polling and the background watcher."""
     if data["status"] == "done" and task_id not in _jobs:
         pending = _pending.pop(task_id, {})
         _jobs[task_id] = {
@@ -787,6 +783,41 @@ async def status(task_id: str):
         pending = _pending.pop(task_id, {})
         _queue_order[:] = [(t, u) for t, u in _queue_order if t != task_id]
         logger.warning("failed user=%s task_id=%s", pending.get("user", "?"), task_id)
+
+
+async def _watch_pending_jobs_once() -> None:
+    """Check pending jobs against AceStep; finalize any that finished.
+
+    Runs the same done-transition as /status, so results are persisted as
+    takes even when no browser is polling (e.g. tab closed or poll died)."""
+    for task_id in list(_pending):
+        if task_id in _jobs:
+            continue
+        try:
+            data = await query_result(task_id)
+        except Exception:
+            continue  # AceStep busy/unreachable — retry next round
+        if data["status"] in ("done", "error"):
+            _finalize_job(task_id, data)
+
+
+async def _pending_job_watcher() -> None:
+    while True:
+        await asyncio.sleep(10)
+        try:
+            await _watch_pending_jobs_once()
+        except Exception as exc:
+            logger.warning("pending-job watcher error: %s", exc)
+
+
+@app.get("/status/{task_id}")
+async def status(task_id: str):
+    try:
+        data = await query_result(task_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AceStep error: {exc}")
+
+    _finalize_job(task_id, data)
 
     # Add queue position info
     pos = next((i for i, (t, _) in enumerate(_queue_order) if t == task_id), -1)
@@ -1656,6 +1687,7 @@ async def _cleanup_loop():
 async def start_cleanup():
     asyncio.create_task(_cleanup_loop())
     asyncio.create_task(_alignment_worker())
+    asyncio.create_task(_pending_job_watcher())
 
 
 # ---------------------------------------------------------------------------

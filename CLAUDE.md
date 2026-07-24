@@ -128,6 +128,8 @@ Set `MODEL_LOCATION` in `.env` (or the environment) to share model checkpoints a
 
 The following AceStep environment variables are forwarded to the AceStep subprocess if set in the parent environment (never set by default): `ACESTEP_DEVICE`, `MAX_CUDA_VRAM`, `ACESTEP_VAE_ON_CPU`, `ACESTEP_LM_BACKEND`, `ACESTEP_INIT_LLM`.
 
+`run.py` sets `ACESTEP_NO_INIT=false` by default (models load at startup rather than on first request — AceStep's lazy default made the first Generate hang ~2 minutes while its API returned errors). Set `ACESTEP_NO_INIT=true` in the environment to restore lazy loading.
+
 When modifying `run.py`, preserve this separation — Wrangler code should never depend on GPU availability.
 
 This project uses vanilla HTML, CSS, and JavaScript. No framework, no build step, no exceptions.
