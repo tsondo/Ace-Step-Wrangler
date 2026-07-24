@@ -365,6 +365,10 @@ def _build_payload(req: GenerateRequest) -> dict:
                 payload["repainting_start"] = req.repainting_start
             if req.repainting_end is not None:
                 payload["repainting_end"] = req.repainting_end
+            if req.repaint_mode:
+                payload["repaint_mode"] = req.repaint_mode
+            if req.repaint_strength is not None:
+                payload["repaint_strength"] = req.repaint_strength
         if req.track_name:
             payload["track_name"] = req.track_name
         if req.track_classes:

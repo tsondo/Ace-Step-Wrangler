@@ -1059,6 +1059,16 @@ function switchApproach(approach) {
   document.getElementById('rework-lyrics-hint').classList.toggle('hidden', approach !== 'cover');
   regionInputs.classList.toggle('hidden', approach !== 'repaint');
 
+  // Amount of change: repaint uses the raw #repaint-strength slider, cover
+  // reuses #cover-strength (already toggled above via coverStrengthGroup).
+  document.getElementById('repaint-strength-row').classList.toggle('hidden', approach !== 'repaint');
+  document.getElementById('repaint-strength').classList.toggle('hidden', approach !== 'repaint');
+  const _changeMode = approach === 'repaint' ? 'repaint' : 'cover';
+  if (!_changeInit[_changeMode]) {
+    _changeInit[_changeMode] = true;
+    _applyChangePreset(_CHANGE_PRESETS[_changeMode].default);
+  }
+
   // Update waveform selection visibility: show handles for Fix & Blend, hide for Reimagine
   if (_waveformData && _waveformDuration > 0) {
     if (approach === 'repaint') {
@@ -1111,6 +1121,52 @@ coverStrengthSlider.addEventListener('input', () => {
 });
 // Init fill
 coverStrengthSlider.dispatchEvent(new Event('input'));
+
+// ===== Amount of change presets =====
+
+const _CHANGE_PRESETS = {
+  repaint: { minimal: 15, light: 25, moderate: 40, rewrite: 70, default: 'minimal' },
+  cover:   { minimal: 15, light: 30, moderate: 60, rewrite: 85, default: 'moderate' },
+};
+
+// Tracks whether each mode's default preset has already been applied this
+// session — the default is applied only the first time a mode is entered,
+// so a returning switch keeps whatever value the user last set.
+let _changeInit = { repaint: false, cover: false };
+
+function _applyChangePreset(name) {
+  const mode = _reworkApproach === 'repaint' ? 'repaint' : 'cover';
+  const value = _CHANGE_PRESETS[mode][name];
+  document.querySelectorAll('.change-preset-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.change === name));
+  if (mode === 'repaint') {
+    const s = document.getElementById('repaint-strength');
+    s.value = value;
+    const pct = ((value - Number(s.min)) / (Number(s.max) - Number(s.min))) * 100;
+    s.style.setProperty('--fill', pct + '%');
+    document.getElementById('repaint-strength-value').textContent = (value / 100).toFixed(2);
+  } else {
+    const s = document.getElementById('cover-strength');
+    s.value = value;
+    s.dispatchEvent(new Event('input'));
+  }
+  document.getElementById('change-amount-value').textContent = '';
+}
+
+document.querySelectorAll('.change-preset-btn').forEach(btn =>
+  btn.addEventListener('click', () => _applyChangePreset(btn.dataset.change)));
+
+document.getElementById('repaint-strength').addEventListener('input', function () {
+  document.getElementById('repaint-strength-value').textContent =
+    (Number(this.value) / 100).toFixed(2);
+  document.querySelectorAll('.change-preset-btn').forEach(b => b.classList.remove('active'));
+});
+
+// Reimagine (cover) is the panel's default active approach on load — apply
+// its default preset now, same as switchApproach() does the first time a
+// mode is switched into.
+_changeInit.cover = true;
+_applyChangePreset(_CHANGE_PRESETS.cover.default);
 
 // ===== Fix & Blend lyric selection =====
 
@@ -3553,6 +3609,8 @@ function buildReworkPayload() {
   } else {
     payload.repainting_start = Number(document.getElementById('region-start').value);
     payload.repainting_end   = Number(document.getElementById('region-end').value);
+    payload.repaint_mode = 'balanced';
+    payload.repaint_strength = Number(document.getElementById('repaint-strength').value) / 100;
   }
 
   return payload;

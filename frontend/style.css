@@ -665,6 +665,24 @@ html, body {
   color: var(--accent);
 }
 
+/* Amount of change presets */
+.change-preset-row { display: flex; gap: 6px; }
+.change-preset-btn {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.change-preset-btn:hover { background: var(--surface-raised); }
+.change-preset-btn.active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
 /* Region inputs */
 .region-inputs {
   display: flex;

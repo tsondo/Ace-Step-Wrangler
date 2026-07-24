@@ -186,6 +186,27 @@
           <p class="field-hint">Click a line; shift-click to extend the selection.</p>
         </div>
 
+        <!-- Amount of change (shared preset row for both sub-modes) -->
+        <div class="control-group" id="change-amount-group">
+          <div class="control-label-row">
+            <label class="field-label">Amount of change</label>
+            <span class="control-value" id="change-amount-value"></span>
+          </div>
+          <div class="change-preset-row">
+            <button class="change-preset-btn" data-change="minimal" type="button">Minimal</button>
+            <button class="change-preset-btn" data-change="light" type="button">Light</button>
+            <button class="change-preset-btn" data-change="moderate" type="button">Moderate</button>
+            <button class="change-preset-btn" data-change="rewrite" type="button">Rewrite</button>
+          </div>
+          <p class="field-hint">Low = re-sing the words with minimal change. High = rewrite the section.</p>
+
+          <div class="control-label-row hidden" id="repaint-strength-row">
+            <label class="field-label" for="repaint-strength">Raw strength</label>
+            <span class="control-value" id="repaint-strength-value">0.15</span>
+          </div>
+          <input type="range" id="repaint-strength" class="slider hidden" min="0" max="100" value="15" step="1">
+        </div>
+
         <!-- Cover strength (Reimagine only) -->
         <div class="control-group" id="cover-strength-group">
           <div class="control-label-row">
