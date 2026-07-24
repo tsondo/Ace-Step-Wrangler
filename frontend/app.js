@@ -1068,6 +1068,10 @@ function switchApproach(approach) {
     _changeInit[_changeMode] = true;
     _applyChangePreset(_CHANGE_PRESETS[_changeMode].default);
   }
+  // Whether or not a default was just applied above, the preset button row
+  // must reflect whatever mode is now visible — re-derive the highlight from
+  // the active mode's current slider value every time, not just on first entry.
+  _resyncChangePresetHighlight();
 
   // Update waveform selection visibility: show handles for Fix & Blend, hide for Reimagine
   if (_waveformData && _waveformDuration > 0) {
@@ -1155,6 +1159,21 @@ function _applyChangePreset(name) {
 
 document.querySelectorAll('.change-preset-btn').forEach(btn =>
   btn.addEventListener('click', () => _applyChangePreset(btn.dataset.change)));
+
+// Re-derive which preset (if any) matches the currently active mode's
+// current slider value, and highlight exactly that button — clearing the
+// highlight entirely if the value doesn't exactly match a preset (e.g. the
+// user dragged the slider manually). Called on every switchApproach(), not
+// just first-entry, so the highlight never lags behind the visible slider.
+function _resyncChangePresetHighlight() {
+  const mode = _reworkApproach === 'repaint' ? 'repaint' : 'cover';
+  const slider = document.getElementById(mode === 'repaint' ? 'repaint-strength' : 'cover-strength');
+  const value = Number(slider.value);
+  const presets = _CHANGE_PRESETS[mode];
+  const match = Object.keys(presets).find(name => name !== 'default' && presets[name] === value);
+  document.querySelectorAll('.change-preset-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.change === match));
+}
 
 document.getElementById('repaint-strength').addEventListener('input', function () {
   document.getElementById('repaint-strength-value').textContent =
