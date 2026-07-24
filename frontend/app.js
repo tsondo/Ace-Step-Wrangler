@@ -880,6 +880,18 @@ initAudioPlayer(audioPreview, document.getElementById('audio-preview-player'), '
 // Also wire the transport bar in the waveform output panel
 initAudioPlayer(audioPreview, document.getElementById('wf-transport'), 'Rework');
 
+// Call right after _reworkTakeRef is assigned a new value (including null) —
+// keeps every take-derived UI mechanism in sync with whatever audio is now
+// loaded: tears down any stale A/B preview, refreshes the inherited region
+// seed, and refreshes the lyric-alignment list. This exact reset sequence
+// was previously duplicated ad-hoc at each call site, which is how it kept
+// getting missed piecemeal — consolidate here instead of adding a new site.
+function _syncReworkDerivedState() {
+  endAbPreview();
+  _initReworkSeed();
+  refreshAlignmentUI();
+}
+
 function handleAudioUpload(file) {
   if (!file || !file.type.startsWith('audio/')) {
     const hint = document.getElementById('generate-hint');
@@ -887,7 +899,11 @@ function handleAudioUpload(file) {
     return;
   }
 
-  endAbPreview(); // loading different audio invalidates any pending A/B decision
+  // A freshly browsed file is never a known take — reset immediately so the
+  // A/B preview, region seed, and alignment list don't sit stale (pointing
+  // at the previous take) while the upload request is still in flight.
+  _reworkTakeRef = null;
+  _syncReworkDerivedState();
 
   // Client-side preview
   const objUrl = URL.createObjectURL(file);
@@ -913,9 +929,6 @@ function handleAudioUpload(file) {
     .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
     .then(data => {
       _uploadedAudioPath = data.path;
-      _reworkTakeRef = null;
-      _initReworkSeed();
-      refreshAlignmentUI();
       _reworkExtractBtn.disabled = false;
       _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
       updateGenerateState();
@@ -935,11 +948,9 @@ function formatDuration(secs) {
 }
 
 function removeAudio() {
-  endAbPreview(); // clearing the audio invalidates any pending A/B decision
   _uploadedAudioPath = null;
   _reworkTakeRef = null;
-  _initReworkSeed();
-  refreshAlignmentUI();
+  _syncReworkDerivedState();
   _uploadedAudioDuration = null;
   audioPreview.src = '';
   document.getElementById('upload-filename').textContent = '';
@@ -1474,9 +1485,9 @@ aiDescription.addEventListener('input', updateGenerateState);
 // --- Load any audio path into Rework mode ---
 
 function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
-  endAbPreview(); // any pending A/B decision is for audio we're about to replace
   _uploadedAudioPath = audioPath;
   _reworkTakeRef = takeRef || null;
+  _syncReworkDerivedState();
   _reworkExtractBtn.disabled = false;
   _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
   audioPreview.src = '/audio?path=' + encodeURIComponent(audioPath);
@@ -1508,8 +1519,6 @@ function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
   updateControlsForMode('rework');
   updateGenerateState();
   loadWaveformForRework(audioPath, _uploadedAudioDuration || null, lyrics || '');
-  refreshAlignmentUI();
-  _initReworkSeed();
 }
 
 // ===== Repaint seed inheritance =====
@@ -1559,10 +1568,12 @@ document.getElementById('rework-seed').addEventListener('input', function () {
 // generate button is blocked (see the guard in the generate click handler)
 // so a second job can never be submitted on top of an undecided one — that
 // would both orphan the pending take on disk and leave the A/B bar wired to
-// stale paths. Any function that loads different audio into Rework
-// (loadAudioIntoRework, handleAudioUpload, removeAudio) also tears down a
-// stale _abState first, so switching tabs/modes or loading new audio can
-// never leave the toggle/Keep/Discard buttons pointed at the wrong audio.
+// stale paths. Every place that points Rework at different audio
+// (loadAudioIntoRework, handleAudioUpload, removeAudio, and the Reimagine
+// completion handler in the /status poll) calls _syncReworkDerivedState(),
+// which tears down a stale _abState first, so switching tabs/modes or
+// loading new audio can never leave the toggle/Keep/Discard buttons pointed
+// at the wrong audio.
 
 let _abState = null;   // {originalPath, reworkedPath, region:{start,end}, resultTake, active}
 
@@ -4167,6 +4178,7 @@ generateBtn.addEventListener('click', async () => {
             const reworkTakeRef = result.take ? { jobId: result.take.job_id, index: result.take.index } : null;
             _uploadedAudioPath = result.audio_url;
             _reworkTakeRef = reworkTakeRef;
+            _syncReworkDerivedState();
             audioPreview.src = '/audio?path=' + encodeURIComponent(result.audio_url);
             document.getElementById('upload-filename').textContent = 'Reworked audio';
             loadWaveformForRework(result.audio_url, null, payload.lyrics || '');
