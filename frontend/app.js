@@ -1497,7 +1497,45 @@ function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
   updateGenerateState();
   loadWaveformForRework(audioPath, _uploadedAudioDuration || null, lyrics || '');
   refreshAlignmentUI();
+  _initReworkSeed();
 }
+
+// ===== Repaint seed inheritance =====
+
+let _reworkSeed = null;
+
+async function _initReworkSeed() {
+  const hint = document.getElementById('rework-seed-hint');
+  const input = document.getElementById('rework-seed');
+  _reworkSeed = null;
+  input.value = '';
+  hint.classList.add('hidden');
+  if (!_reworkTakeRef) {
+    hint.textContent = 'No take metadata — repaint uses a random seed unless you set one.';
+    hint.classList.remove('hidden');
+    return;
+  }
+  try {
+    const res = await fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}`);
+    const take = await res.json();
+    if (take.seed_used != null) {
+      _reworkSeed = take.seed_used;
+      input.value = take.seed_used;
+    } else {
+      hint.textContent = 'Seed unknown for this take — enter one or repaint proceeds random.';
+      hint.classList.remove('hidden');
+    }
+  } catch (_) { /* leave random */ }
+}
+
+document.getElementById('reroll-seed-btn').addEventListener('click', () => {
+  _reworkSeed = Math.floor(Math.random() * 4294967295);
+  document.getElementById('rework-seed').value = _reworkSeed;
+});
+
+document.getElementById('rework-seed').addEventListener('input', function () {
+  _reworkSeed = this.value.trim() === '' ? null : parseInt(this.value, 10);
+});
 
 // ===== Clear button =====
 
@@ -3633,6 +3671,7 @@ function buildReworkPayload() {
     payload.repainting_end   = Number(document.getElementById('region-end').value);
     payload.repaint_mode = 'balanced';
     payload.repaint_strength = Number(document.getElementById('repaint-strength').value) / 100;
+    if (_reworkSeed != null) payload.seed = _reworkSeed;
   }
 
   return payload;
