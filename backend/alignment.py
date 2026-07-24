@@ -75,6 +75,7 @@ def run_alignment(audio_path: str, lyrics: str) -> dict:
                            dtype=torch.int32)
 
     aligned, scores = torchaudio.functional.forced_align(emission, targets, blank=0)
+    scores = scores.exp()  # forced_align returns log-probabilities; convert to probability
     spans = torchaudio.functional.merge_tokens(aligned[0], scores[0])
 
     ratio = wav.size(1) / emission.size(1) / _SAMPLE_RATE
