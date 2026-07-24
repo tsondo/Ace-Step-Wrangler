@@ -428,7 +428,7 @@ modeBtns.forEach(btn =>
     if (mode === 'rework') {
       const tabResult = _tabAudio[_createTab];
       if (tabResult) {
-        loadAudioIntoRework(tabResult.audioPath, 'Generated audio', tabResult.lyrics);
+        loadAudioIntoRework(tabResult.audioPath, 'Generated audio', tabResult.lyrics, null, tabResult.takeRef);
       } else {
         switchMode(mode);
       }
@@ -868,6 +868,7 @@ analyzeUploadZone.addEventListener('drop', (e) => {
 let _uploadedAudioPath = null;
 let _uploadedAudioDuration = null;
 let _reworkApproach = 'cover';
+let _reworkTakeRef = null;   // {jobId, index} of the take loaded in Rework, or null
 
 const audioUploadZone = document.getElementById('audio-upload-zone');
 const uploadPrompt    = document.getElementById('upload-prompt');
@@ -910,6 +911,7 @@ function handleAudioUpload(file) {
     .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
     .then(data => {
       _uploadedAudioPath = data.path;
+      _reworkTakeRef = null;
       _reworkExtractBtn.disabled = false;
       _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
       updateGenerateState();
@@ -1260,7 +1262,7 @@ function switchCreateTab(tab) {
   if (_currentMode === 'rework') {
     const tabResult = _tabAudio[tab];
     if (tabResult) {
-      loadAudioIntoRework(tabResult.audioPath, _TAB_LABELS[tab] || 'Generated audio', tabResult.lyrics);
+      loadAudioIntoRework(tabResult.audioPath, _TAB_LABELS[tab] || 'Generated audio', tabResult.lyrics, null, tabResult.takeRef);
     } else {
       removeAudio();
     }
@@ -1278,8 +1280,9 @@ aiDescription.addEventListener('input', updateGenerateState);
 
 // --- Load any audio path into Rework mode ---
 
-function loadAudioIntoRework(audioPath, label, lyrics, knownDuration) {
+function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
   _uploadedAudioPath = audioPath;
+  _reworkTakeRef = takeRef || null;
   _reworkExtractBtn.disabled = false;
   _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
   audioPreview.src = '/audio?path=' + encodeURIComponent(audioPath);
@@ -3630,6 +3633,7 @@ async function showResultCards(taskId, results, fmt) {
     _tabAudio[_createTab] = {
       audioPath: results[0].audio_url,
       lyrics: results[0].lyrics || (_createTab === 'my-lyrics' ? lyricsText.value : ''),
+      takeRef: results[0].take ? { jobId: results[0].take.job_id, index: results[0].take.index } : null,
     };
   }
 
@@ -3796,7 +3800,9 @@ generateBtn.addEventListener('click', async () => {
         } else if (_currentMode === 'rework') {
           // Stay in waveform view — load the result as the new source audio
           const result = data.results[0];
+          const reworkTakeRef = result.take ? { jobId: result.take.job_id, index: result.take.index } : null;
           _uploadedAudioPath = result.audio_url;
+          _reworkTakeRef = reworkTakeRef;
           audioPreview.src = '/audio?path=' + encodeURIComponent(result.audio_url);
           document.getElementById('upload-filename').textContent = 'Reworked audio';
           loadWaveformForRework(result.audio_url, null, payload.lyrics || '');
@@ -3805,6 +3811,7 @@ generateBtn.addEventListener('click', async () => {
           _tabAudio[_createTab] = {
             audioPath: result.audio_url,
             lyrics: payload.lyrics || (_tabAudio[_createTab] ? _tabAudio[_createTab].lyrics : ''),
+            takeRef: reworkTakeRef,
           };
 
           // Wire download links
@@ -3865,7 +3872,7 @@ const _projectStatusEl  = document.getElementById('project-status');
 function _gatherProject() {
   const activeTags = [...document.querySelectorAll('.tag.active:not(.track-class-tag)')].map(t => t.textContent.trim());
   return {
-    _version: 1,
+    _version: 2,
     _saved: new Date().toISOString(),
     mode: _currentMode,
     createTab: _createTab,
@@ -3911,6 +3918,10 @@ function _gatherProject() {
     coverNoiseStrength: document.getElementById('cover-noise-strength').value,
     // Last used seed (for recall)
     lastSeed: _lastSeed,
+    // Per-tab audio + take references (so Rework can restore durable takes after reload)
+    tabAudio: Object.fromEntries(
+      Object.entries(_tabAudio).filter(([, v]) => v && v.takeRef)
+    ),
   };
 }
 
@@ -3997,6 +4008,12 @@ function _applyProject(proj) {
     _lastSeed = proj.lastSeed;
     _seedLastBtn.disabled = false;
     _seedLastBtn.title = 'Use last seed: ' + proj.lastSeed;
+  }
+
+  if (proj.tabAudio) {
+    for (const [tab, entry] of Object.entries(proj.tabAudio)) {
+      if (entry && entry.takeRef) _tabAudio[tab] = entry;
+    }
   }
 
   // Sync all derived UI state
