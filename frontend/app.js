@@ -938,6 +938,7 @@ function removeAudio() {
   endAbPreview(); // clearing the audio invalidates any pending A/B decision
   _uploadedAudioPath = null;
   _reworkTakeRef = null;
+  _initReworkSeed();
   refreshAlignmentUI();
   _uploadedAudioDuration = null;
   audioPreview.src = '';
