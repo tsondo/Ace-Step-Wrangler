@@ -915,6 +915,7 @@ function handleAudioUpload(file) {
       _uploadedAudioPath = data.path;
       _reworkTakeRef = null;
       _initReworkSeed();
+      refreshAlignmentUI();
       _reworkExtractBtn.disabled = false;
       _reworkExtractBtn.title = 'Analyze this song to extract lyrics, BPM, key, and style';
       updateGenerateState();
@@ -937,6 +938,7 @@ function removeAudio() {
   endAbPreview(); // clearing the audio invalidates any pending A/B decision
   _uploadedAudioPath = null;
   _reworkTakeRef = null;
+  refreshAlignmentUI();
   _uploadedAudioDuration = null;
   audioPreview.src = '';
   document.getElementById('upload-filename').textContent = '';
@@ -1202,6 +1204,7 @@ const _alignState = document.getElementById('align-state');
 let _alignLines = null;      // alignment lines for the loaded take
 let _alignSel = null;        // {first, last} indices into _alignLines
 let _alignPollTimer = null;
+let _alignToken = 0;
 const LOW_CONFIDENCE = 0.5;
 
 // Pad outward, but never cross into an adjacent unselected line. With the
@@ -1266,6 +1269,7 @@ function renderAlignList(lines) {
 }
 
 async function refreshAlignmentUI() {
+  const token = ++_alignToken;
   if (_alignPollTimer) { clearTimeout(_alignPollTimer); _alignPollTimer = null; }
   const isRepaint = _reworkApproach === 'repaint';
   _alignGroup.classList.toggle('hidden', !isRepaint || !_reworkTakeRef);
@@ -1274,6 +1278,7 @@ async function refreshAlignmentUI() {
     const res = await fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}`);
     if (!res.ok) throw new Error(res.statusText);
     const take = await res.json();
+    if (token !== _alignToken) return; // superseded by a newer call
     if (take.alignment && take.alignment.lines.length) {
       _alignState.textContent = '';
       renderAlignList(take.alignment.lines);
@@ -1290,6 +1295,7 @@ async function refreshAlignmentUI() {
       _alignPollTimer = setTimeout(refreshAlignmentUI, 3000);
     }
   } catch (_) {
+    if (token !== _alignToken) return; // superseded by a newer call
     _alignGroup.classList.add('hidden');
   }
 }
