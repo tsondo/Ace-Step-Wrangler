@@ -1584,6 +1584,9 @@ audioPreview.addEventListener('timeupdate', _abLoopTick);
 function startAbPreview(originalPath, reworkedPath, region, resultTake) {
   _abState = { originalPath, reworkedPath, region, resultTake, active: 'reworked' };
   setOutputState('waveform'); // reveal #output-waveform (and the ab-bar inside it), hide the spinner
+  // Hide stale download links from a prior Reimagine — they point at that
+  // older job, not the take currently being previewed here.
+  document.getElementById('waveform-result-actions').classList.add('hidden');
   document.getElementById('ab-bar').classList.remove('hidden');
   _abSetActive('reworked');
   audioPreview.currentTime = Math.max(0, region.start - 2);
@@ -1627,6 +1630,16 @@ document.getElementById('ab-again-btn').addEventListener('click', () => {
   if (s.resultTake) {
     fetch(`/takes/${s.resultTake.job_id}/${s.resultTake.index}`, { method: 'DELETE' });
   }
+  // Restore the region that was actually previewed — the lyric-line list or
+  // the seconds fields may have been clicked/edited while the A/B bar was
+  // showing, so the live region-start/end fields can no longer be trusted
+  // to reflect the take being discarded.
+  document.getElementById('region-start').value = s.region.start;
+  document.getElementById('region-end').value = s.region.end;
+  const wfs = document.getElementById('wf-region-start');
+  const wfe = document.getElementById('wf-region-end');
+  if (wfs) { wfs.value = s.region.start; wfs.dispatchEvent(new Event('input')); }
+  if (wfe) { wfe.value = s.region.end;  wfe.dispatchEvent(new Event('input')); }
   document.getElementById('reroll-seed-btn').click();   // vary, else identical output
   document.getElementById('generate-btn').click();
 });
