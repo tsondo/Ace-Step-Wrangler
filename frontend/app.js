@@ -1504,8 +1504,10 @@ function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
 // ===== Repaint seed inheritance =====
 
 let _reworkSeed = null;
+let _reworkSeedToken = 0;
 
 async function _initReworkSeed() {
+  const token = ++_reworkSeedToken;
   const hint = document.getElementById('rework-seed-hint');
   const input = document.getElementById('rework-seed');
   _reworkSeed = null;
@@ -1519,6 +1521,7 @@ async function _initReworkSeed() {
   try {
     const res = await fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}`);
     const take = await res.json();
+    if (token !== _reworkSeedToken) return; // superseded by a newer call
     if (take.seed_used != null) {
       _reworkSeed = take.seed_used;
       input.value = take.seed_used;
