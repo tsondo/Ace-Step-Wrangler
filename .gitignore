@@ -211,3 +211,4 @@ training/
 
 # LoRA/LoKR adapters (user-trained, often large)
 loras/
+takes/
