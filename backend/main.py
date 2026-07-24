@@ -746,6 +746,7 @@ def _persist_results(task_id: str, results: list, pending: dict) -> None:
                 seed_mode=params.get("seed_mode", "random"),
                 parent_take=params.get("parent_take"),
                 rework=rework,
+                user=pending.get("user", "local"),
             )
         except Exception as exc:
             logger.warning("take persist failed job=%s idx=%d: %s", task_id, i, exc)
@@ -905,16 +906,25 @@ def _alignment_status_for(job_id: str, index: int) -> str:
 
 
 @app.get("/takes/{job_id}/{index}")
-async def get_take(job_id: str, index: int):
+async def get_take(job_id: str, index: int, request: Request):
     take = takes.read_take(job_id, index)
     if take is None:
+        raise HTTPException(status_code=404, detail="Take not found")
+    user = request.state.user
+    if user != "local" and take.get("user") != user:
         raise HTTPException(status_code=404, detail="Take not found")
     take["alignment_status"] = _alignment_status_for(job_id, index)
     return take
 
 
 @app.delete("/takes/{job_id}/{index}")
-async def discard_take(job_id: str, index: int):
+async def discard_take(job_id: str, index: int, request: Request):
+    take = takes.read_take(job_id, index)
+    if take is None:
+        raise HTTPException(status_code=404, detail="Take not found")
+    user = request.state.user
+    if user != "local" and take.get("user") != user:
+        raise HTTPException(status_code=404, detail="Take not found")
     return {"deleted": takes.delete_take(job_id, index)}
 
 

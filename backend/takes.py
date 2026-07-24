@@ -68,7 +68,7 @@ def audio_path_for(job_id: str, index: int) -> Optional[Path]:
 
 def write_take(job_id: str, index: int, result: dict, params: dict, fmt: str,
                seed_mode: str, parent_take: Optional[dict],
-               rework: Optional[dict]) -> Optional[dict]:
+               rework: Optional[dict], user: str = "local") -> Optional[dict]:
     src = _url_to_fs_path(result.get("audio_url", ""))
     if src is None or not src.exists():
         return None
@@ -91,6 +91,7 @@ def write_take(job_id: str, index: int, result: dict, params: dict, fmt: str,
         "index": index,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "audio_file": audio_name,
+        "user": user,
         "params": norm_params,
         "meta": norm_meta,
         "prompt": result.get("prompt", ""),
