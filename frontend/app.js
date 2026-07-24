@@ -887,6 +887,8 @@ function handleAudioUpload(file) {
     return;
   }
 
+  endAbPreview(); // loading different audio invalidates any pending A/B decision
+
   // Client-side preview
   const objUrl = URL.createObjectURL(file);
   audioPreview.src = objUrl;
@@ -932,6 +934,7 @@ function formatDuration(secs) {
 }
 
 function removeAudio() {
+  endAbPreview(); // clearing the audio invalidates any pending A/B decision
   _uploadedAudioPath = null;
   _reworkTakeRef = null;
   _uploadedAudioDuration = null;
@@ -1464,6 +1467,7 @@ aiDescription.addEventListener('input', updateGenerateState);
 // --- Load any audio path into Rework mode ---
 
 function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
+  endAbPreview(); // any pending A/B decision is for audio we're about to replace
   _uploadedAudioPath = audioPath;
   _reworkTakeRef = takeRef || null;
   _reworkExtractBtn.disabled = false;
@@ -1539,6 +1543,92 @@ document.getElementById('reroll-seed-btn').addEventListener('click', () => {
 
 document.getElementById('rework-seed').addEventListener('input', function () {
   _reworkSeed = this.value.trim() === '' ? null : parseInt(this.value, 10);
+});
+
+// ===== A/B preview (Fix & Blend) =====
+//
+// A repaint result is never auto-adopted: it sits in _abState until the user
+// explicitly Keeps, Discards, or retries it. While _abState is active, the
+// generate button is blocked (see the guard in the generate click handler)
+// so a second job can never be submitted on top of an undecided one — that
+// would both orphan the pending take on disk and leave the A/B bar wired to
+// stale paths. Any function that loads different audio into Rework
+// (loadAudioIntoRework, handleAudioUpload, removeAudio) also tears down a
+// stale _abState first, so switching tabs/modes or loading new audio can
+// never leave the toggle/Keep/Discard buttons pointed at the wrong audio.
+
+let _abState = null;   // {originalPath, reworkedPath, region:{start,end}, resultTake, active}
+
+function _abSetActive(which) {
+  if (!_abState) return;
+  _abState.active = which;
+  document.getElementById('ab-original-btn').classList.toggle('active', which === 'original');
+  document.getElementById('ab-reworked-btn').classList.toggle('active', which === 'reworked');
+  const t = audioPreview.currentTime;
+  const wasPlaying = !audioPreview.paused;
+  audioPreview.src = '/audio?path=' + encodeURIComponent(
+    which === 'original' ? _abState.originalPath : _abState.reworkedPath);
+  audioPreview.currentTime = t;
+  if (wasPlaying) audioPreview.play();
+}
+
+function _abLoopTick() {
+  if (!_abState) return;
+  const { start, end } = _abState.region;
+  if (audioPreview.currentTime > end + 2) {
+    audioPreview.currentTime = Math.max(0, start - 2);
+  }
+}
+audioPreview.addEventListener('timeupdate', _abLoopTick);
+
+function startAbPreview(originalPath, reworkedPath, region, resultTake) {
+  _abState = { originalPath, reworkedPath, region, resultTake, active: 'reworked' };
+  setOutputState('waveform'); // reveal #output-waveform (and the ab-bar inside it), hide the spinner
+  document.getElementById('ab-bar').classList.remove('hidden');
+  _abSetActive('reworked');
+  audioPreview.currentTime = Math.max(0, region.start - 2);
+  audioPreview.play();
+}
+
+function endAbPreview() {
+  _abState = null;
+  document.getElementById('ab-bar').classList.add('hidden');
+}
+
+document.getElementById('ab-original-btn').addEventListener('click', () => _abSetActive('original'));
+document.getElementById('ab-reworked-btn').addEventListener('click', () => _abSetActive('reworked'));
+
+document.getElementById('ab-keep-btn').addEventListener('click', () => {
+  const s = _abState;
+  endAbPreview();
+  // Adopt the reworked take as the new working audio (existing replace flow)
+  const takeRef = s.resultTake
+    ? { jobId: s.resultTake.job_id, index: s.resultTake.index } : null;
+  _tabAudio[_createTab] = { audioPath: s.reworkedPath,
+                            lyrics: _tabAudio[_createTab] ? _tabAudio[_createTab].lyrics : '',
+                            takeRef };
+  loadAudioIntoRework(s.reworkedPath, 'Reworked audio',
+                      _tabAudio[_createTab].lyrics, null, takeRef);
+});
+
+document.getElementById('ab-discard-btn').addEventListener('click', () => {
+  const s = _abState;
+  endAbPreview();
+  if (s.resultTake) {
+    fetch(`/takes/${s.resultTake.job_id}/${s.resultTake.index}`, { method: 'DELETE' });
+  }
+  // Original stays the working audio — restore its src
+  audioPreview.src = '/audio?path=' + encodeURIComponent(s.originalPath);
+});
+
+document.getElementById('ab-again-btn').addEventListener('click', () => {
+  const s = _abState;
+  endAbPreview();
+  if (s.resultTake) {
+    fetch(`/takes/${s.resultTake.job_id}/${s.resultTake.index}`, { method: 'DELETE' });
+  }
+  document.getElementById('reroll-seed-btn').click();   // vary, else identical output
+  document.getElementById('generate-btn').click();
 });
 
 // ===== Clear button =====
@@ -3676,6 +3766,9 @@ function buildReworkPayload() {
     payload.repaint_mode = 'balanced';
     payload.repaint_strength = Number(document.getElementById('repaint-strength').value) / 100;
     if (_reworkSeed != null) payload.seed = _reworkSeed;
+    if (_reworkTakeRef) {
+      payload.parent_take = { job_id: _reworkTakeRef.jobId, index: _reworkTakeRef.index };
+    }
   }
 
   return payload;
@@ -3940,6 +4033,10 @@ async function showAnalyzeResults(taskId, results, fmt) {
 }
 
 generateBtn.addEventListener('click', async () => {
+  if (_abState) {
+    generateHint.textContent = 'Keep, discard, or try again on the current A/B preview before generating.';
+    return;
+  }
   if (!hasContent()) {
     generateHint.textContent = (_currentMode === 'rework' || _currentMode === 'analyze')
       ? 'Upload audio to get started.'
@@ -4026,35 +4123,55 @@ generateBtn.addEventListener('click', async () => {
           // Show result cards in the analyze result area
           await showAnalyzeResults(taskId, data.results, payload.audio_format);
         } else if (_currentMode === 'rework') {
-          // Stay in waveform view — load the result as the new source audio
           const result = data.results[0];
-          const reworkTakeRef = result.take ? { jobId: result.take.job_id, index: result.take.index } : null;
-          _uploadedAudioPath = result.audio_url;
-          _reworkTakeRef = reworkTakeRef;
-          audioPreview.src = '/audio?path=' + encodeURIComponent(result.audio_url);
-          document.getElementById('upload-filename').textContent = 'Reworked audio';
-          loadWaveformForRework(result.audio_url, null, payload.lyrics || '');
+          // Use payload.task_type (captured at submit time), not the live
+          // _reworkApproach global — the approach selector isn't disabled
+          // during generation, so it could have changed while this job ran.
+          if (payload.task_type === 'repaint') {
+            // Fix & Blend — never auto-replace. Show an A/B preview and let
+            // the user Keep / Discard / Try again.
+            startAbPreview(
+              payload.src_audio_path, // captured at submit time — not the live
+                                      // _uploadedAudioPath, which could have
+                                      // changed if the user loaded new audio
+                                      // while this job was in flight
+              result.audio_url,
+              // Captured at submit time — the live region-start/end fields
+              // could have moved on (e.g. the user clicked a different lyric
+              // line) while this job was still in flight.
+              { start: payload.repainting_start, end: payload.repainting_end },
+              result.take || null
+            );
+          } else {
+            // Reimagine — stay in waveform view, auto-replace the source audio
+            const reworkTakeRef = result.take ? { jobId: result.take.job_id, index: result.take.index } : null;
+            _uploadedAudioPath = result.audio_url;
+            _reworkTakeRef = reworkTakeRef;
+            audioPreview.src = '/audio?path=' + encodeURIComponent(result.audio_url);
+            document.getElementById('upload-filename').textContent = 'Reworked audio';
+            loadWaveformForRework(result.audio_url, null, payload.lyrics || '');
 
-          // Save reworked audio back to the active tab so it becomes the new source
-          _tabAudio[_createTab] = {
-            audioPath: result.audio_url,
-            lyrics: payload.lyrics || (_tabAudio[_createTab] ? _tabAudio[_createTab].lyrics : ''),
-            takeRef: reworkTakeRef,
-          };
+            // Save reworked audio back to the active tab so it becomes the new source
+            _tabAudio[_createTab] = {
+              audioPath: result.audio_url,
+              lyrics: payload.lyrics || (_tabAudio[_createTab] ? _tabAudio[_createTab].lyrics : ''),
+              takeRef: reworkTakeRef,
+            };
 
-          // Wire download links
-          const fmt = payload.audio_format || 'mp3';
-          const dlAudio = document.getElementById('wf-download-audio');
-          const dlJson  = document.getElementById('wf-download-json');
-          const dlFile  = `acestep-${taskId.slice(0, 8)}-rework.${fmt}`;
-          dlAudio.href     = `/download/${taskId}/0/audio`;
-          dlAudio.download = dlFile;
-          dlJson.href      = `/download/${taskId}/0/json`;
-          dlJson.download  = `acestep-${taskId.slice(0, 8)}-rework.json`;
-          const wfSaveBtn = document.getElementById('wf-save-btn');
-          wfSaveBtn.href     = `/download/${taskId}/0/audio`;
-          wfSaveBtn.download = dlFile;
-          document.getElementById('waveform-result-actions').classList.remove('hidden');
+            // Wire download links
+            const fmt = payload.audio_format || 'mp3';
+            const dlAudio = document.getElementById('wf-download-audio');
+            const dlJson  = document.getElementById('wf-download-json');
+            const dlFile  = `acestep-${taskId.slice(0, 8)}-rework.${fmt}`;
+            dlAudio.href     = `/download/${taskId}/0/audio`;
+            dlAudio.download = dlFile;
+            dlJson.href      = `/download/${taskId}/0/json`;
+            dlJson.download  = `acestep-${taskId.slice(0, 8)}-rework.json`;
+            const wfSaveBtn = document.getElementById('wf-save-btn');
+            wfSaveBtn.href     = `/download/${taskId}/0/audio`;
+            wfSaveBtn.download = dlFile;
+            document.getElementById('waveform-result-actions').classList.remove('hidden');
+          }
         } else {
           await showResultCards(taskId, data.results, payload.audio_format);
           // AI Lyrics tab — populate read-only lyrics display with what AceStep generated

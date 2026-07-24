@@ -29,6 +29,7 @@ ACE-Step-Wrangler/
 ├── vendor/
 │   └── ACE-Step-1.5/      ← git submodule — upstream ACE-Step (do not modify)
 ├── loras/                  ← trained LoRA adapters (auto-scanned by UI)
+├── takes/                  ← auto-persisted results (audio + take JSON, alignment cache)
 ├── docs/
 │   ├── USER_GUIDE.md       ← current user-facing documentation
 │   ├── LYRICS_GUIDE.md     ← tips for writing effective lyrics
@@ -77,6 +78,7 @@ These friendly UI controls map to AceStep parameters:
 | Creativity | `shift` | Inverse mapping: 0% → shift 5.0 (restrained), 100% → shift 1.0 (wild). Lower shift = model deviates more from conditioning. |
 | Polished / Raw | `num_inference_steps` | |
 | Seed | `seed` | Advanced panel only |
+| Amount of change | `repaint_strength` (Fix & Blend) / `audio_cover_strength` (Reimagine) | Presets in main UI; raw sliders secondary. repaint_mode pinned to "balanced". |
 
 ### Model Selection (Advanced Panel)
 

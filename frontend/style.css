@@ -1982,6 +1982,23 @@ details[open] > .advanced-toggle {
   padding: 6px 2px 0;
 }
 
+.ab-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  margin: 6px 2px 0;
+}
+.ab-toggle, .ab-actions { display: flex; gap: 6px; }
+.ab-toggle .ghost-btn.active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
 .wf-label {
   font-size: 11px;
   font-weight: 600;

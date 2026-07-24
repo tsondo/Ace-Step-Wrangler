@@ -124,21 +124,21 @@ Once loaded, the filename, duration, and an audio player appear. The output pane
 
 ### Approach
 
-**Reimagine** — generates a new creative take on the **entire song**. Region selection is disabled in this mode — dragging the waveform and clicking section labels have no effect. Use the **Reimagine strength** slider to control how closely the result resembles the original.
+**Reimagine** — generates a new creative take on the **entire song**. Region selection is disabled in this mode — dragging the waveform and clicking section labels have no effect. Use the **Amount of change** presets (Minimal / Light / Moderate / Rewrite) to control how closely the result resembles the original, or fine-tune with the **Reimagine strength** slider underneath.
 
-| Reimagine strength | Effect |
+| Amount of change | Effect |
 |---|---|
-| Low (Subtle) | Stays close to the original structure and feel |
-| High (Dramatic) | More departure from the source |
+| Minimal | Stays close to the original structure and feel |
+| Rewrite | More departure from the source |
 
-**Fix & Blend** — regenerates **only the selected region** while keeping everything else intact. This is the approach to use when you want to change a specific section. Best used on targeted sections rather than large portions of the song.
+**Fix & Blend** — regenerates **only the selected region** while keeping everything else intact. This is the approach to use when you want to change a specific line or section without touching the rest of the song. Best used on targeted sections rather than large portions of the song.
 
-Set the region:
-- Click and drag on the **waveform** to select a range (highlighted in amber)
-- Drag the left/right handles to adjust an existing selection
-- Click a **section label** (if lyrics were provided) to snap to that section; Shift-click to extend the selection
-- Start/end timecodes are displayed right on the waveform at the selection edges
-- Or type start/end times directly in the region inputs in the Rework panel
+Pick what to fix:
+- If the loaded audio is a generated take, its lyrics appear as a clickable line list — **click a line** to select it, **Shift-click** to extend the selection to a range. Lines the alignment engine is unsure about are highlighted (low confidence) — double-check those against what you actually hear before fixing them.
+- Selecting lines sets the region automatically, padded outward by the **Pad (s)** amount so the fix doesn't cut a word off mid-syllable — no need to type timestamps.
+- If there's no lyric alignment (e.g. externally loaded audio with no matching take), use the **Start (s)** / **End (s)** fields directly, or drag a selection on the waveform / click a section label.
+- **Amount of change** presets apply here too, mapped to the raw repaint strength slider — Minimal re-sings the line with the least deviation from the original performance; Rewrite lets the model take more liberty with that section.
+- **Region seed** shows the seed the source take was generated with, so a repaint of an unrelated section reproduces the rest of the song exactly. Click the re-roll button (🎲) if you want a different variation of the fixed region.
 
 ### Style Direction
 
@@ -150,11 +150,16 @@ If you have lyrics in the Lyrics panel, they are sent to the model as guidance.
 
 ### After Generation
 
-The bottom bar stays on the waveform view with the reworked audio loaded. You can:
+**Reimagine** replaces the working audio immediately — the bottom bar stays on the waveform view with the new take loaded. You can play it, select a new region, rework again, or download it with **Download audio** / **Download JSON**.
 
-- Play the result using the audio player in the upload area or the waveform transport bar (both control the same audio)
-- Select a new region and rework again immediately
-- Download the result with **Download audio** / **Download JSON**
+**Fix & Blend** never replaces the audio automatically. Instead, an **Original / Reworked** toggle appears, looping just the fixed region (with a couple of seconds of context on either side) so you can compare the two directly:
+
+- **Original** / **Reworked** — switch playback between the two without losing your place in the loop
+- **Keep** — adopts the reworked audio as the new working audio, and it becomes the base for further Rework passes
+- **Discard** — throws away the reworked result and keeps the original as the working audio
+- **Try again** — discards the result, re-rolls the region seed, and resubmits the same fix for a different take
+
+Every generated result — kept or not — is auto-saved to the `takes/` folder (audio plus a JSON file recording the parameters, seed, and, for Fix & Blend results, which take it was repainted from) until you clean it up.
 
 ---
 
