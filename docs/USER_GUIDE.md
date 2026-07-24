@@ -159,7 +159,7 @@ If you have lyrics in the Lyrics panel, they are sent to the model as guidance.
 - **Discard** — throws away the reworked result and keeps the original as the working audio
 - **Try again** — discards the result, re-rolls the region seed, and resubmits the same fix for a different take
 
-Every generated result — kept or not — is auto-saved to the `takes/` folder (audio plus a JSON file recording the parameters, seed, and, for Fix & Blend results, which take it was repainted from) until you clean it up.
+Every generated result — kept or not — is auto-saved to the `takes/` folder (audio plus a JSON file recording the parameters, seed, and, for Fix & Blend results, which take it was repainted from) until you clean it up. `takes/` is the single durable copy: once a result is saved there, its temporary original in AceStep's cache is removed automatically, and leftover cache files (e.g. Analyze outputs) are swept after 7 days (`TMP_AUDIO_TTL_DAYS`, 0 to disable). Nothing ever deletes from `takes/` except you — delete a take's folder to reclaim space.
 
 ---
 

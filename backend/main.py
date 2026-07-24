@@ -103,6 +103,7 @@ MAX_JOBS_PER_USER = int(os.environ.get("MAX_JOBS_PER_USER", "2"))
 SESSION_TIMEOUT_MIN = int(os.environ.get("SESSION_TIMEOUT_MINUTES", "60"))
 JOB_TTL_MIN = int(os.environ.get("JOB_TTL_MINUTES", "120"))
 UPLOAD_TTL_MIN = int(os.environ.get("UPLOAD_TTL_MINUTES", "120"))
+TMP_AUDIO_TTL_DAYS = float(os.environ.get("TMP_AUDIO_TTL_DAYS", "7"))  # 0 = disabled
 
 # ---------------------------------------------------------------------------
 # User middleware — inject request.state.user from reverse proxy header
@@ -757,9 +758,17 @@ def _persist_results(task_id: str, results: list, pending: dict) -> None:
             logger.warning("take persist failed job=%s idx=%d: %s", task_id, i, exc)
             continue
         if take:
+            src = takes._url_to_fs_path(result.get("audio_url", ""))
             result["audio_url"] = str(takes.TAKES_DIR / task_id / take["audio_file"])
             result["take"] = {"job_id": task_id, "index": i}
             _enqueue_alignment(task_id, i)
+            # The takes/ copy is now the durable one — drop the tmp original.
+            # Guarded to AceStep's tmp cache so no other source is ever touched.
+            if src and "/.cache/acestep/tmp/" in str(src):
+                try:
+                    src.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
 
 def _finalize_job(task_id: str, data: dict) -> None:
@@ -1640,6 +1649,40 @@ async def api_session(request: Request):
 # TTL cleanup background task
 # ---------------------------------------------------------------------------
 
+_TMP_AUDIO_DIR = (Path(__file__).parent.parent / "vendor" / "ACE-Step-1.5"
+                  / ".cache" / "acestep" / "tmp" / "api_audio")
+
+
+def _sweep_tmp_audio(directory: Path, ttl_seconds: float) -> int:
+    """Delete files in AceStep's tmp audio cache older than ttl_seconds.
+
+    Persisted results already have their tmp originals removed at persist
+    time; this catches everything else (analyze outputs, failed/abandoned
+    jobs, and the pre-existing backlog). takes/ is never touched."""
+    if not directory.is_dir():
+        return 0
+    cutoff = time.time() - ttl_seconds
+    deleted = 0
+    for f in directory.iterdir():
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink()
+                deleted += 1
+        except OSError:
+            continue
+    return deleted
+
+
+async def _tmp_audio_sweeper():
+    while True:
+        if TMP_AUDIO_TTL_DAYS > 0:
+            n = _sweep_tmp_audio(_TMP_AUDIO_DIR, TMP_AUDIO_TTL_DAYS * 86400)
+            if n:
+                logger.info("tmp-audio sweep: deleted %d file(s) older than %g days",
+                            n, TMP_AUDIO_TTL_DAYS)
+        await asyncio.sleep(3600)
+
+
 async def _cleanup_loop():
     """Periodically expire stale jobs, uploads, sessions, and locks."""
     while True:
@@ -1696,6 +1739,7 @@ async def start_cleanup():
     asyncio.create_task(_cleanup_loop())
     asyncio.create_task(_alignment_worker())
     asyncio.create_task(_pending_job_watcher())
+    asyncio.create_task(_tmp_audio_sweeper())
 
 
 # ---------------------------------------------------------------------------
