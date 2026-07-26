@@ -1,0 +1,7 @@
+version: 2
+updates:
+  # PRs the vendor/ACE-Step-1.5 submodule pointer forward when upstream moves.
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "weekly"
