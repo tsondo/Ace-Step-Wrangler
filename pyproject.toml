@@ -21,6 +21,7 @@ dependencies = [
     # nano-vllm pins cp311-only flash-attn wheels; same build exists for cp312.
     # Keeps flash attention (instead of the SDPA fallback) on Python 3.12.
     "flash-attn @ https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.7.12/flash_attn-2.8.3+cu128torch2.10-cp312-cp312-linux_x86_64.whl ; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version == '3.12'",
+    "python-multipart>=0.0.31",
 ]
 
 [project.scripts]
@@ -53,6 +54,10 @@ required-environments = [
     "sys_platform == 'linux' and platform_machine == 'aarch64'",
     "sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
+# ACE-Step pins gradio==6.2.0, but its Gradio UI is never used here (Wrangler
+# replaces it) and the fork's api_server imports cleanly without gradio.
+# Excluding it drops gradio's vulnerable dep tree and frees starlette >=1.x.
+override-dependencies = ["gradio; sys_platform == 'never'"]
 
 [tool.uv.sources]
 ace-step = { path = "vendor/ACE-Step-1.5", editable = true }
