@@ -160,11 +160,13 @@ ACE-Step-Wrangler/
 ## Compatibility
 
 - **Python:** 3.11–3.12
-- **CUDA:** 12.8 (x86_64 / Windows), 13.0 (aarch64 Linux)
-- **PyTorch:** 2.10 (Linux / macOS), 2.7 (Windows)
-- **Platforms:** Linux x86_64, Linux aarch64, macOS Apple Silicon, Windows
+- **CUDA:** 12.8 (x86_64), 13.0 (aarch64 Linux)
+- **PyTorch:** 2.10 (Linux / macOS)
+- **Platforms:** Linux x86_64, Linux aarch64, macOS Apple Silicon
 
 Wrangler itself has no GPU dependencies — GPU/platform support comes entirely from ACE-Step.
+
+**Windows:** native Windows is not supported (the launcher uses Unix-only file locking). Run Wrangler under [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) instead — CUDA GPU passthrough works out of the box with a current NVIDIA driver, and this is a tested configuration.
 
 ## Status
 
