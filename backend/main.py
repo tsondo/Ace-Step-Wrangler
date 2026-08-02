@@ -351,6 +351,13 @@ def _build_payload(req: GenerateRequest) -> dict:
     lm_path = _LM_MODEL.get(req.lm_model)
     if lm_path:
         payload["lm_model_path"] = lm_path
+        # Honor the Planning intelligence selection: an LM chosen in the UI
+        # enables LM planning (audio-code generation), which the REST API
+        # defaults off. setdefault preserves the explicit False set when
+        # user-provided audio codes bypass LM code generation above.
+        payload.setdefault("thinking", True)
+    else:
+        payload["thinking"] = False
 
     # Rework / Analyze params
     if req.task_type in ("cover", "repaint", "extract", "lego", "complete"):
