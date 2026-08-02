@@ -2096,5 +2096,53 @@ details[open] > .advanced-toggle {
   color: var(--text-muted);
   font-size: 12px;
 }
+.lyric-check-sens { width: auto; }
+.lyric-check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lyric-check-line:last-child { border-bottom: none; }
+.lyric-check-line:hover { background: var(--surface-raised); }
+.lyric-check-line.selected {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.lyric-check-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lyric-check-conf {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.lyric-check-play {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  font-size: 11px;
+}
+.lyric-check-empty { padding: 8px 10px; }
+.lyric-align-section {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  background: var(--surface-raised);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lyric-align-section:hover { color: var(--text-primary); }
 
 

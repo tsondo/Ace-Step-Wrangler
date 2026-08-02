@@ -186,6 +186,24 @@
           <p class="field-hint">Click a line; shift-click to extend the selection.</p>
         </div>
 
+        <!-- Lyric Check — flags lines whose sung audio least matches the lyrics -->
+        <div class="control-group hidden" id="lyric-check-group">
+          <div class="control-label-row">
+            <label class="field-label" for="lyric-check-sensitivity">Lyric check</label>
+            <select id="lyric-check-sensitivity" class="select-input lyric-check-sens">
+              <option value="fewer">Fewer flags</option>
+              <option value="normal" selected>Normal</option>
+              <option value="more">More flags</option>
+            </select>
+          </div>
+          <div id="lyric-check-list" class="lyric-align-list"></div>
+          <p class="field-hint hidden" id="lyric-check-cluster-hint"></p>
+          <p class="field-hint hidden" id="lyric-check-scope-hint"></p>
+          <p class="field-hint">Flagged lines sing least like their lyrics — play each to judge.
+            Click a line to target just it, or a section heading to target the
+            whole section, then Fix &amp; Blend. Keep or Discard each result.</p>
+        </div>
+
         <!-- Amount of change (shared preset row for both sub-modes) -->
         <div class="control-group" id="change-amount-group">
           <div class="control-label-row">

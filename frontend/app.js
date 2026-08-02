@@ -1214,6 +1214,7 @@ const _alignGroup = document.getElementById('lyric-align-group');
 const _alignList  = document.getElementById('lyric-align-list');
 const _alignState = document.getElementById('align-state');
 let _alignLines = null;      // alignment lines for the loaded take
+let _alignSections = null;   // [{label, occ, first, last}] from lyric [Tags]
 let _alignSel = null;        // {first, last} indices into _alignLines
 let _alignPollTimer = null;
 let _alignToken = 0;
@@ -1231,10 +1232,19 @@ function computeRepaintRange(lines, first, last, padS, duration) {
 }
 
 function _applyAlignSelection() {
-  [..._alignList.children].forEach((el, i) => {
+  // Query line rows only — section headers sit between them in the DOM,
+  // so children indices no longer map 1:1 onto _alignLines.
+  [..._alignList.querySelectorAll('.lyric-align-line')].forEach((el, i) => {
     el.classList.toggle('selected',
       _alignSel && i >= _alignSel.first && i <= _alignSel.last);
   });
+  // Mirror the selection onto the Lyric Check rows (they carry line indices)
+  [..._checkList.querySelectorAll('.lyric-check-line')].forEach((el) => {
+    const i = Number(el.dataset.lineIndex);
+    el.classList.toggle('selected',
+      _alignSel && i >= _alignSel.first && i <= _alignSel.last);
+  });
+  _updateScopeHint();
   if (!_alignSel) return;
   const pad = Number(document.getElementById('align-pad').value) || 0;
   const r = computeRepaintRange(_alignLines, _alignSel.first, _alignSel.last,
@@ -1250,11 +1260,47 @@ function _applyAlignSelection() {
   if (wfe) { wfe.value = r.end;  wfe.dispatchEvent(new Event('input')); }
 }
 
+// Group aligned lines into sections using the [Tag] lines of the take's
+// lyrics. Each aligned line's line_idx maps back to its original lyric line,
+// so grouping needs no backend support. Repeated tags (two [Chorus] blocks)
+// stay separate sections — grouping is by tag occurrence, not label.
+function computeAlignSections(lyricsRaw, lines) {
+  const TAG = /^\s*\[[^\]]*\]\s*$/;
+  const rawLines = (lyricsRaw || '').split('\n');
+  const tagAt = [];   // per raw lyric line: most recent {label, occ} tag
+  let cur = null;
+  let occ = 0;
+  rawLines.forEach((raw, i) => {
+    if (TAG.test(raw)) { occ++; cur = { label: raw.trim().slice(1, -1), occ }; }
+    tagAt[i] = cur;
+  });
+  const sections = [];
+  lines.forEach((line, i) => {
+    const tag = tagAt[line.line_idx] || { label: 'Start', occ: 0 };
+    const prev = sections[sections.length - 1];
+    if (prev && prev.occ === tag.occ) prev.last = i;
+    else sections.push({ label: tag.label, occ: tag.occ, first: i, last: i });
+  });
+  return sections;
+}
+
 function renderAlignList(lines) {
   _alignLines = lines;
   _alignSel = null;
   _alignList.innerHTML = '';
   lines.forEach((line, i) => {
+    const sec = _alignSections && _alignSections.find(s => s.first === i);
+    if (sec) {
+      const head = document.createElement('div');
+      head.className = 'lyric-align-section';
+      head.textContent = sec.label;
+      head.title = 'Select the whole section';
+      head.addEventListener('click', () => {
+        _alignSel = { first: sec.first, last: sec.last };
+        _applyAlignSelection();
+      });
+      _alignList.appendChild(head);
+    }
     const row = document.createElement('div');
     row.className = 'lyric-align-line';
     if (line.confidence < LOW_CONFIDENCE) {
@@ -1285,7 +1331,10 @@ async function refreshAlignmentUI() {
   if (_alignPollTimer) { clearTimeout(_alignPollTimer); _alignPollTimer = null; }
   const isRepaint = _reworkApproach === 'repaint';
   _alignGroup.classList.toggle('hidden', !isRepaint || !_reworkTakeRef);
-  if (!isRepaint || !_reworkTakeRef) return;
+  if (!isRepaint || !_reworkTakeRef) {
+    _checkGroup.classList.add('hidden');
+    return;
+  }
   try {
     const res = await fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}`);
     if (!res.ok) throw new Error(res.statusText);
@@ -1293,13 +1342,17 @@ async function refreshAlignmentUI() {
     if (token !== _alignToken) return; // superseded by a newer call
     if (take.alignment && take.alignment.lines.length) {
       _alignState.textContent = '';
+      _alignSections = computeAlignSections(take.lyrics, take.alignment.lines);
       renderAlignList(take.alignment.lines);
+      updateLyricCheck();
     } else if (take.alignment_status === 'failed') {
       _alignState.textContent = 'Alignment failed — use the seconds fields below';
       _alignList.innerHTML = '';
+      _checkGroup.classList.add('hidden');
     } else {
       _alignState.textContent = 'Aligning…';
       _alignList.innerHTML = '';
+      _checkGroup.classList.add('hidden');
       if (take.alignment_status === 'none') {
         fetch(`/takes/${_reworkTakeRef.jobId}/${_reworkTakeRef.index}/align`,
               { method: 'POST' });
@@ -1309,10 +1362,173 @@ async function refreshAlignmentUI() {
   } catch (_) {
     if (token !== _alignToken) return; // superseded by a newer call
     _alignGroup.classList.add('hidden');
+    _checkGroup.classList.add('hidden');
   }
 }
 
 document.getElementById('align-pad').addEventListener('input', _applyAlignSelection);
+
+// ===== Lyric Check — flag lines whose sung audio least matches the lyrics =====
+//
+// Uses the forced-alignment confidences already fetched for the line list.
+// Flagging is relative to the take's own median line confidence, because
+// absolute confidence shifts with mix density: a dense full-band section
+// scores lower everywhere than a sparse acoustic one. Fixing goes one line
+// at a time through the existing repaint + A/B Keep/Discard flow, so every
+// fix is auditioned before the next segment is touched.
+
+const _checkGroup  = document.getElementById('lyric-check-group');
+const _checkList   = document.getElementById('lyric-check-list');
+// MMS_FA confidences are heavily skewed and span orders of magnitude between
+// takes, so the threshold is a *divisor* of the take's own median: a flagged
+// line scores several times below the song's typical line, not merely below
+// average. Verified against real takes: ~8-12 focused flags on normal songs,
+// near zero when the whole take is uniformly low (nothing stands out).
+const _CHECK_DIVISORS = { fewer: 8, normal: 4, more: 2 };
+let _checkFlags = [];      // indices into _alignLines, in time order
+let _sliceStopAt = null;   // scoped-playback end time, or null
+let _sliceOwnSeek = false; // distinguishes playSlice's seek from the user's
+
+function computeLyricFlags(lines, sensitivity) {
+  const confs = lines.map(l => l.confidence).sort((a, b) => a - b);
+  if (!confs.length) return [];
+  const median = confs[Math.floor(confs.length / 2)];
+  const thr = median / (_CHECK_DIVISORS[sensitivity] || _CHECK_DIVISORS.normal);
+  return lines.map((l, i) => (l.confidence < thr ? i : -1)).filter(i => i >= 0);
+}
+
+function playSlice(startS, endS) {
+  _sliceOwnSeek = true;
+  _sliceStopAt = endS + 0.5;
+  audioPreview.currentTime = Math.max(0, startS - 0.5);
+  audioPreview.play();
+}
+
+audioPreview.addEventListener('timeupdate', () => {
+  if (_sliceStopAt != null && audioPreview.currentTime >= _sliceStopAt) {
+    audioPreview.pause();
+    _sliceStopAt = null;
+  }
+});
+audioPreview.addEventListener('seeking', () => {
+  if (_sliceOwnSeek) { _sliceOwnSeek = false; return; }
+  _sliceStopAt = null;   // a manual seek cancels the pending slice stop
+});
+
+function renderLyricCheck() {
+  _checkList.innerHTML = '';
+  if (!_checkFlags.length) {
+    const empty = document.createElement('div');
+    empty.className = 'field-hint lyric-check-empty';
+    empty.textContent = 'No suspect lines — alignment confidence looks consistent.';
+    _checkList.appendChild(empty);
+    return;
+  }
+  let lastSec = null;
+  _checkFlags.forEach((li) => {
+    const sec = _sectionOf(li);
+    if (sec && sec !== lastSec) {
+      lastSec = sec;
+      const head = document.createElement('div');
+      head.className = 'lyric-align-section';
+      head.textContent = sec.label;
+      head.title = 'Select the whole section for repaint';
+      head.addEventListener('click', () => {
+        _alignSel = { first: sec.first, last: sec.last };
+        _applyAlignSelection();
+      });
+      _checkList.appendChild(head);
+    }
+    const line = _alignLines[li];
+    const row = document.createElement('div');
+    row.className = 'lyric-check-line';
+    row.dataset.lineIndex = li;
+    row.title = 'Select this line for repaint';
+    row.addEventListener('click', () => {
+      _alignSel = { first: li, last: li };
+      _applyAlignSelection();
+    });
+
+    const text = document.createElement('span');
+    text.className = 'lyric-check-text';
+    text.textContent = line.text;
+    text.title = line.text;
+
+    const conf = document.createElement('span');
+    conf.className = 'lyric-check-conf';
+    const pct = line.confidence < 0.1
+      ? (line.confidence * 100).toFixed(1) : Math.round(line.confidence * 100);
+    conf.textContent =
+      `${formatDuration(line.start_s)}–${formatDuration(line.end_s)} · ${pct}%`;
+
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'ghost-btn lyric-check-play';
+    play.textContent = '▶';
+    play.title = 'Play this line';
+    play.addEventListener('click', (e) => {
+      e.stopPropagation();   // audition without changing the selection
+      playSlice(line.start_s, line.end_s);
+    });
+
+    row.append(text, conf, play);
+    _checkList.appendChild(row);
+  });
+}
+
+function _sectionOf(lineIndex) {
+  return _alignSections &&
+    _alignSections.find(s => lineIndex >= s.first && lineIndex <= s.last);
+}
+
+const _clusterHintEl = document.getElementById('lyric-check-cluster-hint');
+const _scopeHintEl   = document.getElementById('lyric-check-scope-hint');
+
+// Flags clustering in one section usually mean structural failure (a skipped
+// or repeated line) — line-sized repaints can't fix those, section scope can.
+function _updateClusterHint() {
+  const clustered = _checkFlags.some(a => _checkFlags.some(b => {
+    if (a === b) return false;
+    if (Math.abs(a - b) === 1) return true;
+    const sec = _sectionOf(a);
+    return sec && b >= sec.first && b <= sec.last;
+  }));
+  _clusterHintEl.textContent = clustered
+    ? 'Several flags cluster in one section — often a skipped or repeated '
+      + 'line. Click the section heading to repaint the whole section.'
+    : '';
+  _clusterHintEl.classList.toggle('hidden', !clustered);
+}
+
+function _updateScopeHint() {
+  const active = document.querySelector('.change-preset-btn.active');
+  const low = active &&
+    (active.dataset.change === 'minimal' || active.dataset.change === 'light');
+  const multiLine = _alignSel && _alignSel.last > _alignSel.first;
+  const show = !!(low && multiLine);
+  _scopeHintEl.textContent = show
+    ? 'Section-sized fixes need room to re-time lines — consider Moderate change or higher.'
+    : '';
+  _scopeHintEl.classList.toggle('hidden', !show);
+}
+
+function updateLyricCheck() {
+  if (!_alignLines || !_alignLines.length) {
+    _checkGroup.classList.add('hidden');
+    return;
+  }
+  _checkGroup.classList.remove('hidden');
+  const sensitivity = document.getElementById('lyric-check-sensitivity').value;
+  _checkFlags = computeLyricFlags(_alignLines, sensitivity);
+  renderLyricCheck();
+  _updateClusterHint();
+  _updateScopeHint();
+}
+
+document.getElementById('lyric-check-sensitivity')
+  .addEventListener('change', updateLyricCheck);
+document.querySelectorAll('.change-preset-btn').forEach(btn =>
+  btn.addEventListener('click', _updateScopeHint));
 
 // ===== Style panel — tags, count, song params, preview =====
 
