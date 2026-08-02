@@ -264,6 +264,12 @@ def main() -> None:
     # during which its API returns 500s and polls fail. Overridable via env.
     acestep_env.setdefault("ACESTEP_NO_INIT", "false")
 
+    # Selecting an unloaded generation model in the UI loads it at request
+    # time (downloading on first use) instead of silently falling back to
+    # the loaded one. Fork feature; safe with the default single queue
+    # worker. Overridable via env.
+    acestep_env.setdefault("ACESTEP_ON_DEMAND_MODEL_LOAD", "true")
+
     # --- Build environment for Wrangler (no GPU needed) ---------------------
     wrangler_env = os.environ.copy()
     wrangler_env.pop("CUDA_VISIBLE_DEVICES", None)

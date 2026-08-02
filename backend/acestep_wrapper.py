@@ -29,6 +29,15 @@ async def health_check() -> dict:
         return r.json()
 
 
+async def list_models() -> list:
+    """Names of the DiT models currently loaded by the AceStep server."""
+    async with httpx.AsyncClient(timeout=_TIMEOUT_POLL) as client:
+        r = await client.get(f"{ACESTEP_BASE_URL}/v1/models")
+        r.raise_for_status()
+        data = r.json().get("data") or []
+        return [str(m.get("id", "")).split("/")[-1] for m in data]
+
+
 async def release_task(payload: dict) -> str:
     """Submit a generation task. Returns the task_id string."""
     async with httpx.AsyncClient(timeout=_TIMEOUT_SUBMIT) as client:

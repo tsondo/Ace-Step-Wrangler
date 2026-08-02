@@ -90,6 +90,8 @@ These friendly UI controls map to AceStep parameters:
 
 `Qwen3-Embedding-0.6B` is an internal text encoder — always required, never exposed in the UI.
 
+The AceStep server holds one DiT model at a time and (fork feature, `ACESTEP_ON_DEMAND_MODEL_LOAD=true`, set by `run.py`) loads a requested-but-unloaded model at generation time, downloading it on first use. `ACESTEP_CONFIG_PATH` picks the startup model; `_PATH2`/`_PATH3` can optionally preload extras for instant switching. Wrangler queries `/api/models` (relaying AceStep's `/v1/models`) to show an inline note when the next Generate will trigger a model load.
+
 ### Batch Size & VRAM Constraint
 
 `batch_size` is always visible in the advanced panel. Its maximum is determined by two factors: the model combination and the user-selected VRAM tier.

@@ -2309,7 +2309,43 @@ function _waitForAceStep() {
   _healthPollTimer = setInterval(_checkAceStepHealth, 3000);
 }
 
+// ===== Generation model availability =====
+//
+// The AceStep server holds one DiT model at a time and loads a different
+// one on demand when a generation requests it. Surface what that means for
+// the next Generate: a model switch adds load time (plus a one-time
+// download on first ever use).
+
+const _GEN_MODEL_NAMES = {
+  turbo: 'acestep-v15-turbo',
+  sft:   'acestep-v15-sft',
+  base:  'acestep-v15-base',
+};
+
+async function refreshModelAvailability() {
+  const sel = document.getElementById('gen-model');
+  const note = document.getElementById('gen-model-note');
+  let loaded;
+  try {
+    const res = await fetch('/api/models');
+    if (!res.ok) return;
+    loaded = await res.json();
+  } catch { return; /* AceStep not up yet — retried on ready */ }
+  if (!Array.isArray(loaded) || !loaded.length) return;
+
+  const switching = !loaded.includes(_GEN_MODEL_NAMES[sel.value]);
+  note.textContent = switching
+    ? `${_GEN_MODEL_NAMES[sel.value]} loads on your next Generate `
+      + '(first ever use also downloads it, ~5 GB) — expect an extra delay.'
+    : '';
+  note.classList.toggle('hidden', !switching);
+}
+
+document.getElementById('gen-model')
+  .addEventListener('change', refreshModelAvailability);
+
 function _onAceStepReady() {
+  refreshModelAvailability();
   if (_trainPipelineStatus.textContent === 'Waiting for AceStep to start...') {
     _setPipelineStatus('AceStep ready', 'ok');
   }
@@ -4571,7 +4607,10 @@ function _applyProject(proj) {
   });
 
   // Advanced — model selects
-  if (proj.genModel) document.getElementById('gen-model').value = proj.genModel;
+  if (proj.genModel) {
+    document.getElementById('gen-model').value = proj.genModel;
+    refreshModelAvailability();
+  }
   if (proj.lmModel) document.getElementById('lm-model').value = proj.lmModel;
   if (proj.batchSize) document.getElementById('batch-size').value = proj.batchSize;
   if (proj.vramTier) document.getElementById('vram-tier').value = proj.vramTier;

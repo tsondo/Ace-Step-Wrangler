@@ -64,6 +64,7 @@ import takes
 import alignment
 from acestep_wrapper import (
     health_check,
+    list_models,
     release_task,
     query_result,
     get_audio_bytes,
@@ -504,6 +505,14 @@ class EstimateDurationRequest(BaseModel):
 async def api_health():
     try:
         return await health_check()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@app.get("/api/models")
+async def api_models():
+    try:
+        return await list_models()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 

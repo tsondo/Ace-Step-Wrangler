@@ -275,7 +275,7 @@ Click **Advanced** in the Controls panel to expand.
 
 | Setting | Options | Notes |
 |---|---|---|
-| **Generation model** | Turbo (default), High Quality, Base | Turbo is fastest; High Quality produces the most refined output |
+| **Generation model** | Turbo (default), High Quality, Base | Turbo is fastest; High Quality produces the most refined output. Switching models loads the new one on your next Generate (first ever use also downloads it, ~5 GB) — expect an extra delay on that run |
 | **Planning intelligence** | None, Small, Medium (default), Large | The LM that plans lyrics structure and arrangement; larger = slower but often better |
 | **VRAM tier** | ≤16GB (default), 24GB, 32GB+ | Controls the maximum allowed batch size |
 | **Batch size** | 1–8 (tier-dependent) | How many results to generate in one run |
