@@ -4351,7 +4351,12 @@ function _applyProject(proj) {
   if (proj.lmModel) document.getElementById('lm-model').value = proj.lmModel;
   if (proj.batchSize) document.getElementById('batch-size').value = proj.batchSize;
   if (proj.vramTier) document.getElementById('vram-tier').value = proj.vramTier;
-  if (proj.scheduler) document.getElementById('scheduler').value = proj.scheduler;
+  if (proj.scheduler) {
+    const schedulerSel = document.getElementById('scheduler');
+    schedulerSel.value = proj.scheduler;
+    // Projects saved before DPM++/DDIM were removed fall back to Euler
+    if (schedulerSel.selectedIndex === -1) schedulerSel.value = 'euler';
+  }
   if (proj.audioFormat) document.getElementById('audio-format').value = proj.audioFormat;
   if (proj.guidanceMode) document.getElementById('guidance-mode').value = proj.guidanceMode;
   if (proj.cfgStart != null) document.getElementById('cfg-start').value = proj.cfgStart;

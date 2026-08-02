@@ -281,7 +281,7 @@ Click **Advanced** in the Controls panel to expand.
 | **Batch size** | 1–8 (tier-dependent) | How many results to generate in one run |
 | **Audio format** | MP3 (default), WAV, FLAC | Format for downloaded files |
 | **Seed** | Integer or blank | Leave blank for a random seed; set a value to reproduce a result |
-| **Scheduler** | Euler, DPM++, DDIM | Diffusion sampler; Euler is the default |
+| **Scheduler** | Euler, SDE (stochastic) | Diffusion sampler; Euler is the default. SDE re-injects noise each step for more varied results |
 | **Inference steps** | 10–150 | More steps = slower but more refined; overrides the Quality preset |
 | **Guidance scale (lyric)** | 1–15 | Raw control over lyric adherence; overrides the Strictly follow lyrics preset |
 | **Guidance scale (audio)** | 1–15 | Raw control over audio style adherence |
