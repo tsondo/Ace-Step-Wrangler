@@ -888,7 +888,7 @@ initAudioPlayer(audioPreview, document.getElementById('wf-transport'), 'Rework')
 // getting missed piecemeal — consolidate here instead of adding a new site.
 function _syncReworkDerivedState() {
   endAbPreview();
-  _initReworkSeed();
+  _initReworkFromTake();
   refreshAlignmentUI();
 }
 
@@ -1742,7 +1742,7 @@ function loadAudioIntoRework(audioPath, label, lyrics, knownDuration, takeRef) {
 let _reworkSeed = null;
 let _reworkSeedToken = 0;
 
-async function _initReworkSeed() {
+async function _initReworkFromTake() {
   const token = ++_reworkSeedToken;
   const hint = document.getElementById('rework-seed-hint');
   const input = document.getElementById('rework-seed');
@@ -1764,6 +1764,14 @@ async function _initReworkSeed() {
     } else {
       hint.textContent = 'Seed unknown for this take — enter one or repaint proceeds random.';
       hint.classList.remove('hidden');
+    }
+    // Prefill the style direction with the take's own prompt. Repaint
+    // conditions on this text as the music description, so "same style as
+    // the take" is the only safe default — instruction text typed here
+    // (e.g. "minimal change") describes no music and collapses the
+    // repainted window into noise.
+    if (take.prompt) {
+      document.getElementById('rework-direction').value = take.prompt;
     }
   } catch (_) { /* leave random */ }
 }
