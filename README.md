@@ -150,6 +150,8 @@ ACE-Step-Wrangler/
 ├── run.py                    # Unified launcher (both servers)
 ├── pyproject.toml            # Project dependencies (managed by uv)
 ├── pyproject.toml.ROCM       # AMD GPU dependency variant (untested)
+├── scripts/
+│   └── check_rocm_sync.py    # Guards the two pyprojects against drift
 ├── vendor/
 │   └── ACE-Step-1.5/        # Git submodule — upstream ACE-Step
 ├── backend/

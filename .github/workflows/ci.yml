@@ -16,10 +16,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.0
       - run: uv lock --check
 
-  # Resolve-only check of the ROCm variant — keeps pyproject.toml.ROCM from
-  # silently desynchronizing when the main pyproject or the vendored ACE-Step
-  # submodule changes.  No install; just proves the dependency graph still
-  # resolves against the rocm index.
+  # Keeps pyproject.toml.ROCM from silently desynchronizing when the main
+  # pyproject or the vendored ACE-Step submodule changes.  Two checks: the
+  # dependency lists still agree (structural diff), and the ROCm graph still
+  # resolves against the rocm index.  No install in either case.
   rocm-resolve:
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +27,9 @@ jobs:
         with:
           submodules: recursive
       - uses: astral-sh/setup-uv@v10.0.0
+      # Must run before the cp below, which overwrites pyproject.toml.
+      - name: Check ROCm variant is in sync
+        run: uv run --no-project scripts/check_rocm_sync.py
       - name: Resolve ROCm variant
         run: |
           cp pyproject.toml.ROCM pyproject.toml
