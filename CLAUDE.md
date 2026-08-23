@@ -25,6 +25,7 @@ ACE-Step-Wrangler/
 ├── README.md
 ├── run.py                  ← unified launcher (both servers)
 ├── pyproject.toml          ← managed by uv, do not hand-edit
+├── pyproject.toml.ROCM     ← AMD GPU variant, keep in sync with pyproject.toml
 ├── uv.lock                 ← auto-generated, commit this
 ├── vendor/
 │   └── ACE-Step-1.5/      ← git submodule — upstream ACE-Step (do not modify)
@@ -61,6 +62,7 @@ ACE-Step-Wrangler/
 - **No build toolchain.** No webpack, vite, npm, etc. All JS is written to run directly in the browser.
 - **One file per concern.** Keep HTML, CSS, and JS in separate files unless there's a compelling reason.
 - **Use uv for all dependency management.** Do not create or edit `requirements.txt`. Add dependencies via `uv add <package>` which updates `pyproject.toml` and `uv.lock` automatically.
+- **Keep `pyproject.toml.ROCM` in sync.** It is the AMD/ROCm dependency variant (untested on real hardware): ROCm 7.1 wheel index instead of CUDA, no flash-attn, no `nvidia-*` runtime, resolution pinned to Linux x86_64 / Python 3.12. When you change dependencies in `pyproject.toml`, mirror the change there by hand — CI's `rocm-resolve` job only proves the ROCm graph still resolves, not that the two files agree.
 - **Backend is thin.** The FastAPI backend should do minimal logic — its job is to relay requests to AceStep's REST API cleanly, not to reimplement AceStep features.
 - **AceStep is a separate process.** Never import AceStep directly. All communication goes through its local REST API (default: `http://localhost:8001`).
 - **ACE-Step is vendored as a git submodule** in `vendor/ACE-Step-1.5/`. Do not modify files inside `vendor/` — pull upstream changes with `git submodule update --remote`. All communication with AceStep is still via its REST API.

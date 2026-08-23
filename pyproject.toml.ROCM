@@ -1,0 +1,87 @@
+# =============================================================================
+# pyproject.toml.ROCM — AMD GPU (ROCm) variant.  UNTESTED on real hardware.
+#
+# Usage: cp pyproject.toml.ROCM pyproject.toml && uv sync
+# Requires a working ROCm 7.1 runtime (https://rocm.docs.amd.com).
+#
+# Differences from the CUDA pyproject:
+#   - torch/torchvision/torchaudio come from the rocm7.1 wheel index
+#   - ACE-Step's +cu128 / +cu130 torch pins are overridden to plain versions
+#     so the rocm index pin applies
+#   - the cp312 flash-attn wheel is dropped (CUDA-only); nano-vllm's own
+#     flash-attn/triton pins are cp311-gated and drop out on Python 3.12,
+#     so the AceStep LM backend falls back to SDPA attention
+#   - no nvidia-* CUDA runtime wheels are pulled in — resolution is pinned to
+#     a single Linux x86_64 / Python 3.12 environment on the rocm index
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["run"]
+
+[project]
+name = "ace-step-wrangler"
+version = "0.1.0"
+description = "Creative-friendly web UI for AceStep 1.5"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.133.1",
+    "httpx>=0.28.1",
+    "python-dotenv>=1.0",
+    "uvicorn>=0.41.0",
+    # ACE-Step and all its GPU/ML dependencies — resolved via [tool.uv.sources]
+    "ace-step",
+    "uroman>=1.3.1.1",
+    # torch+rocm requires triton-rocm, which exists only on the rocm index;
+    # declared directly so the tool.uv.sources index pin applies to it.
+    "triton-rocm",
+    "python-multipart>=0.0.31",
+]
+
+[project.scripts]
+wrangler = "run:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+# ---------------------------------------------------------------------------
+# uv configuration — must mirror ACE-Step's [tool.uv] because uv only reads
+# tool config from the root project, not from path dependencies.
+# ---------------------------------------------------------------------------
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.1"
+explicit = true
+
+[tool.uv]
+# ROCm wheels are Linux x86_64 only.  Pinning Python to 3.12 also drops
+# nano-vllm's cp311-gated flash-attn / triton (CUDA-only) pins.
+environments = [
+    "python_version == '3.12' and sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+# Override ACE-Step's cu128/cu130-pinned torch packages so the rocm index applies.
+override-dependencies = [
+    "torch==2.10.0",
+    "torchvision==0.25.0",
+    "torchaudio==2.10.0",
+    # ACE-Step pins gradio==6.2.0, but its Gradio UI is never used here (Wrangler
+    # replaces it) and the fork's api_server imports cleanly without gradio.
+    # Excluding it drops gradio's vulnerable dep tree and frees starlette >=1.x.
+    "gradio; sys_platform == 'never'",
+]
+
+[tool.uv.sources]
+ace-step = { path = "vendor/ACE-Step-1.5", editable = true }
+# ACE-Step's local dependency — path adjusted relative to this project root
+nano-vllm = { path = "vendor/ACE-Step-1.5/acestep/third_parts/nano-vllm" }
+# PyTorch custom index — AMD ROCm 7.1 wheels
+torch = { index = "pytorch-rocm" }
+torchvision = { index = "pytorch-rocm" }
+torchaudio = { index = "pytorch-rocm" }
+triton-rocm = { index = "pytorch-rocm" }

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Guard against pyproject.toml / uv.lock drift.
+  lock-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: astral-sh/setup-uv@v10.0.0
+      - run: uv lock --check
+
+  # Resolve-only check of the ROCm variant — keeps pyproject.toml.ROCM from
+  # silently desynchronizing when the main pyproject or the vendored ACE-Step
+  # submodule changes.  No install; just proves the dependency graph still
+  # resolves against the rocm index.
+  rocm-resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: astral-sh/setup-uv@v10.0.0
+      - name: Resolve ROCm variant
+        run: |
+          cp pyproject.toml.ROCM pyproject.toml
+          uv lock
+
+  # Full install + the backend test suite.  Runners are CPU-only, so CUDA is
+  # hidden explicitly; the CUDA wheels install fine without a GPU.  The full
+  # sync is needed because backend/alignment.py imports torch at module level.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: astral-sh/setup-uv@v10.0.0
+      - name: Sync environment
+        run: uv sync
+        env:
+          UV_NO_CACHE: "1"  # CUDA wheels are large; don't keep a second copy on disk
+      - name: Run tests
+        run: uv run pytest -q tests/
+        env:
+          CUDA_VISIBLE_DEVICES: ""

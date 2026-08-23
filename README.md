@@ -30,7 +30,7 @@ See the [User Guide](docs/USER_GUIDE.md) for full documentation, or the [Lyrics 
 ## Requirements
 
 - Python 3.11 or 3.12
-- A CUDA-capable GPU (for AceStep — Wrangler itself has no GPU requirements)
+- A CUDA-capable GPU (for AceStep — Wrangler itself has no GPU requirements), or an AMD GPU via the [ROCm variant](#amd-gpu-rocm)
 - A modern browser
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
@@ -52,6 +52,17 @@ uv sync
 ```
 
 `uv sync` creates a virtual environment and installs everything — Wrangler's lightweight dependencies and ACE-Step's full ML stack (PyTorch, transformers, etc.).
+
+### AMD GPU (ROCm)
+
+`pyproject.toml.ROCM` is an alternative dependency set that pulls PyTorch from AMD's ROCm 7.1 wheel index instead of the CUDA one. **It is untested on real hardware** — CI proves it still resolves, but no generation has been run on an AMD GPU.
+
+```bash
+cp pyproject.toml.ROCM pyproject.toml
+uv sync
+```
+
+Requires a working [ROCm 7.1 runtime](https://rocm.docs.amd.com). Differences from the CUDA build: Linux x86_64 and Python 3.12 only, no `nvidia-*` runtime wheels, and no flash-attn — AceStep's LM backend falls back to SDPA attention.
 
 ## Usage
 
@@ -138,6 +149,7 @@ This connects to AceStep's API at `http://localhost:8001` by default. Open `http
 ACE-Step-Wrangler/
 ├── run.py                    # Unified launcher (both servers)
 ├── pyproject.toml            # Project dependencies (managed by uv)
+├── pyproject.toml.ROCM       # AMD GPU dependency variant (untested)
 ├── vendor/
 │   └── ACE-Step-1.5/        # Git submodule — upstream ACE-Step
 ├── backend/
@@ -161,6 +173,7 @@ ACE-Step-Wrangler/
 
 - **Python:** 3.11–3.12
 - **CUDA:** 12.8 (x86_64), 13.0 (aarch64 Linux)
+- **ROCm:** 7.1 (Linux x86_64, Python 3.12 only) — via `pyproject.toml.ROCM`, untested
 - **PyTorch:** 2.10 (Linux / macOS)
 - **Platforms:** Linux x86_64, Linux aarch64, macOS Apple Silicon
 
